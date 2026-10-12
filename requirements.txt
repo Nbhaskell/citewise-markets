@@ -2,4 +2,5 @@ psycopg[binary]>=3.2
 yfinance>=1.7
 requests>=2.32
 beautifulsoup4>=4.12
+fastembed>=0.9
 pytest>=8

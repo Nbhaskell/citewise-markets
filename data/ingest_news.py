@@ -33,6 +33,7 @@ def ingest_news(conn: psycopg.Connection, source: NewsSource, symbol: str, days:
                 "ON CONFLICT DO NOTHING",
                 (item.id, symbol),
             )
+    conn.commit()
     return new
 
 
