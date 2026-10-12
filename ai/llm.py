@@ -3,7 +3,7 @@
 Pick one with LLM_PROVIDER in .env (default "ollama"). A Claude implementation is not
 written yet; it slots in here as another class plus one line in get_llm().
 """
-from typing import Protocol
+from typing import Optional, Protocol
 
 import requests
 
@@ -13,7 +13,9 @@ from data.db import get_setting
 class LLM(Protocol):
     name: str
 
-    def generate(self, system: str, user: str) -> str: ...
+    def generate(self, system: str, user: str, json_schema: Optional[dict] = None) -> str:
+        """Reply text. With json_schema, the reply is constrained to valid JSON of that shape."""
+        ...
 
 
 class OllamaLLM:
@@ -25,22 +27,21 @@ class OllamaLLM:
         self._host = host.rstrip("/")
         self._timeout = timeout
 
-    def generate(self, system: str, user: str) -> str:
+    def generate(self, system: str, user: str, json_schema: Optional[dict] = None) -> str:
+        body = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "stream": False,
+            "think": False,  # skip Qwen3's long hidden reasoning; answers are grounded in passages
+            "options": {"temperature": 0.1, "num_ctx": 8192},
+        }
+        if json_schema:
+            body["format"] = json_schema
         try:
-            resp = requests.post(
-                f"{self._host}/api/chat",
-                json={
-                    "model": self._model,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    "stream": False,
-                    "think": False,  # skip Qwen3's long hidden reasoning; answers are grounded in passages
-                    "options": {"temperature": 0.1, "num_ctx": 8192},
-                },
-                timeout=self._timeout,
-            )
+            resp = requests.post(f"{self._host}/api/chat", json=body, timeout=self._timeout)
             resp.raise_for_status()
         except requests.ConnectionError as exc:
             raise RuntimeError(f"Can't reach Ollama at {self._host}. Is the Ollama app running?") from exc

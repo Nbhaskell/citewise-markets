@@ -14,6 +14,8 @@ import requests
 from .base import NewsItem
 
 FEED_URL = "https://news.google.com/rss/search"
+# Sites that flood results with auto-generated "Fund X bought N shares" posts and drown real news.
+EXCLUDED_SITES = ("marketbeat.com",)
 
 
 def parse_feed(xml_bytes: bytes, symbol: str, source_name: str = "google_news") -> list[NewsItem]:
@@ -50,7 +52,8 @@ class GoogleNewsSource:
 
     def get_news(self, symbol: str, company_name: Optional[str], days: int = 7) -> list[NewsItem]:
         query = f'"{company_name}" {symbol} stock' if company_name else f"{symbol} stock"
-        params = {"q": f"{query} when:{days}d", "hl": "en-US", "gl": "US", "ceid": "US:en"}
+        exclusions = "".join(f" -site:{site}" for site in EXCLUDED_SITES)
+        params = {"q": f"{query} when:{days}d{exclusions}", "hl": "en-US", "gl": "US", "ceid": "US:en"}
         resp = requests.get(
             f"{FEED_URL}?{urllib.parse.urlencode(params)}",
             headers={"User-Agent": "Mozilla/5.0"},

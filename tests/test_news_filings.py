@@ -117,3 +117,23 @@ def test_ingest_filings_skips_already_stored(conn):
     assert ingest_filings(conn, edgar, SYMBOL, ["10-K"], 1) == 0
     assert edgar.fetched == 1
     assert conn.execute("SELECT cik FROM instruments WHERE symbol = %s", (SYMBOL,)).fetchone()[0] == "0000000001"
+
+
+def test_google_news_query_excludes_spam_sites(monkeypatch):
+    import data.sources.google_news as gn
+
+    seen = {}
+
+    class Resp:
+        content = b"<rss><channel></channel></rss>"
+
+        def raise_for_status(self):
+            pass
+
+    def fake_get(url, headers=None, timeout=None):
+        seen["url"] = url
+        return Resp()
+
+    monkeypatch.setattr(gn.requests, "get", fake_get)
+    gn.GoogleNewsSource().get_news("AAPL", "Apple Inc.", days=3)
+    assert "-site%3Amarketbeat.com" in seen["url"] and "when%3A3d" in seen["url"]
