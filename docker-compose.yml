@@ -1,0 +1,20 @@
+services:
+  db:
+    image: timescale/timescaledb-ha:pg17
+    container_name: stockmarket-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stockmarket}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-stockmarket}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/home/postgres/pgdata/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stockmarket}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
