@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { StockSummary } from "../api/types";
 import { useApi } from "../hooks/useApi";
@@ -17,7 +18,9 @@ function Row({ stock }: { stock: StockSummary }) {
   return (
     <tr>
       <th scope="row">
-        <span className="symbol">{stock.symbol}</span>
+        <Link className="symbol" to={`/stocks/${stock.symbol}`}>
+          {stock.symbol}
+        </Link>
         <span className="muted block">{stock.name}</span>
       </th>
       <td className="num">{formatPrice(stock.last_price)}</td>

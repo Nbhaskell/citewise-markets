@@ -4,7 +4,7 @@ import type { CopilotResponse } from "../api/types";
 import { safeHttpUrl } from "../lib/format";
 import { AnswerText } from "./AnswerText";
 
-const EXAMPLES = [
+const DEFAULT_EXAMPLES = [
   "What are NVIDIA's biggest risks?",
   "How many employees does Tesla have?",
   "Compare Apple's and Microsoft's biggest risks.",
@@ -17,7 +17,13 @@ type State =
   | { kind: "error"; message: string }
   | { kind: "done"; result: CopilotResponse };
 
-export function CopilotBox() {
+interface Props {
+  /** Limit every question to this company's filings. */
+  symbol?: string;
+  examples?: string[];
+}
+
+export function CopilotBox({ symbol, examples = DEFAULT_EXAMPLES }: Props) {
   const [question, setQuestion] = useState("");
   const [hint, setHint] = useState<string | null>(null);
   const [state, setState] = useState<State>({ kind: "idle" });
@@ -39,7 +45,7 @@ export function CopilotBox() {
     inFlight.current = controller;
     setState({ kind: "loading", question: q });
     try {
-      const result = await api.copilot({ question: q }, controller.signal);
+      const result = await api.copilot({ question: q, symbols: symbol ? [symbol] : undefined }, controller.signal);
       setState({ kind: "done", result });
     } catch (err) {
       if (isAbort(err)) return;
@@ -61,7 +67,7 @@ export function CopilotBox() {
 
   return (
     <section className="card" aria-labelledby="copilot-title">
-      <h2 id="copilot-title">Ask the filings</h2>
+      <h2 id="copilot-title">{symbol ? `Ask about ${symbol}` : "Ask the filings"}</h2>
       <p className="muted small">
         Answers come only from the 10-K and 10-Q filings stored here, with numbered sources. Not financial advice.
       </p>
@@ -75,7 +81,7 @@ export function CopilotBox() {
           rows={2}
           maxLength={500}
           value={question}
-          placeholder="e.g. What are Nvidia's biggest risks?"
+          placeholder={symbol ? "e.g. What are the biggest risks?" : "e.g. What are Nvidia's biggest risks?"}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -91,7 +97,7 @@ export function CopilotBox() {
       {hint && <p role="alert" className="error small">{hint}</p>}
 
       <div className="chips" aria-label="Example questions">
-        {EXAMPLES.map((example) => (
+        {examples.map((example) => (
           <button
             key={example}
             type="button"

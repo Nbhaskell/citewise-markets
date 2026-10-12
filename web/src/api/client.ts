@@ -1,12 +1,14 @@
 import type {
   CopilotRequest,
   CopilotResponse,
+  FilingOut,
   Health,
   NewsFeedItem,
   NewsLabel,
   PriceRange,
   PriceSeries,
   StatusOut,
+  StockDetail,
   StockSummary,
 } from "./types";
 
@@ -62,12 +64,17 @@ export const api = {
   health: (signal?: AbortSignal) => request<Health>("/health", { signal }),
   status: (signal?: AbortSignal) => request<StatusOut>("/api/status", { signal }),
   stocks: (signal?: AbortSignal) => request<StockSummary[]>("/api/stocks", { signal }),
+  stock: (symbol: string, signal?: AbortSignal) =>
+    request<StockDetail>(`/api/stocks/${encodeURIComponent(symbol)}`, { signal }),
+  filings: (symbol: string, signal?: AbortSignal) =>
+    request<FilingOut[]>(`/api/stocks/${encodeURIComponent(symbol)}/filings`, { signal }),
   prices: (symbol: string, range: PriceRange, signal?: AbortSignal) =>
     request<PriceSeries>(`/api/stocks/${encodeURIComponent(symbol)}/prices?range=${range}`, { signal }),
-  news: (opts: { days?: number; limit?: number; sentiment?: NewsLabel[] }, signal?: AbortSignal) => {
+  news: (opts: { days?: number; limit?: number; sentiment?: NewsLabel[]; symbol?: string }, signal?: AbortSignal) => {
     const params = new URLSearchParams();
     if (opts.days) params.set("days", String(opts.days));
     if (opts.limit) params.set("limit", String(opts.limit));
+    if (opts.symbol) params.set("symbol", opts.symbol);
     opts.sentiment?.forEach((label) => params.append("sentiment", label));
     return request<NewsFeedItem[]>(`/api/news?${params}`, { signal });
   },

@@ -22,6 +22,8 @@ benchmarks.
 | API is read-only and has no login yet | Four of the six wireframe screens need only reads, and it avoids handling passwords before there is a reason to. It listens on `127.0.0.1` and allows only the local web app's origin |
 | Web app: React + TypeScript + Vite, plain CSS, no UI or chart library | Small and fast (about 87 kB compressed). Sparklines are a few lines of SVG. A charting library can come with the stock detail page, where it earns its weight |
 | Web types generated from the API's OpenAPI file | The contract can't drift silently: a Python test fails if `web/openapi.json` is stale, and a type error appears if a screen uses a field that no longer exists |
+| Price chart is hand-drawn SVG, not a charting library | The chart needs only a line, axes, and a selected-day readout. Hand-drawn SVG tests in jsdom (a canvas library wouldn't), follows the dark and light themes through CSS, is keyboard and screen-reader friendly, and adds no dependency. The cost: we own the tick and scale math (covered by tests). Candlesticks, volume bars, or indicators would be the moment to reconsider a library |
+| Stock detail reuses the dashboard's news panel and copilot box | One component each, with an optional company, instead of two near-copies that would drift apart |
 | Dashboard shows only what the data supports | The wireframe's market indices, portfolio value, and AI daily brief are left out rather than faked |
 | News panel defaults to positive/negative headlines | About two-thirds of headlines are routine (quote pages, "X vs Y"), so showing all of them buries the news. A toggle shows everything |
 | Feature branches for the web screens | A new codebase with many commits shouldn't land on `main` half-finished, and the nightly job runs whatever is checked out |
@@ -39,6 +41,8 @@ benchmarks.
 | 82% of NVIDIA's headlines were one site's auto-generated "Fund X bought N shares" posts | Excluded `marketbeat.com` in the Google News query (`EXCLUDED_SITES` in `google_news.py`) |
 | Search tests failed intermittently, returning 1 result instead of 10 | Tests insert and delete vectors constantly. Dead entries in the HNSW vector index crowded out live results until a `VACUUM`. `tests/conftest.py` now vacuums first. In normal use autovacuum handles it |
 | `openapi-typescript` crashed with "Cannot read properties of undefined (reading 'createKeywordTypeNode')" | npm installed TypeScript 7 (the new native compiler), which lacks the compiler interface that tool uses. TypeScript is pinned to 5.9 (`typescript@~5.9.3`), which the tool officially supports. Don't upgrade past 5.x until the tool supports it |
+| One-year chart labels read "Oct 25" and "Jan 26" | That looks like October 25th and January 26th, but meant October 2025. Found while looking at the real page. The one-year axis now says "Oct 2025" |
+| The 52-week range marker's position was a long float in the page (`88.10625000000002%`) | Harmless to look at, but sloppy. It's rounded to one decimal |
 | Generated types marked the copilot's `limit` as required | The generator treats fields with defaults as required. The `gen:api` script passes `--default-non-nullable false` |
 | With the API stopped, the page said "The API returned an error (502)" | In development the Vite proxy answers 502 or 504 when the API is down, so the browser never sees a network failure. The client now maps a 502 or 504 with no API message to "Can't reach the API. Is it running? python -m api" |
 | `node` was "not found" right after installing Node.js | Terminals and tools opened before the install don't see the new PATH. Open a new terminal (tools started earlier need `PATH` extended with `C:\Program Files\nodejs`) |
@@ -91,6 +95,14 @@ benchmarks.
 - **The wireframes show things the API can't supply yet:** a natural-language screener (no fundamentals data) and an
   "AI signal: bullish, 72%" (no forecasting model exists, and we haven't decided one should).
 - **A latest price bar can be a partial day** if requested while the market is open. `as_of` shows its date.
+- **The stock detail page has no AI signal or fundamentals.** Those need data and a model that don't exist. It shows what
+  the stored data supports: prices, news mood, filings, and the filings copilot.
+- **Duplicate headlines:** the free news feed can return the same title from different sources or links, so a headline
+  can appear twice in a company's news list. Not deduplicated yet.
+- **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
+  The latest day can be partial while the market is open.
+- **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
+  range switching, the page's copilot, the not-found page, a 375 px phone width), in dark mode only.
 - **The dashboard was checked visually in dark mode at 780 px wide (single column) and by DOM and CSS checks at
   desktop width.** My screenshots of the two-column desktop layout were cropped by the preview pane, and light mode
   wasn't viewed. Look at both on a real screen.

@@ -4,6 +4,9 @@ import type { components } from "./schema";
 type S = components["schemas"];
 
 export type StockSummary = S["StockSummary"];
+export type StockDetail = S["StockDetail"];
+export type FilingOut = S["FilingOut"];
+export type PricePoint = S["PricePoint"];
 export type SentimentSummary = S["SentimentSummary"];
 export type PriceSeries = S["PriceSeries"];
 export type NewsFeedItem = S["NewsFeedItem"];
