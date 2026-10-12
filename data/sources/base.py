@@ -4,7 +4,7 @@ Swapping yfinance for a licensed feed means writing one new class here;
 nothing downstream changes.
 """
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, Protocol
 
 
@@ -36,3 +36,20 @@ class PriceSource(Protocol):
     def get_instrument(self, symbol: str) -> Instrument: ...
 
     def get_daily_bars(self, symbol: str, period: str = "5y") -> list[PriceBar]: ...
+
+
+@dataclass(frozen=True)
+class NewsItem:
+    id: str
+    source: str
+    symbol: str
+    title: str
+    publisher: Optional[str]
+    url: str
+    published_at: "datetime"
+
+
+class NewsSource(Protocol):
+    name: str
+
+    def get_news(self, symbol: str, company_name: Optional[str], days: int = 7) -> list[NewsItem]: ...
