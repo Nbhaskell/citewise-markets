@@ -130,6 +130,12 @@ Dashboard page (/)
   NewsPanel      <- /api/news                   latest positive/negative headlines (toggle for all)
   CopilotBox     -> POST /api/copilot           cited answer, clickable sources, warnings
 
+Copilot page (/copilot)
+  CompanyFilter      <- /api/stocks             pick up to 5 companies, or none for all
+  ConversationView   -> POST /api/copilot       one message per question, each with its own AnswerView
+  Composer                                      Enter sends; the button becomes Stop while waiting
+  useConversation    localStorage               newest 20 finished questions, validated on load
+
 Stock detail page (/stocks/:symbol)
   header + KeyStats  <- /api/stocks/{symbol}    price, change, 52-week range bar, volume, sector, news mood
   PriceHistory       <- /api/stocks/{symbol}/prices?range=   PriceChart (SVG) with 1M, 3M, 6M, 1Y, 5Y, MAX
@@ -149,7 +155,13 @@ Stock detail page (/stocks/:symbol)
   `src/lib/chart.ts`. The selected day is shown in a text readout (hover, touch, or arrow keys), which doubles as the
   accessible description. While a new range loads the old chart stays, dimmed, and its labels follow the data it was
   given, so they never mismatch.
-- **Routing:** `/` and `/stocks/:symbol` (React Router). An unknown ticker (the API's 404) gets a "not tracked" page
+- **Copilot conversation:** `useConversation` keeps a list of exchanges (pending, done, error, stopped). It allows one
+  in flight at a time, checking a ref that updates instantly as well as state, so two sends in the same instant
+  can't both go through. History persists in `localStorage` under a versioned key. Only finished exchanges are
+  saved, loaded entries are validated field by field, and a blocked or full storage is reported, never thrown.
+  `AnswerView` is the one place an answer is rendered (dashboard box, stock page, and copilot page), and gives its
+  source elements unique ids so many answers can share a page.
+- **Routing:** `/`, `/stocks/:symbol`, and `/copilot` (React Router), with a main navigation that marks the current page. An unknown ticker (the API's 404) gets a "not tracked" page
   with the command to add it, and a malformed one is rejected before any request is made.
 - **Tests:** Vitest with Testing Library against a fake `fetch`. They cover each panel's loading, empty, error, and
   warning states, plus the client's error messages.
