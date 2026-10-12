@@ -42,6 +42,12 @@ command-line tools. The nightly job, backend API, and screens are not built.
   not shell heredocs that carry escape sequences (`\n`, `\b`), which have corrupted files before.
 - **Commits and pushes:** only when the user asks. The GitHub repo is private.
 
+- **Nightly job (`jobs/refresh.py`):** keep each (step, company) isolated so one failure never stops the run, keep
+  the advisory lock, and keep missing prerequisites as skipped-and-`partial`, never silent successes. Tests for it
+  inject fakes through `Deps` and set the job name to `test_refresh` so they never touch real run history.
+- **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` (it changes Windows Task Scheduler)
+  without being asked.
+
 ## Conventions
 
 - Small tools: each ingest or AI command is a module with a `main()` and `argparse`, is idempotent, and logs

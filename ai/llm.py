@@ -27,6 +27,13 @@ class OllamaLLM:
         self._host = host.rstrip("/")
         self._timeout = timeout
 
+    def available(self) -> bool:
+        """True if the Ollama server answers. Lets batch jobs skip model steps instead of failing."""
+        try:
+            return requests.get(f"{self._host}/api/version", timeout=3).ok
+        except requests.RequestException:
+            return False
+
     def generate(self, system: str, user: str, json_schema: Optional[dict] = None) -> str:
         body = {
             "model": self._model,

@@ -6,6 +6,7 @@ different size means a new migration and re-indexing.
 from typing import Protocol
 
 DIM = 384
+DEFAULT_MODEL = "BAAI/bge-small-en-v1.5"
 
 
 class Embedder(Protocol):
@@ -20,7 +21,7 @@ class Embedder(Protocol):
 class FastEmbedder:
     dim = DIM
 
-    def __init__(self, model: str = "BAAI/bge-small-en-v1.5"):
+    def __init__(self, model: str = DEFAULT_MODEL):
         from fastembed import TextEmbedding  # heavy import, load on use
 
         self.name = model

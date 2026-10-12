@@ -10,6 +10,7 @@ What works today:
 - A copilot that answers questions from the filings, with `[1]`-style citations, and a check that flags figures
   not found in the cited passages
 - News headline sentiment (positive / negative / neutral / irrelevant) per company
+- A nightly refresh job that keeps all of the above up to date (you register it once, see below)
 
 Everything runs locally and costs nothing. The AI uses a local model through Ollama.
 
@@ -87,6 +88,32 @@ Run these in order. Each is safe to re-run: existing rows are updated or skipped
 Prices must come first, because they create the company records the other steps need. Indexing six companies' filings
 takes about 8 minutes and scoring about 700 headlines takes about 2.5 minutes on an RTX 3080.
 
+## Keeping data fresh (nightly job)
+
+`python -m jobs.refresh` runs the whole pipeline for every active company in the database: recent prices, news,
+new filings, embedding of any new filings, and sentiment for new headlines. A company or step that fails is
+recorded and the rest still run. A normal run on six companies takes well under a minute when nothing big is new.
+
+```bash
+.venv\Scripts\python -m jobs.refresh --status     # recent runs and how fresh each company's data is
+.venv\Scripts\python -m jobs.refresh              # run it now
+.venv\Scripts\python -m jobs.refresh --symbols AAPL --steps news sentiment   # just part of it
+```
+
+Add a new company once with `python -m data.ingest TICKER` (prices create the company record), and the nightly job
+picks it up from then on. Runs are logged to the `job_runs` table and to `logs/refresh.log`. Exit codes: 0 all good,
+1 something failed or was skipped, 2 database unreachable, 3 another run already in progress.
+
+**Schedule it** (one time, changes your Windows Task Scheduler):
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts\register_nightly_task.ps1 -Time 23:00
+```
+
+Remove it with `powershell -File scripts\unregister_nightly_task.ps1`. The task only runs while you are logged in,
+and if the PC was off at the scheduled time it runs when you next log in. **Docker Desktop and Ollama must be running**
+at that time. If Docker is down the run exits with code 2, and if Ollama is down only the sentiment step is skipped.
+
 ## Command cheat sheet
 
 | What | Command | Useful options |
@@ -98,6 +125,8 @@ takes about 8 minutes and scoring about 700 headlines takes about 2.5 minutes on
 | Search filings | `python -m ai.search "supply chain risk" --symbol AAPL` | `--form 10-K` `--limit 5` `--latest` |
 | Ask the copilot | `python -m ai.copilot "What are Nvidia's biggest risks?"` | `--symbol NVDA` `--no-expand` `--show-prompt` |
 | Score headlines | `python -m ai.sentiment AAPL` | `--days 7` `--no-score` (summary only) |
+| Refresh everything | `python -m jobs.refresh` | `--symbols AAPL` `--steps prices news filings index sentiment` |
+| Check freshness | `python -m jobs.refresh --status` | |
 | Run tests | `python -m pytest` | |
 | Database shell | `docker exec -it stockmarket-db psql -U stockmarket` | |
 
@@ -112,7 +141,10 @@ If printing filing text fails with an encoding error in a Windows console, set `
 data/        Ingest tools and data sources
   sources/     base.py (interfaces), yfinance_source.py, google_news.py, edgar.py
 ai/          Chunking, embeddings, search, copilot, sentiment, and the LLM interface
+jobs/        The nightly refresh runner (refresh.py) and its status report (status.py)
 db/          migrate.py and numbered SQL migrations (never edit one that has been applied)
+scripts/     PowerShell scripts to schedule and unschedule the nightly job
+logs/        refresh.log (git-ignored)
 tests/       pytest tests (run against the real database with ZZ-prefixed test tickers)
 docker-compose.yml   The database container
 .env         Your private settings (git-ignored, never commit it)
@@ -130,7 +162,7 @@ docker-compose.yml   The database container
 
 ## What is not built yet
 
-- A nightly job that runs the whole pipeline automatically
+- Failure alerts for the nightly job (today you check `--status` or the log)
 - The backend API (accounts, portfolios, alerts) and the web and mobile screens
 - A Claude (Anthropic API) implementation of the LLM interface
 - A paid, licensed market data feed

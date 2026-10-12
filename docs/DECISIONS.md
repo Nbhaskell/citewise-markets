@@ -14,6 +14,10 @@ benchmarks.
 | Local LLM through Ollama (Qwen3 8B) as the starting model | No paid API key was available. The `LLM` interface keeps Claude a drop-in later |
 | Headlines only for news | The free feed has no article text. Enough for a mood score, not for deep analysis |
 | Filings stored whole, then chunked | Keeps the original text so re-chunking or re-embedding never needs a re-download |
+| Nightly job as a plain Python command, scheduled by Windows Task Scheduler | No extra services to run. Works for a personal dev machine. A hosted deployment would use a cron job or a cloud scheduler running the same command |
+| Task runs only while logged in (interactive principal) | Avoids storing a Windows password. Docker Desktop and Ollama start at login anyway, and the job needs both |
+| Missing prerequisites are skipped and flagged `partial`, not failed | One missing piece (Ollama down, no SEC contact) shouldn't block prices and news, but it shouldn't pass silently either |
+| Postgres advisory lock for "one run at a time" | The database is already the shared source of truth, and the lock disappears automatically if the process dies |
 | Migrations are append-only numbered SQL files | `db/migrate.py` applies each once. Never edit one that has been applied; add a new file |
 
 ## Gotchas we hit
@@ -57,13 +61,22 @@ benchmarks.
   near zero. Consistency across re-runs was not measured.
 - **The copilot reads filings only.** It does not use prices, news, or sentiment yet.
 - **Search is vector-only.** A keyword (full-text) search was considered for exact-term lookups and not built.
+- **The nightly job needs the PC on and you logged in, with Docker Desktop and Ollama running.** Otherwise it
+  catches up the next time it can. Nothing alerts you if it fails; you'd see it in `--status` or the log.
+- **Price counts mean "bars refreshed", not "new".** Each run rewrites the recent window (upsert), so the number is
+  how many bars were written.
+- **Free sources can break without notice.** If Yahoo or Google change something, that step errors for each company
+  and the run is marked `partial`. Failures are visible but not repaired automatically.
+- **The scheduled path was tested once:** after registering, `Start-ScheduledTask` ran the job through Task Scheduler
+  (result code 0, run logged as success). A run at the scheduled clock time, and a catch-up after a missed run,
+  have not been observed yet.
 - **Evaluation is small.** About 14 copilot questions and 40 headlines, judged by one reviewer.
 - **The embedding model has no query prefix.** bge models recommend one, but fastembed's `query_embed` doesn't add it.
   Adding it by hand made no difference on the test questions, so it was left out.
 
 ## Ideas not built yet
 
-- Nightly job to refresh prices, news, and filings, then embed and score new items
+- Failure alerts for the nightly job (email or desktop notification)
 - A Claude implementation of `LLM` (needs an Anthropic API key), then compare answers against Qwen on the same questions
 - Keyword plus vector hybrid search; a reranker
 - Filtering quote-page and comparison-page headlines out of sentiment

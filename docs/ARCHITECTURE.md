@@ -26,6 +26,7 @@ Tables, created by the numbered files in `db/migrations/`:
 | `filing_chunks` | Filing text cut into about 1,200-character passages, each with a 384-number embedding |
 | `news_articles`, `news_article_symbols` | Headlines (no article bodies) and which company each belongs to |
 | `news_sentiment` | One label per (article, company, model) |
+| `job_runs` | One row per nightly refresh: status (running, success, partial, failed) and per-step results as JSON |
 | `schema_migrations` | Which migrations have been applied |
 
 ### Data sources (swappable)
@@ -71,6 +72,29 @@ headlines -> sentiment.py -> LLM labels in batches (strict JSON) -> news_sentime
 - It refuses buy/sell/hold advice and price predictions. It adds a "not financial advice" note.
 - "Annual report" or "10-K" restricts the search to 10-Ks, and "quarter" or "10-Q" restricts it to 10-Qs.
 
+## Nightly refresh (`jobs/`)
+
+`python -m jobs.refresh` walks every active company through five steps, in order:
+
+```
+prices -> news -> filings -> index (embed new filings) -> sentiment (score new headlines)
+```
+
+- **Isolation:** each (step, company) runs in its own try/except. A failure is recorded and the run continues.
+- **Status:** `success` if everything ran, `partial` if anything failed or was skipped, `failed` if every unit failed.
+  Exit code 0 only for `success`, so Task Scheduler's "Last Run Result" is meaningful.
+- **Skips, not failures, for missing prerequisites:** no `SEC_USER_AGENT` skips filings, Ollama not answering skips
+  sentiment, and an embedding model that won't load skips indexing. The run is marked `partial` so it isn't silent.
+- **Incremental prices:** asks for just enough history to cover the gap since the last stored day (1 month, 3 months,
+  and so on, up to the full 5 years for a new company). Prices are upserted, so overlap is harmless.
+- **No overlap:** a Postgres advisory lock stops two runs at once; the second exits with code 3. The lock is released
+  even if the run crashes.
+- **Dependencies are injected** through a `Deps` dataclass, so tests swap in fakes for every outside service.
+- **Observability:** the `job_runs` table, `logs/refresh.log`, and `python -m jobs.refresh --status` (recent runs and
+  per-company freshness: last price, newest headline, newest filing, filings indexed, unscored headlines).
+- **Scheduling:** `scripts/register_nightly_task.ps1` creates a Windows Task Scheduler task (daily, runs when you
+  are logged in, catches up after a missed time, never overlaps, 2-hour limit). It is not registered automatically.
+
 ## Swappable pieces at a glance
 
 | To change... | Write... | Edit... |
@@ -81,4 +105,5 @@ headlines -> sentiment.py -> LLM labels in batches (strict JSON) -> news_sentime
 
 ## Not built yet
 
-Nightly refresh job, backend API, web and mobile screens, a Claude implementation of `LLM`, and a licensed data feed.
+Failure alerts for the nightly job, backend API, web and mobile screens, a Claude implementation of `LLM`, and a
+licensed data feed.
