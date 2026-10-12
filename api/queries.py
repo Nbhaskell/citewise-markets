@@ -98,6 +98,28 @@ def news_items(
     ]
 
 
+def news_feed(
+    conn: psycopg.Connection, model: str, days: int, limit: int, include_irrelevant: bool,
+    symbols: Optional[list[str]], labels: Optional[list[str]],
+) -> list[dict]:
+    rows = conn.execute(
+        "SELECT a.id, a.title, a.publisher, a.url, a.published_at, s.symbol, n.label "
+        "FROM news_articles a JOIN news_article_symbols s ON s.article_id = a.id "
+        "JOIN instruments i ON i.symbol = s.symbol AND i.active "
+        "LEFT JOIN news_sentiment n ON n.article_id = a.id AND n.symbol = s.symbol AND n.model = %(m)s "
+        "WHERE a.published_at >= now() - make_interval(days => %(d)s) "
+        "AND (%(irr)s OR n.label IS DISTINCT FROM 'irrelevant') "
+        "AND (%(symbols)s::text[] IS NULL OR s.symbol = ANY(%(symbols)s)) "
+        "AND (%(labels)s::text[] IS NULL OR n.label = ANY(%(labels)s)) "
+        "ORDER BY a.published_at DESC, s.symbol LIMIT %(l)s",
+        {"m": model, "d": days, "irr": include_irrelevant, "symbols": symbols, "labels": labels, "l": limit},
+    ).fetchall()
+    return [
+        {"id": i, "title": t, "publisher": p, "url": u, "published_at": at, "symbol": sym, "sentiment": label}
+        for i, t, p, u, at, sym, label in rows
+    ]
+
+
 def filing_rows(conn: psycopg.Connection, symbol: str) -> list[dict]:
     rows = conn.execute(
         "SELECT f.accession_number, f.form, f.filed_at, f.period_of_report, f.url, "

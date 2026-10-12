@@ -101,6 +101,25 @@ def stock_news(
     return queries.news_items(conn, symbol, model, days, limit, include_irrelevant)
 
 
+@app.get("/api/news", response_model=list[schemas.NewsFeedItem], tags=["news"])
+def news_feed(
+    conn: Conn, model: SentimentModel,
+    days: Annotated[int, Query(ge=1, le=90)] = 3,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    symbol: Annotated[Optional[list[str]], Query(description="Repeat to limit to several tickers")] = None,
+    sentiment: Annotated[
+        Optional[list[Literal["positive", "negative", "neutral"]]],
+        Query(description="Only these labels, e.g. positive and negative to skip routine items"),
+    ] = None,
+    include_irrelevant: bool = False,
+):
+    """Latest headlines across every tracked company (for the dashboard's news panel)."""
+    if symbol and not all(SYMBOL_RE.match(s) for s in symbol):
+        raise HTTPException(422, "symbol must be a ticker like AAPL")
+    symbols = [s.upper() for s in symbol] if symbol else None
+    return queries.news_feed(conn, model, days, limit, include_irrelevant, symbols, sentiment)
+
+
 @app.get("/api/stocks/{symbol}/filings", response_model=list[schemas.FilingOut], tags=["filings"])
 def stock_filings(symbol: Symbol, conn: Conn):
     symbol = _require_company(conn, symbol)

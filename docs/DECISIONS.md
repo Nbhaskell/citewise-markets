@@ -20,6 +20,11 @@ benchmarks.
 | Postgres advisory lock for "one run at a time" | The database is already the shared source of truth, and the lock disappears automatically if the process dies |
 | Backend in Python (FastAPI), not Node | All the data and AI code is Python, so the API calls it directly instead of through a second service. Node.js is still needed later, only for building the web screens |
 | API is read-only and has no login yet | Four of the six wireframe screens need only reads, and it avoids handling passwords before there is a reason to. It listens on `127.0.0.1` and allows only the local web app's origin |
+| Web app: React + TypeScript + Vite, plain CSS, no UI or chart library | Small and fast (about 87 kB compressed). Sparklines are a few lines of SVG. A charting library can come with the stock detail page, where it earns its weight |
+| Web types generated from the API's OpenAPI file | The contract can't drift silently: a Python test fails if `web/openapi.json` is stale, and a type error appears if a screen uses a field that no longer exists |
+| Dashboard shows only what the data supports | The wireframe's market indices, portfolio value, and AI daily brief are left out rather than faked |
+| News panel defaults to positive/negative headlines | About two-thirds of headlines are routine (quote pages, "X vs Y"), so showing all of them buries the news. A toggle shows everything |
+| Feature branches for the web screens | A new codebase with many commits shouldn't land on `main` half-finished, and the nightly job runs whatever is checked out |
 | One database connection per request | Simple and fast enough locally (a connect takes a few milliseconds on `127.0.0.1`). A connection pool is the upgrade if load ever matters |
 | Migrations are append-only numbered SQL files | `db/migrate.py` applies each once. Never edit one that has been applied; add a new file |
 
@@ -33,6 +38,10 @@ benchmarks.
 | Indexing 8 minutes of work showed nothing in the database | With psycopg, `with conn.transaction()` after an earlier query only creates a savepoint, not a commit. Call `conn.commit()` after each unit of work |
 | 82% of NVIDIA's headlines were one site's auto-generated "Fund X bought N shares" posts | Excluded `marketbeat.com` in the Google News query (`EXCLUDED_SITES` in `google_news.py`) |
 | Search tests failed intermittently, returning 1 result instead of 10 | Tests insert and delete vectors constantly. Dead entries in the HNSW vector index crowded out live results until a `VACUUM`. `tests/conftest.py` now vacuums first. In normal use autovacuum handles it |
+| `openapi-typescript` crashed with "Cannot read properties of undefined (reading 'createKeywordTypeNode')" | npm installed TypeScript 7 (the new native compiler), which lacks the compiler interface that tool uses. TypeScript is pinned to 5.9 (`typescript@~5.9.3`), which the tool officially supports. Don't upgrade past 5.x until the tool supports it |
+| Generated types marked the copilot's `limit` as required | The generator treats fields with defaults as required. The `gen:api` script passes `--default-non-nullable false` |
+| With the API stopped, the page said "The API returned an error (502)" | In development the Vite proxy answers 502 or 504 when the API is down, so the browser never sees a network failure. The client now maps a 502 or 504 with no API message to "Can't reach the API. Is it running? python -m api" |
+| `node` was "not found" right after installing Node.js | Terminals and tools opened before the install don't see the new PATH. Open a new terminal (tools started earlier need `PATH` extended with `C:\Program Files\nodejs`) |
 | Python patch scripts wrote broken strings and regexes into files | Escapes like `\n` and `\b` were mangled by shell heredocs. Edit files directly, or build such characters explicitly |
 
 ## How the safety checks were calibrated
@@ -82,6 +91,13 @@ benchmarks.
 - **The wireframes show things the API can't supply yet:** a natural-language screener (no fundamentals data) and an
   "AI signal: bullish, 72%" (no forecasting model exists, and we haven't decided one should).
 - **A latest price bar can be a partial day** if requested while the market is open. `as_of` shows its date.
+- **The dashboard was checked visually in dark mode at 780 px wide (single column) and by DOM and CSS checks at
+  desktop width.** My screenshots of the two-column desktop layout were cropped by the preview pane, and light mode
+  wasn't viewed. Look at both on a real screen.
+- **The dashboard is for local development only:** no login, no production build served anywhere, no HTTPS. The
+  production build (`npm run build`) compiles but hasn't been deployed or served.
+- **Tests fake the network.** The web tests use a fake `fetch`. They were backed by one real browser session (watchlist
+  with live data, a live copilot answer, a clicked citation, and the API-down state), not by automated browser tests.
 - **Evaluation is small.** About 14 copilot questions and 40 headlines, judged by one reviewer.
 - **The embedding model has no query prefix.** bge models recommend one, but fastembed's `query_embed` doesn't add it.
   Adding it by hand made no difference on the test questions, so it was left out.

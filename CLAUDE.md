@@ -50,6 +50,15 @@ command-line tools. The nightly job, backend API, and screens are not built.
   depend on them, and keep copilot answers passing through the `unverified_numbers` field. Tests override the
   embedder, chat model, and sentiment model via `app.dependency_overrides`; don't load real models in tests.
   Stop any server you start for a manual check.
+- **Web app (`web/`):** its types are generated, never hand-copied. After changing an endpoint or response shape, run
+  `python -m api.export_openapi` then `npm run gen:api` in `web/` (the Python contract test fails otherwise). Keep
+  TypeScript on 5.x (see DECISIONS). Never use `dangerouslySetInnerHTML` or render API text as HTML, and run any
+  outside URL through `safeHttpUrl`. Keep warnings visible (stale data, failed refresh, offline model,
+  `unverified_numbers`) and never rely on color alone. Run `npm run typecheck` and `npm test` before committing.
+  Node.js lives in `C:\Program Files\nodejs`; add it to `PATH` if a tool can't find `node`. Stop any dev servers you
+  start (ports 5173 and 8000).
+- **Branches:** do new feature work on a `feature/...` branch and tell the user when a step warrants one. The nightly job
+  runs whatever code is checked out, so don't leave half-finished work checked out at 5pm.
 - **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` (it changes Windows Task Scheduler)
   without being asked.
 

@@ -12,6 +12,7 @@ What works today:
 - News headline sentiment (positive / negative / neutral / irrelevant) per company
 - A nightly refresh job that keeps all of the above up to date (you register it once, see below)
 - A read-only HTTP API (FastAPI) over all of it, for the web screens to use (see "The API" below)
+- A web dashboard (React) with a watchlist, news panel, and copilot box (see "The web app" below)
 
 Everything runs locally and costs nothing. The AI uses a local model through Ollama.
 
@@ -29,7 +30,7 @@ things are the way they are, including known weak spots.
 | Docker Desktop | Runs the database (Postgres 17 with TimescaleDB and pgvector) |
 | Python | Developed on 3.14. Newer syntax (`X \| None`) means 3.10 or later is needed; other versions are untested |
 | Ollama with `qwen3:latest` | The local AI model for the copilot and sentiment |
-| Node.js | Not needed yet. It's for the future web app |
+| Node.js (LTS) | Builds and runs the web app in `web/`. Install with `winget install OpenJS.NodeJS.LTS`, then open a new terminal |
 
 ## One-time setup
 
@@ -129,6 +130,7 @@ every endpoint. The database must be running, and Ollama for the copilot.
 | `GET /health` | Database and AI model status |
 | `GET /api/status` | Nightly job history and how fresh each company's data is |
 | `GET /api/stocks` | Every tracked company: latest price, daily change, news sentiment (the dashboard) |
+| `GET /api/news?days=3&limit=30&sentiment=positive&sentiment=negative` | Latest headlines across all companies (filters: `symbol`, `sentiment`, `include_irrelevant`) |
 | `GET /api/stocks/{symbol}` | One company, plus 52-week range and volume |
 | `GET /api/stocks/{symbol}/prices?range=1M\|3M\|6M\|1Y\|5Y\|MAX` | Daily price bars for a chart |
 | `GET /api/stocks/{symbol}/news?days=7&limit=30` | Headlines with sentiment labels (add `include_irrelevant=true` to see all) |
@@ -141,6 +143,22 @@ the user if it isn't empty.
 
 **It is read-only and has no login.** It only listens on this computer (`127.0.0.1`) and only allows requests from
 the local web app's address (`localhost:5173` or `:3000`). Don't expose it to a network until accounts exist.
+
+## The web app
+
+The dashboard lives in `web/`. Start the API, then the app:
+
+```bash
+.venv\Scripts\python -m api
+cd web
+npm install        # first time only
+npm run dev        # opens at http://localhost:5173
+```
+
+It shows the watchlist (price, daily change, one-month trend, news mood), the latest positive and negative headlines,
+a data-freshness line that warns about stale data or a failed refresh, and a box for asking the copilot questions
+with clickable numbered sources. See [web/README.md](web/README.md) for details, tests, and how its types are
+generated from the API.
 
 ## Command cheat sheet
 
@@ -156,6 +174,7 @@ the local web app's address (`localhost:5173` or `:3000`). Don't expose it to a 
 | Refresh everything | `python -m jobs.refresh` | `--symbols AAPL` `--steps prices news filings index sentiment` |
 | Check freshness | `python -m jobs.refresh --status` | |
 | Start the API | `python -m api` | docs at `http://127.0.0.1:8000/docs` |
+| Start the web app | `cd web` then `npm run dev` | needs the API running; `npm test` for its tests |
 | Run tests | `python -m pytest` | |
 | Database shell | `docker exec -it stockmarket-db psql -U stockmarket` | |
 
@@ -171,6 +190,7 @@ data/        Ingest tools and data sources
   sources/     base.py (interfaces), yfinance_source.py, google_news.py, edgar.py
 ai/          Chunking, embeddings, search, copilot, sentiment, and the LLM interface
 api/         The FastAPI app (app.py), response shapes (schemas.py), SQL (queries.py), per-request setup (deps.py)
+web/         The React web app (see web/README.md)
 jobs/        The nightly refresh runner (refresh.py) and its status report (status.py)
 db/          migrate.py and numbered SQL migrations (never edit one that has been applied)
 scripts/     PowerShell scripts to schedule and unschedule the nightly job
@@ -197,6 +217,9 @@ docker-compose.yml   The database container
 - Failure alerts for the nightly job (today you check `--status` or the log)
 - Accounts and login, portfolios, and alerts (the API so far is read-only)
 - A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
-- The web and mobile screens
+- More screens: stock detail with a price chart, a full copilot page, screener, portfolio, alerts and settings.
+  Only the dashboard exists, and it leaves out the wireframe's market indices strip, portfolio value, and
+  "AI daily brief" because no data or accounts sit behind them yet
+- A mobile app, and anything for putting the app online
 - A Claude (Anthropic API) implementation of the LLM interface
 - A paid, licensed market data feed
