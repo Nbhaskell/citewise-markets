@@ -5,8 +5,30 @@ history see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md]
 
 ## What this is
 
-An AI stock market app, built bottom-up. The data layer (`data/`, `db/`) and AI layer (`ai/`) are built as
-command-line tools. The nightly job, backend API, and screens are not built.
+An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
+refresh job (`jobs/`, scheduled in Windows Task Scheduler for 5pm Pacific), a read-only FastAPI backend (`api/`), and a
+React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot. Not built: accounts and
+login, portfolios, alerts, a screener, a Claude (Anthropic API) provider, and anything that puts it online. See the
+README's "What is not built yet" for the current list.
+
+## Working with the owner
+
+The owner is building this step by step and is not a professional developer, so explain things plainly.
+
+- **After each technical step**, end with a short "in plain terms" summary written so a 12-year-old could follow it
+  (simple analogies, no jargon). Skip it for routine things like commits, pushes, and branch cleanup.
+- **At the start of each step**, say whether it deserves a feature branch and why. Small docs changes can go straight to
+  `main`.
+- **Ask before you commit, push, or open a pull request.** The owner merges pull requests themselves on GitHub; once
+  they say it's merged, verify it, then clean up (switch to `main`, pull, delete the branch locally and on GitHub).
+- **Report faithfully.** Say what was verified and how, what wasn't, and what is still weak. Test things for real
+  (a browser, the live API) and look for ways to make a test fail; several real bugs here were found that way.
+- **Check before big or irreversible actions** (installing software, changing Windows settings, deleting data), and
+  never touch secrets: `.env` is private and the SEC contact email in it is only ever sent to sec.gov.
+- **Don't store notes about the owner outside this repo** (no separate memory files); anything worth keeping goes in
+  these docs where the owner can see and edit it.
+- **Keep an eye on plan limits.** Long sessions use more of the owner's usage allowance, so when a session gets long
+  (the context window passes about 60-70%), say so and suggest a fresh one at a natural boundary.
 
 ## Run and test
 
@@ -16,6 +38,9 @@ command-line tools. The nightly job, backend API, and screens are not built.
 - Tests: `python -m pytest`. They use the **real** dev database with `ZZ`-prefixed test tickers and clean up after
   themselves. The database container must be running. Run the suite before committing.
 - Ollama (with `qwen3:latest`) must be running for the copilot and sentiment.
+- Web app: `cd web`, then `npm install` (first time), `npm test`, `npm run typecheck`, `npm run build`. To see it,
+  start `python -m api` and `npm run dev` (port 5173).
+- Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
 
 ## Rules
 
