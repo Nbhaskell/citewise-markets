@@ -1,0 +1,17 @@
+// Named aliases for the types generated from the API (src/api/schema.d.ts, made by `npm run gen:api`).
+import type { components } from "./schema";
+
+type S = components["schemas"];
+
+export type StockSummary = S["StockSummary"];
+export type SentimentSummary = S["SentimentSummary"];
+export type PriceSeries = S["PriceSeries"];
+export type NewsFeedItem = S["NewsFeedItem"];
+export type CopilotRequest = S["CopilotRequest"];
+export type CopilotResponse = S["CopilotResponse"];
+export type CopilotSource = S["Source"];
+export type StatusOut = S["StatusOut"];
+export type Health = S["Health"];
+
+export type PriceRange = "1M" | "3M" | "6M" | "1Y" | "5Y" | "MAX";
+export type NewsLabel = "positive" | "negative" | "neutral";

@@ -157,6 +157,31 @@ def test_news_hides_irrelevant_and_old_items_by_default(client):
     assert client.get(f"/api/stocks/{SYM}/news", params={"limit": 500}).status_code == 422
 
 
+def test_news_feed_spans_companies_and_filters(client):
+    default = client.get("/api/news", params={"symbol": SYM}).json()  # dashboard default: last 3 days
+    assert [i["title"] for i in default] == ["Zeta wins big deal", "Zeta faces probe"]
+    feed = client.get("/api/news", params={"symbol": SYM.lower(), "days": 7}).json()
+    assert [(i["symbol"], i["title"]) for i in feed] == [
+        (SYM, "Zeta wins big deal"), (SYM, "Zeta faces probe"), (SYM, "Zeta quote page"), (SYM, "Zeta unscored story")]
+    assert feed[0]["sentiment"] == "positive" and feed[0]["publisher"] == "Wire"
+    only = client.get("/api/news", params={"symbol": SYM, "days": 7, "sentiment": ["positive", "negative"]}).json()
+    assert [i["title"] for i in only] == ["Zeta wins big deal", "Zeta faces probe"]
+    assert len(client.get("/api/news", params={"symbol": SYM, "days": 90, "include_irrelevant": True}).json()) == 6
+    assert len(client.get("/api/news", params={"symbol": SYM, "limit": 1}).json()) == 1
+    several = client.get("/api/news", params={"symbol": [SYM, "NOPE"], "days": 7}).json()  # repeatable filter
+    assert {i["symbol"] for i in several} == {SYM}  # a ticker with no headlines just matches nothing
+    everyone = client.get("/api/news", params={"limit": 100}).json()  # no filter: every active company
+    assert len(everyone) <= 100 and all(i["symbol"] for i in everyone)
+    assert [i["published_at"] for i in everyone] == sorted((i["published_at"] for i in everyone), reverse=True)
+
+
+def test_news_feed_validates_input(client):
+    assert client.get("/api/news", params={"sentiment": "great"}).status_code == 422
+    assert client.get("/api/news", params={"symbol": "bad$"}).status_code == 422
+    assert client.get("/api/news", params={"limit": 0}).status_code == 422
+    assert client.get("/api/news", params={"days": 365}).status_code == 422
+
+
 def test_filings_list_says_which_are_searchable(client):
     filings = client.get(f"/api/stocks/{SYM}/filings").json()
     assert [(f["form"], f["searchable"]) for f in filings] == [("10-Q", False), ("10-K", True)]

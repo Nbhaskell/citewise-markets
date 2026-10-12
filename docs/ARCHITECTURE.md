@@ -3,7 +3,7 @@
 The app is built in layers, bottom-up. Each layer only depends on the ones below it.
 
 ```
-Client apps        (not built)   web app, mobile app, notifications, admin
+Client apps        (partly built) web dashboard: web/. Not built: other screens, mobile app, notifications, admin
 Backend services   (partly built) read-only API: api/. Not built: accounts, portfolios, alerts, broker API
 AI layer           (built)       embeddings, search, copilot, sentiment      -> ai/
 Data layer         (built)       prices, news, filings, one Postgres DB      -> data/, db/
@@ -114,8 +114,32 @@ Python process space as the AI code, so the copilot and search are plain functio
 - **Price ranges** end at the latest stored bar, not today, so weekends and holidays never give an empty chart.
 - **Validation:** tickers must look like tickers, ranges and limits are bounded, questions are 3 to 500 characters.
   Unknown companies return 404, a model that isn't running returns 503.
-- **Screens covered:** dashboard, stock detail (except an AI signal), and copilot chat. Not covered: screener,
+- **News feed:** `GET /api/news` returns recent headlines across all active companies, optionally filtered by
+  company and sentiment label; each row carries the company it was labeled for.
+- **Screens the API can support:** dashboard, stock detail (except an AI signal), and copilot chat. Not covered: screener,
   portfolio, alerts and settings, because the data or accounts behind them don't exist yet.
+
+## Web app (`web/`)
+
+React 19 and TypeScript, built with Vite. It only talks to the API; it never touches the database or the AI code.
+
+```
+Dashboard page
+  FreshnessBar   <- /api/status, /health        data age, failed refreshes, AI model offline
+  Watchlist      <- /api/stocks, /prices        price, change, 1-month sparkline, news mood
+  NewsPanel      <- /api/news                   latest positive/negative headlines (toggle for all)
+  CopilotBox     -> POST /api/copilot           cited answer, clickable sources, warnings
+```
+
+- **Types come from the API.** `api/export_openapi.py` writes `web/openapi.json`; `npm run gen:api` turns it into
+  `src/api/schema.d.ts`. A Python test fails if the committed `openapi.json` is stale.
+- **Dev connection:** Vite proxies `/api` and `/health` to `127.0.0.1:8000`, so the browser sees a single origin. The
+  API's CORS list (`localhost:5173` and `:3000`) is the backstop for any other setup.
+- **Each panel loads and fails on its own**, with its own error and retry, so one broken endpoint doesn't blank the page.
+- **Safety in the UI:** API text is rendered as React text, never HTML. Links from outside data go through
+  `safeHttpUrl` (http and https only). Every price change has an arrow and sign, not only a color.
+- **Tests:** Vitest with Testing Library against a fake `fetch`. They cover each panel's loading, empty, error, and
+  warning states, plus the client's error messages.
 
 ## Swappable pieces at a glance
 
@@ -128,4 +152,4 @@ Python process space as the AI code, so the copilot and search are plain functio
 ## Not built yet
 
 Failure alerts for the nightly job, accounts and login, portfolios, alerts, the screener and AI-signal endpoints,
-web and mobile screens, a Claude implementation of `LLM`, and a licensed data feed.
+the remaining web screens, a mobile app, a Claude implementation of `LLM`, and a licensed data feed.

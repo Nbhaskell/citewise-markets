@@ -65,6 +65,10 @@ class NewsItemOut(BaseModel):
     sentiment: Optional[str] = Field(None, description="positive, negative, neutral, irrelevant, or null if not scored yet")
 
 
+class NewsFeedItem(NewsItemOut):
+    symbol: str = Field(description="The company this headline was labeled for. A headline about two companies appears once for each")
+
+
 class FilingOut(BaseModel):
     accession_number: str
     form: str
