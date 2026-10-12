@@ -23,6 +23,9 @@ benchmarks.
 | Web app: React + TypeScript + Vite, plain CSS, no UI or chart library | Small and fast (about 87 kB compressed). Sparklines are a few lines of SVG. A charting library can come with the stock detail page, where it earns its weight |
 | Web types generated from the API's OpenAPI file | The contract can't drift silently: a Python test fails if `web/openapi.json` is stale, and a type error appears if a screen uses a field that no longer exists |
 | Price chart is hand-drawn SVG, not a charting library | The chart needs only a line, axes, and a selected-day readout. Hand-drawn SVG tests in jsdom (a canvas library wouldn't), follows the dark and light themes through CSS, is keyboard and screen-reader friendly, and adds no dependency. The cost: we own the tick and scale math (covered by tests). Candlesticks, volume bars, or indicators would be the moment to reconsider a library |
+| Copilot history is saved in the browser, not on the server | There are no accounts, so the server can't tell users apart. Browser storage needs no backend change and stays private to the browser. The cost: history doesn't follow you between browsers or devices |
+| The copilot page does not pretend to remember | The API takes one question and no earlier messages. Sending earlier turns to the model would be a real feature (prompt changes, retrieval that understands "its", new evaluation), not a UI change. The page says each question stands alone |
+| One question at a time on the copilot page | The local model answers one at a time, and a queue of slow answers is worse than a Stop button |
 | Stock detail reuses the dashboard's news panel and copilot box | One component each, with an optional company, instead of two near-copies that would drift apart |
 | Dashboard shows only what the data supports | The wireframe's market indices, portfolio value, and AI daily brief are left out rather than faked |
 | News panel defaults to positive/negative headlines | About two-thirds of headlines are routine (quote pages, "X vs Y"), so showing all of them buries the news. A toggle shows everything |
@@ -41,6 +44,9 @@ benchmarks.
 | 82% of NVIDIA's headlines were one site's auto-generated "Fund X bought N shares" posts | Excluded `marketbeat.com` in the Google News query (`EXCLUDED_SITES` in `google_news.py`) |
 | Search tests failed intermittently, returning 1 result instead of 10 | Tests insert and delete vectors constantly. Dead entries in the HNSW vector index crowded out live results until a `VACUUM`. `tests/conftest.py` now vacuums first. In normal use autovacuum handles it |
 | `openapi-typescript` crashed with "Cannot read properties of undefined (reading 'createKeywordTypeNode')" | npm installed TypeScript 7 (the new native compiler), which lacks the compiler interface that tool uses. TypeScript is pinned to 5.9 (`typescript@~5.9.3`), which the tool officially supports. Don't upgrade past 5.x until the tool supports it |
+| A follow-up with no company ("And what about its biggest risks?") was answered about Amazon | With no company named, the copilot searches every company and returned Amazon's passages. Found by trying it in the browser. The answer now carries a notice that no company was named and lists the companies it drew on. It doesn't fix the cause (no memory); that needs conversation-aware retrieval |
+| A saved-history test passed even with a bug in saving | It checked what loads back, and loading also discards unfinished entries, which hid the bug. Found by deliberately breaking the code. The test now reads the raw saved data |
+| After a test made `localStorage` throw, cleanup crashed and broke later tests | The test setup cleared storage before undoing the mock. It now restores mocks first |
 | One-year chart labels read "Oct 25" and "Jan 26" | That looks like October 25th and January 26th, but meant October 2025. Found while looking at the real page. The one-year axis now says "Oct 2025" |
 | The 52-week range marker's position was a long float in the page (`88.10625000000002%`) | Harmless to look at, but sloppy. It's rounded to one decimal |
 | Generated types marked the copilot's `limit` as required | The generator treats fields with defaults as required. The `gen:api` script passes `--default-non-nullable false` |
@@ -95,6 +101,14 @@ benchmarks.
 - **The wireframes show things the API can't supply yet:** a natural-language screener (no fundamentals data) and an
   "AI signal: bullish, 72%" (no forecasting model exists, and we haven't decided one should).
 - **A latest price bar can be a partial day** if requested while the market is open. `as_of` shows its date.
+- **The copilot has no memory.** Follow-ups that depend on an earlier answer ("its risks", "compare that to Apple")
+  don't work. The page says so and flags answers where no company was named, but a user can still be confused.
+- **History is per browser.** Clearing site data, a private window, or another browser loses it. Nothing is stored on
+  the server, and nothing stops someone else using the same browser from reading it.
+- **No streaming.** An answer appears all at once after several seconds, with only a "working" message until then.
+- **The copilot page was checked in a real browser:** a company-filtered question, a reload that restored history,
+  an unnamed follow-up (which exposed the Amazon problem above), the clear flow, and a 375 px phone width. Stop
+  and retry were checked by automated tests only. Dark mode only.
 - **The stock detail page has no AI signal or fundamentals.** Those need data and a model that don't exist. It shows what
   the stored data supports: prices, news mood, filings, and the filings copilot.
 - **Duplicate headlines:** the free news feed can return the same title from different sources or links, so a headline

@@ -57,6 +57,9 @@ command-line tools. The nightly job, backend API, and screens are not built.
   `unverified_numbers`) and never rely on color alone. Run `npm run typecheck` and `npm test` before committing.
   Node.js lives in `C:\Program Files\nodejs`; add it to `PATH` if a tool can't find `node`. Stop any dev servers you
   start (ports 5173 and 8000).
+- **Copilot page:** it must keep telling users that each question stands alone (the API has no conversation memory),
+  keep the notice for answers where no company was named, and validate anything read back from `localStorage`.
+  Don't write a feature that implies memory without changing the API and evaluating the result.
 - **Branches:** do new feature work on a `feature/...` branch and tell the user when a step warrants one. The nightly job
   runs whatever code is checked out, so don't leave half-finished work checked out at 5pm.
 - **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` (it changes Windows Task Scheduler)

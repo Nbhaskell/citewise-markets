@@ -1,10 +1,11 @@
 # Web app
 
-The browser screens for stockMarket. React 19, TypeScript, built with Vite. Two screens so far:
+The browser screens for stockMarket. React 19, TypeScript, built with Vite. Three screens so far:
 
 - **Dashboard** (`/`): a watchlist, a combined news panel, and a box for asking the filing-grounded copilot questions.
 - **Stock detail** (`/stocks/AAPL`): an interactive price chart, key stats with a 52-week range bar, that company's news,
   its SEC filings, and the copilot limited to that company. Click a ticker on the dashboard to get there.
+- **Copilot** (`/copilot`): a full-page chat with a saved history, a company filter, and Stop and retry.
 
 ## Run it
 
@@ -46,12 +47,15 @@ A Python test (`tests/test_openapi_contract.py`) fails if `openapi.json` is out 
 
 ```
 src/api/          client.ts (fetch + friendly errors), types.ts (names for generated types), schema.d.ts (generated)
-src/hooks/        useApi: load data, cancel on leave, retry
+src/hooks/        useApi: load data, cancel on leave, retry; useConversation: the copilot's saved history
+                  useElementWidth: size an SVG to its container
 src/lib/          format.ts: prices, percentages, dates, volumes, news mood, safe links
                   chart.ts: axis ticks, scales, and paths for the price chart (pure functions)
+                  conversation.ts: the copilot history's shape, validation, and browser storage
 src/components/   Watchlist, NewsPanel, CopilotBox, AnswerText, FreshnessBar, Sparkline, pills,
-                  PriceHistory + PriceChart, KeyStats, FilingsList
-src/pages/        Dashboard, StockPage
+                  PriceHistory + PriceChart, KeyStats, FilingsList,
+                  AnswerView (one copilot answer), Composer, ConversationView, CompanyFilter
+src/pages/        Dashboard, StockPage, CopilotPage
 src/test/         setup and a fake API for tests
 ```
 
@@ -61,6 +65,19 @@ src/test/         setup and a fake API for tests
 readable on a phone. A readout above the chart shows the selected day: hover or touch to pick one, or focus the
 chart and use the arrow keys (Shift for 10 days, Home and End for the ends). The line is green if the range ended
 at or above where it started, red if below. The math lives in `src/lib/chart.ts` so it can be tested directly.
+
+## The copilot page
+
+- **Each question is answered on its own.** The API takes one question and no earlier messages, so the copilot has no
+  memory. The page says so. The history is a record for the reader, not context for the model.
+- **History is saved in this browser only** (`localStorage`, the newest 20). Unfinished questions aren't saved. Saved
+  data is validated field by field on load, because anything with access to the browser can edit it; damaged
+  entries are dropped. If the browser refuses to save (private window, full storage), the page says so.
+- **One question at a time**, because the AI model answers one at a time. While one is running the button becomes
+  Stop, and a stopped or failed question can be asked again in place.
+- **Company filter:** pick up to five companies (the API's limit), or none for all. When no company is named or
+  chosen, the answer carries a notice listing the companies it actually drew on, so a follow-up like "what about its
+  risks?" can't quietly pass as being about the previous company.
 
 ## Things to keep true
 

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
 import { defaultRoutes, mockApi } from "./test/mockApi";
@@ -36,5 +36,21 @@ describe("App", () => {
     renderAt("/nope");
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to the dashboard" })).toHaveAttribute("href", "/");
+  });
+
+  it("has navigation between the dashboard and the copilot, and marks where you are", async () => {
+    mockApi(defaultRoutes());
+    renderAt("/copilot");
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "Copilot" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "Dashboard" })).not.toHaveAttribute("aria-current");
+    expect(await screen.findByRole("heading", { level: 1, name: "Copilot" })).toBeInTheDocument();
+  });
+
+  it("links the dashboard's copilot box to the full page", async () => {
+    mockApi(defaultRoutes());
+    renderAt("/");
+    expect(await screen.findByRole("link", { name: /Open the full-page copilot/ })).toHaveAttribute("href", "/copilot");
+    expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
   });
 });

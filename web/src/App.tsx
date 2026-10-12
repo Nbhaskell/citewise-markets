@@ -1,4 +1,5 @@
-import { Link, Route, Routes } from "react-router-dom";
+import { Link, NavLink, Route, Routes } from "react-router-dom";
+import { CopilotPage } from "./pages/CopilotPage";
 import { Dashboard } from "./pages/Dashboard";
 import { StockPage } from "./pages/StockPage";
 
@@ -20,12 +21,19 @@ export function App() {
         <Link to="/" className="brand">
           stockMarket
         </Link>
+        <nav className="main-nav" aria-label="Main">
+          <NavLink to="/" end>
+            Dashboard
+          </NavLink>
+          <NavLink to="/copilot">Copilot</NavLink>
+        </nav>
         <span className="muted small">Research from public filings. Not financial advice.</span>
       </header>
       <main>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/stocks/:symbol" element={<StockPage />} />
+          <Route path="/copilot" element={<CopilotPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

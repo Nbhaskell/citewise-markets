@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, isAbort } from "../api/client";
 import type { CopilotResponse } from "../api/types";
-import { safeHttpUrl } from "../lib/format";
-import { AnswerText } from "./AnswerText";
+import { AnswerView } from "./AnswerView";
 
 const DEFAULT_EXAMPLES = [
   "What are NVIDIA's biggest risks?",
@@ -27,7 +26,6 @@ export function CopilotBox({ symbol, examples = DEFAULT_EXAMPLES }: Props) {
   const [question, setQuestion] = useState("");
   const [hint, setHint] = useState<string | null>(null);
   const [state, setState] = useState<State>({ kind: "idle" });
-  const [highlight, setHighlight] = useState<number | null>(null);
   const inFlight = useRef<AbortController | null>(null);
 
   useEffect(() => () => inFlight.current?.abort(), []);
@@ -39,7 +37,6 @@ export function CopilotBox({ symbol, examples = DEFAULT_EXAMPLES }: Props) {
       return;
     }
     setHint(null);
-    setHighlight(null);
     inFlight.current?.abort(); // a newer question replaces an older one still running
     const controller = new AbortController();
     inFlight.current = controller;
@@ -56,11 +53,6 @@ export function CopilotBox({ symbol, examples = DEFAULT_EXAMPLES }: Props) {
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     void ask(question);
-  }
-
-  function showSource(n: number) {
-    setHighlight(n);
-    document.getElementById(`source-${n}`)?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
   }
 
   const loading = state.kind === "loading";
@@ -122,72 +114,8 @@ export function CopilotBox({ symbol, examples = DEFAULT_EXAMPLES }: Props) {
             {state.message}
           </p>
         )}
-        {state.kind === "done" && <Result result={state.result} highlight={highlight} onCite={showSource} />}
+        {state.kind === "done" && <AnswerView result={state.result} />}
       </div>
     </section>
-  );
-}
-
-function Result({
-  result,
-  highlight,
-  onCite,
-}: {
-  result: CopilotResponse;
-  highlight: number | null;
-  onCite: (n: number) => void;
-}) {
-  const uncited = !result.refused && !result.grounded;
-  return (
-    <div className="result">
-      <p className="muted small">
-        {result.refused
-          ? "No matching passages found"
-          : result.companies.length > 0
-            ? `Searched filings for ${result.companies.join(", ")}`
-            : "Searched all stored filings"}
-      </p>
-
-      <AnswerText text={result.answer} onCite={onCite} />
-
-      {result.unverified_numbers.length > 0 && (
-        <p role="alert" className="flag warn">
-          Some figures in this answer weren't found in the cited passages ({result.unverified_numbers.join(", ")}).
-          Check the source before relying on them.
-        </p>
-      )}
-      {uncited && (
-        <p role="alert" className="flag warn">
-          This answer doesn't cite any filing passages. Treat it as unverified.
-        </p>
-      )}
-
-      {result.sources.length > 0 && (
-        <ol className="sources" aria-label="Sources">
-          {result.sources.map((s) => (
-            <li key={s.number} id={`source-${s.number}`} className={highlight === s.number ? "highlight" : undefined} value={s.number}>
-              <strong>
-                {s.symbol} {s.form}
-              </strong>{" "}
-              filed {s.filed_at}
-              {s.section ? ` · ${s.section}` : ""}
-              {safeHttpUrl(s.url) && (
-                <>
-                  {" · "}
-                  <a href={safeHttpUrl(s.url)} target="_blank" rel="noopener noreferrer">
-                    View filing
-                  </a>
-                </>
-              )}
-              <details>
-                <summary>Excerpt</summary>
-                <p className="excerpt">{s.excerpt}</p>
-              </details>
-            </li>
-          ))}
-        </ol>
-      )}
-      <p className="muted small">{result.disclaimer}</p>
-    </div>
   );
 }
