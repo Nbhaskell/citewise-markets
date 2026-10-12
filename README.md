@@ -11,6 +11,7 @@ What works today:
   not found in the cited passages
 - News headline sentiment (positive / negative / neutral / irrelevant) per company
 - A nightly refresh job that keeps all of the above up to date (you register it once, see below)
+- A read-only HTTP API (FastAPI) over all of it, for the web screens to use (see "The API" below)
 
 Everything runs locally and costs nothing. The AI uses a local model through Ollama.
 
@@ -114,6 +115,33 @@ Remove it with `powershell -File scripts\unregister_nightly_task.ps1`. The task 
 and if the PC was off at the scheduled time it runs when you next log in. **Docker Desktop and Ollama must be running**
 at that time. If Docker is down the run exits with code 2, and if Ollama is down only the sentiment step is skipped.
 
+## The API
+
+```bash
+.venv\Scripts\python -m api
+```
+
+Serves `http://127.0.0.1:8000`. Open `http://127.0.0.1:8000/docs` for interactive documentation where you can try
+every endpoint. The database must be running, and Ollama for the copilot.
+
+| Endpoint | Returns |
+|---|---|
+| `GET /health` | Database and AI model status |
+| `GET /api/status` | Nightly job history and how fresh each company's data is |
+| `GET /api/stocks` | Every tracked company: latest price, daily change, news sentiment (the dashboard) |
+| `GET /api/stocks/{symbol}` | One company, plus 52-week range and volume |
+| `GET /api/stocks/{symbol}/prices?range=1M\|3M\|6M\|1Y\|5Y\|MAX` | Daily price bars for a chart |
+| `GET /api/stocks/{symbol}/news?days=7&limit=30` | Headlines with sentiment labels (add `include_irrelevant=true` to see all) |
+| `GET /api/stocks/{symbol}/filings` | Stored SEC filings and whether each is searchable |
+| `GET /api/filings/search?q=...&symbol=AAPL&form=10-K&latest=true` | Matching filing passages with source links |
+| `POST /api/copilot` with `{"question": "...", "symbols": ["NVDA"]}` | A cited answer from the filings |
+
+The copilot can take several seconds, so show a loading state. Check `unverified_numbers` in its reply and warn
+the user if it isn't empty.
+
+**It is read-only and has no login.** It only listens on this computer (`127.0.0.1`) and only allows requests from
+the local web app's address (`localhost:5173` or `:3000`). Don't expose it to a network until accounts exist.
+
 ## Command cheat sheet
 
 | What | Command | Useful options |
@@ -127,6 +155,7 @@ at that time. If Docker is down the run exits with code 2, and if Ollama is down
 | Score headlines | `python -m ai.sentiment AAPL` | `--days 7` `--no-score` (summary only) |
 | Refresh everything | `python -m jobs.refresh` | `--symbols AAPL` `--steps prices news filings index sentiment` |
 | Check freshness | `python -m jobs.refresh --status` | |
+| Start the API | `python -m api` | docs at `http://127.0.0.1:8000/docs` |
 | Run tests | `python -m pytest` | |
 | Database shell | `docker exec -it stockmarket-db psql -U stockmarket` | |
 
@@ -141,6 +170,7 @@ If printing filing text fails with an encoding error in a Windows console, set `
 data/        Ingest tools and data sources
   sources/     base.py (interfaces), yfinance_source.py, google_news.py, edgar.py
 ai/          Chunking, embeddings, search, copilot, sentiment, and the LLM interface
+api/         The FastAPI app (app.py), response shapes (schemas.py), SQL (queries.py), per-request setup (deps.py)
 jobs/        The nightly refresh runner (refresh.py) and its status report (status.py)
 db/          migrate.py and numbered SQL migrations (never edit one that has been applied)
 scripts/     PowerShell scripts to schedule and unschedule the nightly job
@@ -159,10 +189,14 @@ docker-compose.yml   The database container
 | `SEC_USER_AGENT` | for filings | "Your Name your@email.com", sent to sec.gov |
 | `LLM_PROVIDER` | no | Defaults to `ollama`. No other provider exists yet |
 | `OLLAMA_MODEL` | no | Defaults to `qwen3:latest` |
+| `API_PORT` | no | Port for the API. Defaults to `8000` |
+| `CORS_ORIGINS` | no | Comma-separated web app addresses the API accepts. Defaults to localhost on ports 5173 and 3000 |
 
 ## What is not built yet
 
 - Failure alerts for the nightly job (today you check `--status` or the log)
-- The backend API (accounts, portfolios, alerts) and the web and mobile screens
+- Accounts and login, portfolios, and alerts (the API so far is read-only)
+- A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
+- The web and mobile screens
 - A Claude (Anthropic API) implementation of the LLM interface
 - A paid, licensed market data feed

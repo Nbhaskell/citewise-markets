@@ -4,7 +4,7 @@ The app is built in layers, bottom-up. Each layer only depends on the ones below
 
 ```
 Client apps        (not built)   web app, mobile app, notifications, admin
-Backend services   (not built)   accounts, portfolios, alerts, optional broker API
+Backend services   (partly built) read-only API: api/. Not built: accounts, portfolios, alerts, broker API
 AI layer           (built)       embeddings, search, copilot, sentiment      -> ai/
 Data layer         (built)       prices, news, filings, one Postgres DB      -> data/, db/
 ```
@@ -95,6 +95,28 @@ prices -> news -> filings -> index (embed new filings) -> sentiment (score new h
 - **Scheduling:** `scripts/register_nightly_task.ps1` creates a Windows Task Scheduler task (daily, runs when you
   are logged in, catches up after a missed time, never overlaps, 2-hour limit). It is not registered automatically.
 
+## Read-only API (`api/`)
+
+A FastAPI app that exposes the stored data and the AI tools as JSON, for the web screens. It runs in the same
+Python process space as the AI code, so the copilot and search are plain function calls, not a second service.
+
+| File | Role |
+|---|---|
+| `api/app.py` | Routes. Plain (non-async) endpoints, which FastAPI runs in a thread pool, matching the synchronous database driver |
+| `api/schemas.py` | The response and request shapes. These are the contract with the screens and drive `/docs` |
+| `api/queries.py` | The SQL for each endpoint |
+| `api/deps.py` | Per-request database connection, the embedder and chat model (loaded once, on first use), CORS settings |
+
+- **Fakes in tests:** the embedder, chat model, and sentiment model name are FastAPI dependencies, so tests replace
+  them via `app.dependency_overrides`. The tests use the real database with `ZZAPI` seed data.
+- **Sentiment model:** headline labels are reported for the currently configured chat model (`LLM_PROVIDER`), so a
+  later Claude run doesn't mix with Qwen's labels.
+- **Price ranges** end at the latest stored bar, not today, so weekends and holidays never give an empty chart.
+- **Validation:** tickers must look like tickers, ranges and limits are bounded, questions are 3 to 500 characters.
+  Unknown companies return 404, a model that isn't running returns 503.
+- **Screens covered:** dashboard, stock detail (except an AI signal), and copilot chat. Not covered: screener,
+  portfolio, alerts and settings, because the data or accounts behind them don't exist yet.
+
 ## Swappable pieces at a glance
 
 | To change... | Write... | Edit... |
@@ -105,5 +127,5 @@ prices -> news -> filings -> index (embed new filings) -> sentiment (score new h
 
 ## Not built yet
 
-Failure alerts for the nightly job, backend API, web and mobile screens, a Claude implementation of `LLM`, and a
-licensed data feed.
+Failure alerts for the nightly job, accounts and login, portfolios, alerts, the screener and AI-signal endpoints,
+web and mobile screens, a Claude implementation of `LLM`, and a licensed data feed.

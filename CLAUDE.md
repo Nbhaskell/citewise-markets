@@ -45,6 +45,11 @@ command-line tools. The nightly job, backend API, and screens are not built.
 - **Nightly job (`jobs/refresh.py`):** keep each (step, company) isolated so one failure never stops the run, keep
   the advisory lock, and keep missing prerequisites as skipped-and-`partial`, never silent successes. Tests for it
   inject fakes through `Deps` and set the job name to `test_refresh` so they never touch real run history.
+- **API (`api/`):** keep it read-only and bound to `127.0.0.1` until accounts exist. Don't add write endpoints, widen
+  CORS, or bind to `0.0.0.0` without being asked. Keep response shapes in `schemas.py` stable, since the screens
+  depend on them, and keep copilot answers passing through the `unverified_numbers` field. Tests override the
+  embedder, chat model, and sentiment model via `app.dependency_overrides`; don't load real models in tests.
+  Stop any server you start for a manual check.
 - **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` (it changes Windows Task Scheduler)
   without being asked.
 

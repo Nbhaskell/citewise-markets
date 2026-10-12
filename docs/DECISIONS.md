@@ -18,6 +18,9 @@ benchmarks.
 | Task runs only while logged in (interactive principal) | Avoids storing a Windows password. Docker Desktop and Ollama start at login anyway, and the job needs both |
 | Missing prerequisites are skipped and flagged `partial`, not failed | One missing piece (Ollama down, no SEC contact) shouldn't block prices and news, but it shouldn't pass silently either |
 | Postgres advisory lock for "one run at a time" | The database is already the shared source of truth, and the lock disappears automatically if the process dies |
+| Backend in Python (FastAPI), not Node | All the data and AI code is Python, so the API calls it directly instead of through a second service. Node.js is still needed later, only for building the web screens |
+| API is read-only and has no login yet | Four of the six wireframe screens need only reads, and it avoids handling passwords before there is a reason to. It listens on `127.0.0.1` and allows only the local web app's origin |
+| One database connection per request | Simple and fast enough locally (a connect takes a few milliseconds on `127.0.0.1`). A connection pool is the upgrade if load ever matters |
 | Migrations are append-only numbered SQL files | `db/migrate.py` applies each once. Never edit one that has been applied; add a new file |
 
 ## Gotchas we hit
@@ -70,6 +73,15 @@ benchmarks.
 - **The scheduled path was tested once:** after registering, `Start-ScheduledTask` ran the job through Task Scheduler
   (result code 0, run logged as success). A run at the scheduled clock time, and a catch-up after a missed run,
   have not been observed yet.
+- **The API has no authentication, rate limiting, or per-user data.** It is safe only because it is bound to this
+  computer. Anyone who can reach it can ask the copilot questions, which uses your GPU.
+- **The copilot answers one question at a time well.** Several at once queue up behind the single local model and
+  would each be slow. Nothing limits concurrent copilot requests yet.
+- **The first search or copilot request after the server starts loads the embedding model** (a few seconds). There is
+  no warm-up at startup.
+- **The wireframes show things the API can't supply yet:** a natural-language screener (no fundamentals data) and an
+  "AI signal: bullish, 72%" (no forecasting model exists, and we haven't decided one should).
+- **A latest price bar can be a partial day** if requested while the market is open. `as_of` shows its date.
 - **Evaluation is small.** About 14 copilot questions and 40 headlines, judged by one reviewer.
 - **The embedding model has no query prefix.** bge models recommend one, but fastembed's `query_embed` doesn't add it.
   Adding it by hand made no difference on the test questions, so it was left out.
