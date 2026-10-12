@@ -45,4 +45,21 @@ describe("NewsPanel", () => {
     await userEvent.click(screen.getByRole("checkbox"));
     expect(await screen.findByText("No headlines in the last 3 days.")).toBeInTheDocument();
   });
+
+  it("can focus on one company over a longer window", async () => {
+    const fetchMock = mockApi(defaultRoutes());
+    render(<NewsPanel symbol="NVDA" />);
+    expect(await screen.findByRole("heading", { name: "NVDA news" })).toBeInTheDocument();
+    await screen.findByText("Nvidia wins a big contract");
+    const query = new URL(String(fetchMock.mock.calls[0][0]), "http://localhost").searchParams;
+    expect(query.get("symbol")).toBe("NVDA");
+    expect(query.get("days")).toBe("7");
+    expect(query.get("limit")).toBe("20");
+  });
+
+  it("names the longer window when there is nothing to show for one company", async () => {
+    mockApi({ ...defaultRoutes(), "GET /api/news": [] });
+    render(<NewsPanel symbol="NVDA" />);
+    expect(await screen.findByText(/No positive or negative headlines in the last 7 days/)).toBeInTheDocument();
+  });
 });

@@ -1,5 +1,6 @@
 import { Link, Route, Routes } from "react-router-dom";
 import { Dashboard } from "./pages/Dashboard";
+import { StockPage } from "./pages/StockPage";
 
 function NotFound() {
   return (
@@ -24,6 +25,7 @@ export function App() {
       <main>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/stocks/:symbol" element={<StockPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

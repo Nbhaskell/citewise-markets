@@ -90,3 +90,36 @@ export const defaultRoutes = (): Record<string, Handler> => ({
   "GET /health": okHealth,
   "POST /api/copilot": copilotAnswer(),
 });
+
+export const stockDetail = {
+  ...stocks[0],
+  exchange: "NMS",
+  currency: "USD",
+  high_52w: 360,
+  low_52w: 200,
+  volume: 53_200_000,
+};
+
+export const filingRows = [
+  { accession_number: "0-1", form: "10-Q", filed_at: "2026-07-31", period_of_report: "2026-06-27", url: "https://www.sec.gov/q", searchable: true },
+  { accession_number: "0-2", form: "10-K", filed_at: "2025-10-31", period_of_report: "2025-09-27", url: "javascript:alert(1)", searchable: false },
+];
+
+/** 400 days of closes rising by 1 a day, ending 2026-10-09. */
+export const longPrices = (symbol: string, range = "1Y", n = 120) => ({
+  symbol,
+  range,
+  points: Array.from({ length: n }, (_, k) => {
+    const d = new Date(Date.UTC(2026, 9, 9) - (n - 1 - k) * 86_400_000).toISOString().slice(0, 10);
+    const close = 200 + k;
+    return { date: d, open: close, high: close + 1, low: close - 1, close, volume: 1_000_000 + k };
+  }),
+});
+
+export const detailRoutes = (): Record<string, Handler> => ({
+  ...defaultRoutes(),
+  "GET /api/stocks/AAPL": stockDetail,
+  "GET /api/stocks/AAPL/prices": () => longPrices("AAPL"),
+  "GET /api/stocks/AAPL/filings": filingRows,
+  "GET /api/news": newsItems.filter((n) => n.symbol === "AAPL"),
+});

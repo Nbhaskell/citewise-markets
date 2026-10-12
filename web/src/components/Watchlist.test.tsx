@@ -1,7 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Watchlist } from "./Watchlist";
 import { defaultRoutes, json, mockApi } from "../test/mockApi";
+import { renderWithRouter as render } from "../test/renderWithRouter";
 
 describe("Watchlist", () => {
   it("shows each company with price, change, trend and news mood", async () => {
@@ -19,6 +20,13 @@ describe("Watchlist", () => {
     expect(within(nvda).getByText("▼ -1.29%")).toHaveClass("down");
     expect(within(nvda).getByText("Positive")).toBeInTheDocument();
     expect(await within(nvda).findByRole("img", { name: /NVDA price/ })).toHaveClass("down");
+  });
+
+  it("links each company to its detail page", async () => {
+    mockApi(defaultRoutes());
+    render(<Watchlist />);
+    expect(await screen.findByRole("link", { name: "AAPL" })).toHaveAttribute("href", "/stocks/AAPL");
+    expect(screen.getByRole("link", { name: "NVDA" })).toHaveAttribute("href", "/stocks/NVDA");
   });
 
   it("copes with a company that has no price change or news yet", async () => {

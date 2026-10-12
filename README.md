@@ -12,7 +12,8 @@ What works today:
 - News headline sentiment (positive / negative / neutral / irrelevant) per company
 - A nightly refresh job that keeps all of the above up to date (you register it once, see below)
 - A read-only HTTP API (FastAPI) over all of it, for the web screens to use (see "The API" below)
-- A web dashboard (React) with a watchlist, news panel, and copilot box (see "The web app" below)
+- A web app (React): a dashboard, and a stock detail page with a price chart, stats, news, filings, and a copilot
+  for that company (see "The web app" below)
 
 Everything runs locally and costs nothing. The AI uses a local model through Ollama.
 
@@ -155,9 +156,10 @@ npm install        # first time only
 npm run dev        # opens at http://localhost:5173
 ```
 
-It shows the watchlist (price, daily change, one-month trend, news mood), the latest positive and negative headlines,
-a data-freshness line that warns about stale data or a failed refresh, and a box for asking the copilot questions
-with clickable numbered sources. See [web/README.md](web/README.md) for details, tests, and how its types are
+The dashboard shows the watchlist (price, daily change, one-month trend, news mood), the latest positive and negative
+headlines, a data-freshness line that warns about stale data or a failed refresh, and a box for asking the copilot
+questions with clickable numbered sources. Click a ticker to open its stock detail page: an interactive price chart
+(1M to MAX), key stats, that company's news and SEC filings, and a copilot limited to that company's filings. See [web/README.md](web/README.md) for details, tests, and how its types are
 generated from the API.
 
 ## Command cheat sheet
@@ -217,8 +219,8 @@ docker-compose.yml   The database container
 - Failure alerts for the nightly job (today you check `--status` or the log)
 - Accounts and login, portfolios, and alerts (the API so far is read-only)
 - A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
-- More screens: stock detail with a price chart, a full copilot page, screener, portfolio, alerts and settings.
-  Only the dashboard exists, and it leaves out the wireframe's market indices strip, portfolio value, and
+- More screens: a full copilot page, screener, portfolio, alerts and settings. Only the dashboard and stock detail
+  exist. The dashboard leaves out the wireframe's market indices strip, portfolio value, and
   "AI daily brief" because no data or accounts sit behind them yet
 - A mobile app, and anything for putting the app online
 - A Claude (Anthropic API) implementation of the LLM interface

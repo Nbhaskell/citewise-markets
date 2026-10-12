@@ -5,21 +5,22 @@ import { useApi } from "../hooks/useApi";
 import { relativeTime, safeHttpUrl } from "../lib/format";
 import { NewsLabelPill } from "./SentimentPill";
 
-const DAYS = 3;
 const MOVERS: NewsLabel[] = ["positive", "negative"];
 
-export function NewsPanel() {
+/** Latest headlines. With a `symbol`, only that company's, over a longer window. */
+export function NewsPanel({ symbol }: { symbol?: string }) {
+  const days = symbol ? 7 : 3;
   // Most headlines are routine (quote pages, "X vs Y" comparisons), so start with the ones labeled good or bad.
   const [moversOnly, setMoversOnly] = useState(true);
   const news = useApi(
-    (signal) => api.news({ days: DAYS, limit: 12, sentiment: moversOnly ? MOVERS : undefined }, signal),
-    [moversOnly],
+    (signal) => api.news({ days, limit: symbol ? 20 : 12, symbol, sentiment: moversOnly ? MOVERS : undefined }, signal),
+    [moversOnly, symbol, days],
   );
 
   return (
     <section className="card" aria-labelledby="news-title">
       <div className="card-head">
-        <h2 id="news-title">Latest news</h2>
+        <h2 id="news-title">{symbol ? `${symbol} news` : "Latest news"}</h2>
         <label className="toggle">
           <input type="checkbox" checked={moversOnly} onChange={(e) => setMoversOnly(e.target.checked)} />
           Positive and negative only
@@ -35,8 +36,8 @@ export function NewsPanel() {
       {news.data && news.data.length === 0 && (
         <p className="muted">
           {moversOnly
-            ? `No positive or negative headlines in the last ${DAYS} days.`
-            : `No headlines in the last ${DAYS} days.`}
+            ? `No positive or negative headlines in the last ${days} days.`
+            : `No headlines in the last ${days} days.`}
         </p>
       )}
       {news.data && news.data.length > 0 && (

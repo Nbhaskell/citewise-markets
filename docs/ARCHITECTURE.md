@@ -124,11 +124,18 @@ Python process space as the AI code, so the copilot and search are plain functio
 React 19 and TypeScript, built with Vite. It only talks to the API; it never touches the database or the AI code.
 
 ```
-Dashboard page
+Dashboard page (/)
   FreshnessBar   <- /api/status, /health        data age, failed refreshes, AI model offline
   Watchlist      <- /api/stocks, /prices        price, change, 1-month sparkline, news mood
   NewsPanel      <- /api/news                   latest positive/negative headlines (toggle for all)
   CopilotBox     -> POST /api/copilot           cited answer, clickable sources, warnings
+
+Stock detail page (/stocks/:symbol)
+  header + KeyStats  <- /api/stocks/{symbol}    price, change, 52-week range bar, volume, sector, news mood
+  PriceHistory       <- /api/stocks/{symbol}/prices?range=   PriceChart (SVG) with 1M, 3M, 6M, 1Y, 5Y, MAX
+  NewsPanel (symbol) <- /api/news?symbol=       that company's headlines over 7 days
+  FilingsList        <- /api/stocks/{symbol}/filings         forms, dates, searchable badge, SEC links
+  CopilotBox (symbol) -> POST /api/copilot      every question limited to this company
 ```
 
 - **Types come from the API.** `api/export_openapi.py` writes `web/openapi.json`; `npm run gen:api` turns it into
@@ -138,6 +145,12 @@ Dashboard page
 - **Each panel loads and fails on its own**, with its own error and retry, so one broken endpoint doesn't blank the page.
 - **Safety in the UI:** API text is rendered as React text, never HTML. Links from outside data go through
   `safeHttpUrl` (http and https only). Every price change has an arrow and sign, not only a color.
+- **Price chart:** hand-drawn SVG sized to its container. The scale, tick, and path math are pure functions in
+  `src/lib/chart.ts`. The selected day is shown in a text readout (hover, touch, or arrow keys), which doubles as the
+  accessible description. While a new range loads the old chart stays, dimmed, and its labels follow the data it was
+  given, so they never mismatch.
+- **Routing:** `/` and `/stocks/:symbol` (React Router). An unknown ticker (the API's 404) gets a "not tracked" page
+  with the command to add it, and a malformed one is rejected before any request is made.
 - **Tests:** Vitest with Testing Library against a fake `fetch`. They cover each panel's loading, empty, error, and
   warning states, plus the client's error messages.
 

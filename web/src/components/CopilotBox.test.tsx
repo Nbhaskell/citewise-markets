@@ -99,6 +99,22 @@ describe("CopilotBox", () => {
   });
 });
 
+describe("CopilotBox for one company", () => {
+  it("limits every question to that company and uses its own examples", async () => {
+    const fetchMock = mockApi({ "POST /api/copilot": copilotAnswer() });
+    render(<CopilotBox symbol="NVDA" examples={["What are the biggest risks?"]} />);
+    expect(screen.getByRole("heading", { name: "Ask about NVDA" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "How many employees does Tesla have?" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "What are the biggest risks?" }));
+    await screen.findByText(/As of fiscal 2026 NVIDIA had/);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      question: "What are the biggest risks?",
+      symbols: ["NVDA"],
+    });
+  });
+});
+
 describe("AnswerText", () => {
   it("renders bold and citations but never raw HTML", () => {
     const onCite = vi.fn();

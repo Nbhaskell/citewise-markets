@@ -62,3 +62,30 @@ export function safeHttpUrl(url: string | null | undefined): string | undefined 
     return undefined;
   }
 }
+
+/** "Mon, Oct 12, 2026" from a "YYYY-MM-DD" date. */
+export function formatLongDate(date: string): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric", year: "numeric",
+  });
+}
+
+export function formatShortDate(date: string | null | undefined): string {
+  if (!date) return "n/a";
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/** 53_200_000 -> "53.2M". */
+export function formatVolume(value: number | null | undefined): string {
+  if (value == null) return "n/a";
+  if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
+  if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
+  return String(value);
+}
+
+/** Where a price sits between the low and high, 0 to 100, for the 52-week range bar. */
+export function positionInRange(price: number | null, low: number | null, high: number | null): number | null {
+  if (price == null || low == null || high == null || high <= low) return null;
+  return Math.min(100, Math.max(0, ((price - low) / (high - low)) * 100));
+}

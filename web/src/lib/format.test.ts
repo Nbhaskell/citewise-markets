@@ -1,4 +1,7 @@
-import { directionOf, formatChangePct, formatPrice, isStale, moodFor, relativeTime, safeHttpUrl } from "./format";
+import {
+  directionOf, formatChangePct, formatLongDate, formatPrice, formatShortDate, formatVolume, isStale, moodFor,
+  positionInRange, relativeTime, safeHttpUrl,
+} from "./format";
 
 const summary = (score: number | null) => ({ days: 7, positive: 1, neutral: 1, negative: 1, irrelevant: 0, score });
 
@@ -64,5 +67,36 @@ describe("safeHttpUrl", () => {
     expect(safeHttpUrl("data:text/html,<script>alert(1)</script>")).toBeUndefined();
     expect(safeHttpUrl("not a url")).toBeUndefined();
     expect(safeHttpUrl(null)).toBeUndefined();
+  });
+});
+
+describe("formatVolume", () => {
+  it("abbreviates large numbers", () => {
+    expect(formatVolume(53_200_000)).toBe("53.2M");
+    expect(formatVolume(1_250_000_000)).toBe("1.3B");
+    expect(formatVolume(48_500)).toBe("48.5K");
+    expect(formatVolume(950)).toBe("950");
+    expect(formatVolume(null)).toBe("n/a");
+  });
+});
+
+describe("dates", () => {
+  it("formats plain dates without shifting them by time zone", () => {
+    expect(formatLongDate("2026-10-12")).toBe("Mon, Oct 12, 2026");
+    expect(formatShortDate("2026-01-01")).toBe("Jan 1, 2026");
+    expect(formatShortDate(null)).toBe("n/a");
+  });
+});
+
+describe("positionInRange", () => {
+  it("places a price between the low and high, clamped to the bar", () => {
+    expect(positionInRange(150, 100, 200)).toBe(50);
+    expect(positionInRange(50, 100, 200)).toBe(0);
+    expect(positionInRange(250, 100, 200)).toBe(100);
+  });
+  it("gives nothing when the range is unknown or empty", () => {
+    expect(positionInRange(null, 100, 200)).toBeNull();
+    expect(positionInRange(150, null, 200)).toBeNull();
+    expect(positionInRange(150, 200, 200)).toBeNull();
   });
 });

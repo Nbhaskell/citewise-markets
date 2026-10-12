@@ -1,7 +1,10 @@
 # Web app
 
-The browser screens for stockMarket. React 19, TypeScript, built with Vite. Right now it has the dashboard:
-a watchlist, a combined news panel, and a box for asking the filing-grounded copilot questions.
+The browser screens for stockMarket. React 19, TypeScript, built with Vite. Two screens so far:
+
+- **Dashboard** (`/`): a watchlist, a combined news panel, and a box for asking the filing-grounded copilot questions.
+- **Stock detail** (`/stocks/AAPL`): an interactive price chart, key stats with a 52-week range bar, that company's news,
+  its SEC filings, and the copilot limited to that company. Click a ticker on the dashboard to get there.
 
 ## Run it
 
@@ -44,11 +47,20 @@ A Python test (`tests/test_openapi_contract.py`) fails if `openapi.json` is out 
 ```
 src/api/          client.ts (fetch + friendly errors), types.ts (names for generated types), schema.d.ts (generated)
 src/hooks/        useApi: load data, cancel on leave, retry
-src/lib/          format.ts: prices, percentages, relative times, news mood, safe links
-src/components/   Watchlist, NewsPanel, CopilotBox, AnswerText, FreshnessBar, Sparkline, pills
-src/pages/        Dashboard
+src/lib/          format.ts: prices, percentages, dates, volumes, news mood, safe links
+                  chart.ts: axis ticks, scales, and paths for the price chart (pure functions)
+src/components/   Watchlist, NewsPanel, CopilotBox, AnswerText, FreshnessBar, Sparkline, pills,
+                  PriceHistory + PriceChart, KeyStats, FilingsList
+src/pages/        Dashboard, StockPage
 src/test/         setup and a fake API for tests
 ```
+
+## The price chart
+
+`PriceChart` is hand-drawn SVG (no charting library). It draws at its container's real pixel width, so axis text stays
+readable on a phone. A readout above the chart shows the selected day: hover or touch to pick one, or focus the
+chart and use the arrow keys (Shift for 10 days, Home and End for the ends). The line is green if the range ended
+at or above where it started, red if below. The math lives in `src/lib/chart.ts` so it can be tested directly.
 
 ## Things to keep true
 
