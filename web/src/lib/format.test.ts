@@ -1,5 +1,5 @@
 import {
-  directionOf, formatChangePct, formatLongDate, formatPrice, formatShortDate, formatVolume, isStale, moodFor,
+  directionOf, formatBigMoney, formatChangePct, formatFraction, formatShareCount, formatLongDate, formatPrice, formatShortDate, formatVolume, isStale, moodFor,
   positionInRange, relativeTime, safeHttpUrl,
 } from "./format";
 
@@ -98,5 +98,25 @@ describe("positionInRange", () => {
     expect(positionInRange(null, 100, 200)).toBeNull();
     expect(positionInRange(150, null, 200)).toBeNull();
     expect(positionInRange(150, 200, 200)).toBeNull();
+  });
+});
+
+describe("company-sized numbers", () => {
+  it("writes dollars in words", () => {
+    expect(formatBigMoney(466_800_000_000)).toBe("$466.8 billion");
+    expect(formatBigMoney(4_976_000_000_000)).toBe("$4.98 trillion");
+    expect(formatBigMoney(3_800_000_000)).toBe("$3.8 billion");
+    expect(formatBigMoney(41_300_000)).toBe("$41.3 million");
+    expect(formatBigMoney(-2_500_000_000)).toBe("-$2.5 billion");
+    expect(formatBigMoney(null)).toBe("n/a");
+  });
+
+  it("writes fractions as percentages and share counts in words", () => {
+    expect(formatFraction(0.2763)).toBe("27.6%");
+    expect(formatFraction(-0.05)).toBe("-5.0%");
+    expect(formatFraction(null)).toBe("n/a");
+    expect(formatShareCount(14_594_180_000)).toBe("14.59 billion");
+    expect(formatShareCount(250_000_000)).toBe("250.0 million");
+    expect(formatShareCount(undefined)).toBe("n/a");
   });
 });

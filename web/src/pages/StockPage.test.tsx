@@ -27,6 +27,8 @@ describe("StockPage", () => {
 
     expect(await screen.findByRole("img", { name: /AAPL closing price over 1Y/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Key stats" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Fundamentals" })).toBeInTheDocument();
+    expect(await screen.findByText("$466.8 billion")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "AAPL news" })).toBeInTheDocument();
     expect(await screen.findByText("Apple faces a probe")).toBeInTheDocument();
     expect(await screen.findByRole("rowheader", { name: "10-Q" })).toBeInTheDocument();

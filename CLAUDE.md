@@ -31,8 +31,9 @@ them (the owner hasn't confirmed the order):
    failing; an occasional copy to OneDrive or a USB drive is the owner's call. No "newest backup is old" warning yet.
 3. **Fundamentals** (P/E, market value, revenue, margins), in three steps the owner approved on 2026-10-13: (1) data
    and calculations, built: SEC "company facts" stored in `financial_facts`, ratios computed in `data/fundamentals.py`,
-   a nightly `fundamentals` step; (2) an API endpoint and a stock detail page section, not started; (3) the copilot
-   answering from them, not started (it still refuses). US-GAAP filers only; foreign filers show "not available".
+   a nightly `fundamentals` step; (2) built: `GET /api/stocks/{symbol}/fundamentals` and a "Fundamentals" card on the
+   stock detail page (`web/src/components/Fundamentals.tsx`); (3) the copilot answering from them, not started (it
+   still refuses). US-GAAP filers only; foreign filers show "not available".
    Python computes every ratio and the model only quotes it as a numbered source. A screener can't exist without these.
 4. **A daily "what changed" view** (new filings, big moves, notable headlines) from data already stored.
 5. **Copilot trust.** "Follow-up to another company" and "price target" fail in `ai.eval_market` every time, and the

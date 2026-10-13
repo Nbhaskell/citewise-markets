@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import type {
   CopilotResponse,
+  Fundamentals,
   Health,
   NewsFeedItem,
   PriceSeries,
@@ -124,5 +125,33 @@ export const detailRoutes = (): Record<string, Handler> => ({
   "GET /api/stocks/AAPL": stockDetail,
   "GET /api/stocks/AAPL/prices": () => longPrices("AAPL"),
   "GET /api/stocks/AAPL/filings": filingRows,
+  ...fundamentalsRoutes(),
   "GET /api/news": newsItems.filter((n) => n.symbol === "AAPL"),
+});
+
+export const fundamentalsData: Fundamentals = {
+  symbol: "AAPL",
+  available: true,
+  unavailable_reason: null,
+  period_end: "2026-06-27",
+  revenue: {
+    value: 466_800_000_000, period_end: "2026-06-27", growth: 0.162,
+    growth_label: "the 9 months to 2026-06-27 vs the same 9 months a year earlier",
+    how: "the last full year (ended 2025-09-27) + the 9 months to 2026-06-27 - the same 9 months a year earlier",
+    sources: ["10-K filed 2025-10-31 (the year ended 2025-09-27)", "10-Q filed 2026-07-31 (9 months to 2026-06-27)",
+      "10-Q filed 2025-08-01 (the same 9 months a year earlier)"],
+  },
+  net_income: { value: 128_900_000_000, period_end: "2026-06-27", growth: 0.2, growth_label: "9 months vs the same 9 months a year earlier",
+    how: "the last full year + the 9 months - the same 9 months a year earlier", sources: ["10-Q filed 2026-07-31 (9 months to 2026-06-27)"] },
+  diluted_eps: { value: 8.72, period_end: "2026-06-27", growth: null, growth_label: null,
+    how: "the last full year + the 9 months - the same 9 months a year earlier", sources: [] },
+  operating_income: { value: 154_900_000_000, period_end: "2026-06-27", growth: null, growth_label: null, how: "operating income recipe", sources: [] },
+  gross_margin: 0.487, operating_margin: 0.332, net_margin: 0.276,
+  shares: { value: 14_590_000_000, source: "the cover page of the 10-Q filed 2026-07-31", as_of: "2026-07-17" },
+  price: 340.97, price_date: "2026-10-12", market_value: 4_976_000_000_000, pe: 39.1, pe_note: null,
+  cautions: [],
+};
+
+export const fundamentalsRoutes = (over: Partial<Fundamentals> = {}): Record<string, Handler> => ({
+  "GET /api/stocks/AAPL/fundamentals": { ...fundamentalsData, ...over },
 });

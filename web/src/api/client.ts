@@ -2,6 +2,7 @@ import type {
   CopilotRequest,
   CopilotResponse,
   FilingOut,
+  Fundamentals,
   Health,
   NewsFeedItem,
   NewsLabel,
@@ -66,6 +67,8 @@ export const api = {
   stocks: (signal?: AbortSignal) => request<StockSummary[]>("/api/stocks", { signal }),
   stock: (symbol: string, signal?: AbortSignal) =>
     request<StockDetail>(`/api/stocks/${encodeURIComponent(symbol)}`, { signal }),
+  fundamentals: (symbol: string, signal?: AbortSignal) =>
+    request<Fundamentals>(`/api/stocks/${encodeURIComponent(symbol)}/fundamentals`, { signal }),
   filings: (symbol: string, signal?: AbortSignal) =>
     request<FilingOut[]>(`/api/stocks/${encodeURIComponent(symbol)}/filings`, { signal }),
   prices: (symbol: string, range: PriceRange, signal?: AbortSignal) =>

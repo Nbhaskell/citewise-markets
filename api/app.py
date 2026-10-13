@@ -91,6 +91,14 @@ def stock_prices(
     return {"symbol": symbol, "range": range, "points": queries.price_points(conn, symbol, range)}
 
 
+@app.get("/api/stocks/{symbol}/fundamentals", response_model=schemas.FundamentalsOut, tags=["stocks"])
+def stock_fundamentals(symbol: Symbol, conn: Conn):
+    """Revenue, profit, margins, market value, and P/E from the SEC filings, each with how it was built and any cautions.
+    `available` is false for a company with no figures (not downloaded yet, or a foreign filer)."""
+    symbol = _require_company(conn, symbol)
+    return queries.fundamentals(conn, symbol)
+
+
 @app.get("/api/stocks/{symbol}/news", response_model=list[schemas.NewsItemOut], tags=["stocks"])
 def stock_news(
     symbol: Symbol, conn: Conn, model: SentimentModel,

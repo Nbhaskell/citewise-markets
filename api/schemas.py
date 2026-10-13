@@ -175,3 +175,41 @@ class FreshnessOut(BaseModel):
 class StatusOut(BaseModel):
     runs: list[RunOut]
     companies: list[FreshnessOut]
+
+
+class FundamentalFigure(BaseModel):
+    value: float
+    how: str = Field(description="How the figure was built, in plain words, with the dates")
+    period_end: date = Field(description="Where the latest filed period ends")
+    sources: list[str] = Field(description="The SEC filings it came from, e.g. '10-Q filed 2026-07-31 (9 months to 2026-06-27)'")
+    growth: Optional[float] = Field(None, description="The latest period vs the same period a year earlier (0.12 = up 12%); null if it can't be told")
+    growth_label: Optional[str] = Field(None, description="Which two periods growth compares")
+
+
+class SharesOut(BaseModel):
+    value: float
+    source: str = Field(description="Where the count was read, in words")
+    as_of: date
+
+
+class FundamentalsOut(BaseModel):
+    """Figures computed from the SEC filings. Every ratio is worked out in Python; cautions explain where a correct number could mislead."""
+
+    symbol: str
+    available: bool
+    unavailable_reason: Optional[str] = Field(None, description="Why there are no figures (not downloaded yet, or a foreign filer), when available is false")
+    period_end: Optional[date] = Field(None, description="End of the latest reported period behind the figures")
+    revenue: Optional[FundamentalFigure] = Field(None, description="Dollars over the last twelve months")
+    net_income: Optional[FundamentalFigure] = Field(None, description="Dollars over the last twelve months, the part belonging to shareholders")
+    diluted_eps: Optional[FundamentalFigure] = Field(None, description="Dollars per share over the last twelve months")
+    operating_income: Optional[FundamentalFigure] = Field(None, description="Dollars over the last twelve months")
+    gross_margin: Optional[float] = Field(None, description="A fraction: 0.5 = 50%. Null if the company reports no gross profit")
+    operating_margin: Optional[float] = None
+    net_margin: Optional[float] = None
+    shares: Optional[SharesOut] = None
+    price: Optional[float] = Field(None, description="The latest stored close, used for market value and P/E")
+    price_date: Optional[date] = None
+    market_value: Optional[float] = Field(None, description="Shares times the latest close, in dollars")
+    pe: Optional[float] = Field(None, description="Latest close divided by diluted EPS for the last twelve months; null when earnings are zero or negative")
+    pe_note: Optional[str] = Field(None, description="Why P/E is missing, when it is")
+    cautions: list[str]

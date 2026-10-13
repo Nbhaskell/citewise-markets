@@ -15,6 +15,8 @@ export type HistoryTurn = S["HistoryTurn"];
 export type CopilotResponse = S["CopilotResponse"];
 export type CopilotSource = S["Source"];
 export type StatusOut = S["StatusOut"];
+export type Fundamentals = S["FundamentalsOut"];
+export type FundamentalFigure = S["FundamentalFigure"];
 export type Health = S["Health"];
 
 export type PriceRange = "1M" | "3M" | "6M" | "1Y" | "5Y" | "MAX";
