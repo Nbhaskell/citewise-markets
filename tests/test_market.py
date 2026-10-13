@@ -193,8 +193,9 @@ def test_headlines_are_deduplicated_filtered_and_newest_first(conn):
 
 def test_sentiment_summary_counts_only_the_window_and_says_it_is_imperfect(conn):
     ev = sentiment_evidence(conn, A, MODEL, 7, TODAY)
-    assert "2 positive, 2 neutral, 1 negative, 1 not actually about the company" in ev.text
-    assert "imperfect" in ev.text and "Score: +0.20" in ev.text  # (2 - 1) / 5 relevant
+    # the two copies of one story count once, and the quote page and "vs." page (both neutral) are left out
+    assert "1 positive, 0 neutral, 1 negative, 1 not actually about the company" in ev.text
+    assert "imperfect" in ev.text and "Score: +0.00" in ev.text  # (1 - 1) / 2 relevant
     assert sentiment_evidence(conn, B, MODEL, 7, TODAY) is None
 
 

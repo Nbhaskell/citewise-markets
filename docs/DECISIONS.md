@@ -40,7 +40,7 @@ benchmarks.
 | The copilot picks prices, headlines, or filings with keyword rules, not a model call | Predictable, testable, and instant. A model call would add a delay and a new way to be wrong. The cost is vocabulary gaps: a fresh set of 14 questions found three phrasings the rules missed. Gaps fall back to the filings route, which says "the sources don't provide that" |
 | Python computes every price figure; the model only copies | Matches the rule that the model never calculates. Changes, highs, lows, and ranges are written into the source text, with the direction in words ("a rise"), so the numbers check can verify the answer |
 | Headlines are context, never a cause | They are titles only. The copilot is told, and checked, not to say a headline explains a price move. "Why did it move?" is answered with the move, the headlines of the period, and "the stored data can't show the cause" |
-| Quote pages and "X vs Y" pages are left out of the copilot's headlines | They are most of the neutral labels, say nothing new, and quote intraday prices that read like closing prices. The news panel is unchanged |
+| Quote pages and "X vs Y" pages are left out of the copilot's headlines | They are most of the neutral labels, say nothing new, and quote intraday prices that read like closing prices. The news panel is unchanged, but the sentiment totals and score now leave them out too |
 | Index and market-wide questions are refused | No index data is stored. Asked "What is the S&P 500 at?", the model answered "$217" from a filing's total-return chart (scaled from $100). Refusing is better than a confident wrong number |
 | A cause hint is retried, then shown as a caution | The prompt alone didn't stop the model hedging ("may have influenced market sentiment"), so the code checks for it, retries once, and the reply carries a visible `cautions` entry if it persists |
 
@@ -109,8 +109,9 @@ benchmarks.
 - **Tables are hard to search.** Financial statements are lines of numbers, which the embedding model handles poorly.
 - **Sentiment is shallow and leans neutral.** In a hand audit of 40 headlines, about 35 labels looked right. Mildly
   good or bad news is often labeled neutral, and headlines about other companies are often labeled neutral instead of
-  irrelevant. About two-thirds of labels are neutral, mostly quote pages and "X vs Y" comparison pages, so scores sit
-  near zero. Consistency across re-runs was not measured.
+  irrelevant. Before quote pages were left out of the totals (see "Sentiment totals count each story once" below),
+  about two-thirds of labels were neutral, so scores sat near zero; neutral is still the biggest group. Consistency
+  across re-runs was not measured.
 - **Which sources a question gets is decided by keyword rules**, and about one fresh phrasing in five is missed (see
   the fair number above). A missed one falls back to the filings route. That is usually an honest "the sources don't
   provide that", but not always: asked "Why is Apple stock crashing?" before "crashing" was a known word, it answered
@@ -193,9 +194,27 @@ benchmarks.
   (newest copy kept), using the same rule as the copilot (`data/headlines.py`: case, spacing, and a trailing
   " - Publisher" are ignored). A story about two companies still appears once for each. Only identical titles match:
   two outlets that reword the same story still show twice. The rows stay in the database, and the sentiment counts and
-  score still count every copy, so those numbers can be higher than the list beside them. Checked with automated tests
-  (which fail without the change) and a query against the dev database (MSFT, TSLA, and the dashboard feed had repeats
-  before, none after, each still full at 30); not yet looked at in the browser.
+  score counted every copy at that point (fixed in the next entry). Checked with automated tests (which fail without
+  the change) and a query against the dev database (MSFT, TSLA, and the dashboard feed had repeats before, none after,
+  each still full at 30); not yet looked at in the browser.
+- **Sentiment totals count each story once and leave out quote pages.** The positive / neutral / negative / irrelevant
+  counts and the score (dashboard, stock detail, and the copilot's sentiment summary) come from one function,
+  `label_counts` in `ai/sentiment.py`. It counts a story once per company (the newest copy's label, as in the news
+  lists) and skips stock-quote and "X vs Y" pages, using the same pattern as the copilot's headlines. The labels stay
+  in the database and the news lists still show quote pages, so a list can show a neutral quote page that no total
+  counts. On the last 7 days of dev data, 30 of 706 labeled headlines were repeats (37 extra copies, and only one story
+  had copies labeled differently) and 210 (30%) were quote or comparison pages, 90% of them neutral. Repeats hardly
+  moved any score; quote pages did: Google went from +0.08 to +0.18, Tesla +0.10 to +0.14, Microsoft +0.11 to +0.15,
+  Apple, Amazon, and Nvidia barely changed. **Google's dashboard mood word flips from Neutral to Positive** (the cutoff
+  is 0.15), and Microsoft (0.145) and Tesla (0.140) sit just under it. The score now means "positives minus negatives over
+  real stories", so it moves further from zero than before; that is a change in meaning, not proof it is more accurate. The quote-page pattern is loose: in two
+  weeks of data it caught one real story ("Wells Fargo cuts Amazon stock price target", labeled negative) among 206
+  matches. If every headline for a company in the window is a quote page, its mood reads "No news". Checked with
+  tests (which fail without the change), the real data above, and the copilot's sentiment answers, which matched the
+  database (Tesla: 15 positive, 35 neutral, 7 negative, 1 irrelevant, +0.14). `ai.eval_market --repeat 3 --show` scored
+  121 of 129 before, 121 after the counting change, and 123 after the source text was reworded to say what is counted.
+  The same cases fail at times (follow-up to another company and "price target" every time; "why did it move" and
+  "should I sell" in some runs), none about sentiment. The two-point difference is run-to-run variation, not a gain.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
@@ -216,9 +235,7 @@ benchmarks.
 - Email or phone alerts for the nightly job (the desktop alert exists)
 - A Claude implementation of `LLM` (needs an Anthropic API key), then compare answers against Qwen on the same questions
 - Keyword plus vector hybrid search; a reranker
-- Filtering quote-page and comparison-page headlines out of sentiment scoring (the copilot already leaves them out of
-  its headlines, but they still count in the labels and the dashboard)
-- Counting each story once in the sentiment totals and score (the news lists already hide repeats)
+- A narrower quote-page pattern, or skipping quote pages before labeling so the model isn't asked about them
 - A proper evaluation set of questions with known answers
 - Index and fundamentals data (S&P 500, P/E, market value) so those questions can be answered instead of refused
 - A code rule for bare "What about Tesla?" follow-ups that carries the previous question's topic over

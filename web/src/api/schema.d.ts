@@ -454,7 +454,7 @@ export interface components {
             positive: number;
             /**
              * Score
-             * @description -1 (all bad news) to +1 (all good); null if no scored headlines
+             * @description -1 (all bad news) to +1 (all good); null if no scored headlines. Each story is counted once, and stock-quote and comparison pages are left out of every count
              */
             score?: number | null;
         };

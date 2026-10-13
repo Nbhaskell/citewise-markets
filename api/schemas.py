@@ -19,7 +19,7 @@ class SentimentSummary(BaseModel):
     neutral: int
     negative: int
     irrelevant: int
-    score: Optional[float] = Field(None, description="-1 (all bad news) to +1 (all good); null if no scored headlines")
+    score: Optional[float] = Field(None, description="-1 (all bad news) to +1 (all good); null if no scored headlines. Each story is counted once, and stock-quote and comparison pages are left out of every count")
 
 
 class StockSummary(BaseModel):

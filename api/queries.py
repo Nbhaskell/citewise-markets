@@ -3,7 +3,7 @@ from typing import Optional
 
 import psycopg
 
-from ai.sentiment import SentimentSummary as Counts
+from ai.sentiment import SentimentSummary as Counts, label_counts
 from data.headlines import title_key
 
 RANGE_DAYS: dict[str, Optional[int]] = {"1M": 31, "3M": 92, "6M": 183, "1Y": 366, "5Y": 1830, "MAX": None}
@@ -40,15 +40,7 @@ def stock_rows(conn: psycopg.Connection, symbol: Optional[str] = None) -> list[d
 
 
 def sentiment_by_symbol(conn: psycopg.Connection, model: str, days: int, symbol: Optional[str] = None) -> dict[str, dict]:
-    rows = conn.execute(
-        "SELECT n.symbol, n.label, count(*) FROM news_sentiment n JOIN news_articles a ON a.id = n.article_id "
-        "WHERE n.model = %(m)s AND a.published_at >= now() - make_interval(days => %(d)s) "
-        "AND (%(s)s::text IS NULL OR n.symbol = %(s)s) GROUP BY n.symbol, n.label",
-        {"m": model, "d": days, "s": symbol},
-    ).fetchall()
-    counts: dict[str, dict[str, int]] = {}
-    for sym, label, n in rows:
-        counts.setdefault(sym, {})[label] = n
+    counts = label_counts(conn, model, days, symbol)
     return {sym: sentiment_dict(sym, c, days) for sym, c in counts.items()}
 
 
