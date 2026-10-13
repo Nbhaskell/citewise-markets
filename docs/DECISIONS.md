@@ -90,14 +90,22 @@ benchmarks.
 - **The copilot reads filings only.** It does not use prices, news, or sentiment yet.
 - **Search is vector-only.** A keyword (full-text) search was considered for exact-term lookups and not built.
 - **The nightly job needs the PC on and you logged in, with Docker Desktop and Ollama running.** Otherwise it
-  catches up the next time it can. Nothing alerts you if it fails; you'd see it in `--status` or the log.
+  catches up the next time it can. A bad run shows a desktop alert (see below), but if the PC is off or you aren't
+  logged in, nothing runs and so nothing alerts you; the dashboard's stale-data warning is the backstop.
+- **Alerts are a Windows desktop notification only.** Windows' Focus Assist / Do Not Disturb can hide them (they
+  still land in the notification centre), they reach no other device, and there is no email. Email would need a
+  mail password stored in `.env`, which was left out on purpose. Checked: the notification call succeeds and the
+  failure paths (partial run, database down, crash) are covered by tests with a fake notifier. The test notification was
+  seen on screen; an alert from a real scheduled 5pm run that had problems has not been observed yet.
+- **A stopped database used to hang the job.** `psycopg` waited minutes on a closed port (found by pointing the job at a
+  dead port). Connections now give up after 10 seconds.
 - **Price counts mean "bars refreshed", not "new".** Each run rewrites the recent window (upsert), so the number is
   how many bars were written.
 - **Free sources can break without notice.** If Yahoo or Google change something, that step errors for each company
   and the run is marked `partial`. Failures are visible but not repaired automatically.
-- **The scheduled path was tested once:** after registering, `Start-ScheduledTask` ran the job through Task Scheduler
-  (result code 0, run logged as success). A run at the scheduled clock time, and a catch-up after a missed run,
-  have not been observed yet.
+- **The scheduled path has worked twice:** after registering, `Start-ScheduledTask` ran the job through Task Scheduler,
+  and on 2026-10-12 the task started by itself at 5:00 PM (result code 0, run logged as success). A catch-up after a
+  missed run has not been observed yet.
 - **The API has no authentication, rate limiting, or per-user data.** It is safe only because it is bound to this
   computer. Anyone who can reach it can ask the copilot questions, which uses your GPU.
 - **The copilot answers one question at a time well.** Several at once queue up behind the single local model and
@@ -148,7 +156,7 @@ benchmarks.
 
 ## Ideas not built yet
 
-- Failure alerts for the nightly job (email or desktop notification)
+- Email or phone alerts for the nightly job (the desktop alert exists)
 - A Claude implementation of `LLM` (needs an Anthropic API key), then compare answers against Qwen on the same questions
 - Keyword plus vector hybrid search; a reranker
 - Filtering quote-page and comparison-page headlines out of sentiment

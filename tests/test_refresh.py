@@ -211,3 +211,101 @@ def test_summary_and_status_report_are_readable(conn, capsys):
     print_status(conn, "fake-emb", "fake-llm")
     out = capsys.readouterr().out
     assert "Recent runs" in out and "Data freshness:" in out and A in out
+
+
+# ---- desktop alerts ----
+
+class Alerts:
+    """Stands in for the desktop notification and remembers what it was asked to show."""
+
+    def __init__(self):
+        self.shown = []
+
+    def __call__(self, title, body):
+        self.shown.append((title, body))
+
+
+@pytest.fixture
+def quiet_main(monkeypatch):
+    monkeypatch.setattr(refresh, "setup_logging", lambda: None)  # don't write to the real logs/refresh.log
+
+
+def test_alert_message_names_the_steps_that_had_problems(conn):
+    report = run_refresh(conn, make_deps(price_source=FakePrices(fail=[B]), llm=FakeLLM(up=False)), [A, B], today=TODAY)
+    title, body = refresh.alert_message(report)
+    assert title == "Nightly refresh: PARTIAL"
+    assert "prices: 1 failed" in body and "sentiment: skipped - the local AI model isn't reachable" in body
+    assert "index:" not in body  # a step with no problems stays out of it
+    only_models = run_refresh(conn, make_deps(llm=FakeLLM(up=False)), [A], steps=("index", "sentiment"), today=TODAY)
+    assert refresh.alert_message(only_models)[1].startswith("sentiment: skipped - ")
+
+
+def test_a_clean_run_shows_no_alert(conn, monkeypatch, quiet_main):
+    monkeypatch.setattr(refresh, "default_deps", make_deps)
+    alerts = Alerts()
+    assert refresh.main(["--symbols", A], notify=alerts) == 0
+    assert alerts.shown == []
+
+
+def test_a_run_with_problems_shows_one_alert(conn, monkeypatch, quiet_main):
+    monkeypatch.setattr(refresh, "default_deps", lambda: make_deps(llm=FakeLLM(up=False)))
+    alerts = Alerts()
+    assert refresh.main(["--symbols", A], notify=alerts) == 1
+    assert len(alerts.shown) == 1 and alerts.shown[0][0] == "Nightly refresh: PARTIAL"
+
+
+def test_no_alert_flag_silences_alerts(conn, monkeypatch, quiet_main):
+    monkeypatch.setattr(refresh, "default_deps", lambda: make_deps(llm=FakeLLM(up=False)))
+    alerts = Alerts()
+    assert refresh.main(["--symbols", A, "--no-alert"], notify=alerts) == 1
+    assert alerts.shown == []
+
+
+def test_an_unreachable_database_shows_an_alert(monkeypatch, quiet_main):
+    def down():
+        raise ConnectionError("connection refused")
+
+    monkeypatch.setattr(refresh, "connect", down)
+    alerts = Alerts()
+    assert refresh.main([], notify=alerts) == 2
+    assert len(alerts.shown) == 1 and "Docker" in alerts.shown[0][1]
+
+
+def test_a_crash_shows_an_alert_and_exit_code_4(conn, monkeypatch, quiet_main):
+    def boom(*args, **kwargs):
+        raise RuntimeError("something unexpected")
+
+    monkeypatch.setattr(refresh, "default_deps", make_deps)
+    monkeypatch.setattr(refresh, "run_refresh", boom)
+    alerts = Alerts()
+    assert refresh.main(["--symbols", A], notify=alerts) == 4
+    assert len(alerts.shown) == 1 and "something unexpected" in alerts.shown[0][1]
+
+
+def test_another_run_in_progress_is_not_an_alert(conn, monkeypatch, quiet_main):
+    monkeypatch.setattr(refresh, "default_deps", make_deps)
+    alerts = Alerts()
+    with connect() as other:
+        other.execute("SELECT pg_advisory_lock(%s)", (LOCK_KEY,))
+        assert refresh.main(["--symbols", A], notify=alerts) == 3
+        other.execute("SELECT pg_advisory_unlock(%s)", (LOCK_KEY,))
+    assert alerts.shown == []
+
+
+def test_a_notification_that_fails_never_raises(monkeypatch):
+    import jobs.notify as notify
+
+    def broken(*args, **kwargs):
+        raise OSError("powershell not found")
+
+    monkeypatch.setattr(notify.subprocess, "run", broken)
+    assert notify.send_notification("t", "b") is False
+
+
+def test_database_connections_give_up_instead_of_hanging(monkeypatch):
+    import data.db as db
+
+    seen = {}
+    monkeypatch.setattr(db.psycopg, "connect", lambda url, **kw: seen.update(kw))
+    db.connect()
+    assert 0 < seen["connect_timeout"] <= 30
