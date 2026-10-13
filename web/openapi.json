@@ -268,6 +268,265 @@
         "title": "FreshnessOut",
         "type": "object"
       },
+      "FundamentalFigure": {
+        "properties": {
+          "growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest period vs the same period a year earlier (0.12 = up 12%); null if it can't be told",
+            "title": "Growth"
+          },
+          "growth_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which two periods growth compares",
+            "title": "Growth Label"
+          },
+          "how": {
+            "description": "How the figure was built, in plain words, with the dates",
+            "title": "How",
+            "type": "string"
+          },
+          "period_end": {
+            "description": "Where the latest filed period ends",
+            "format": "date",
+            "title": "Period End",
+            "type": "string"
+          },
+          "sources": {
+            "description": "The SEC filings it came from, e.g. '10-Q filed 2026-07-31 (9 months to 2026-06-27)'",
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "value",
+          "how",
+          "period_end",
+          "sources"
+        ],
+        "title": "FundamentalFigure",
+        "type": "object"
+      },
+      "FundamentalsOut": {
+        "description": "Figures computed from the SEC filings. Every ratio is worked out in Python; cautions explain where a correct number could mislead.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "cautions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cautions",
+            "type": "array"
+          },
+          "diluted_eps": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundamentalFigure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Dollars per share over the last twelve months"
+          },
+          "gross_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A fraction: 0.5 = 50%. Null if the company reports no gross profit",
+            "title": "Gross Margin"
+          },
+          "market_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Shares times the latest close, in dollars",
+            "title": "Market Value"
+          },
+          "net_income": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundamentalFigure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Dollars over the last twelve months, the part belonging to shareholders"
+          },
+          "net_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Margin"
+          },
+          "operating_income": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundamentalFigure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Dollars over the last twelve months"
+          },
+          "operating_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operating Margin"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Latest close divided by diluted EPS for the last twelve months; null when earnings are zero or negative",
+            "title": "Pe"
+          },
+          "pe_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why P/E is missing, when it is",
+            "title": "Pe Note"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "End of the latest reported period behind the figures",
+            "title": "Period End"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest stored close, used for market value and P/E",
+            "title": "Price"
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "revenue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundamentalFigure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Dollars over the last twelve months"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SharesOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why there are no figures (not downloaded yet, or a foreign filer), when available is false",
+            "title": "Unavailable Reason"
+          }
+        },
+        "required": [
+          "symbol",
+          "available",
+          "cautions"
+        ],
+        "title": "FundamentalsOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -694,6 +953,31 @@
           "irrelevant"
         ],
         "title": "SentimentSummary",
+        "type": "object"
+      },
+      "SharesOut": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "source": {
+            "description": "Where the count was read, in words",
+            "title": "Source",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "value",
+          "source",
+          "as_of"
+        ],
+        "title": "SharesOut",
         "type": "object"
       },
       "Source": {
@@ -1605,6 +1889,52 @@
         "summary": "Stock Filings",
         "tags": [
           "filings"
+        ]
+      }
+    },
+    "/api/stocks/{symbol}/fundamentals": {
+      "get": {
+        "description": "Revenue, profit, margins, market value, and P/E from the SEC filings, each with how it was built and any cautions.\n`available` is false for a company with no figures (not downloaded yet, or a foreign filer).",
+        "operationId": "stock_fundamentals_api_stocks__symbol__fundamentals_get",
+        "parameters": [
+          {
+            "description": "Ticker, e.g. AAPL",
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "description": "Ticker, e.g. AAPL",
+              "pattern": "^[A-Za-z][A-Za-z0-9.\\-]{0,9}$",
+              "title": "Symbol",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundamentalsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stock Fundamentals",
+        "tags": [
+          "stocks"
         ]
       }
     },

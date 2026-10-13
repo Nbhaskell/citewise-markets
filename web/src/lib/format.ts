@@ -89,3 +89,27 @@ export function positionInRange(price: number | null, low: number | null, high: 
   if (price == null || low == null || high == null || high <= low) return null;
   return Math.min(100, Math.max(0, ((price - low) / (high - low)) * 100));
 }
+
+/** 466_800_000_000 -> "$466.8 billion"; 4_976e9 -> "$4.98 trillion". Company-sized dollar amounts. */
+export function formatBigMoney(value: number | null | undefined): string {
+  if (value == null) return "n/a";
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  if (abs >= 1e12) return `${sign}$${(abs / 1e12).toFixed(2)} trillion`;
+  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(1)} billion`;
+  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(1)} million`;
+  return `${sign}$${abs.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
+/** 0.276 -> "27.6%". */
+export function formatFraction(value: number | null | undefined): string {
+  return value == null ? "n/a" : `${(value * 100).toFixed(1)}%`;
+}
+
+/** 14_594_180_000 -> "14.59 billion". */
+export function formatShareCount(value: number | null | undefined): string {
+  if (value == null) return "n/a";
+  if (value >= 1e9) return `${(value / 1e9).toFixed(2)} billion`;
+  if (value >= 1e6) return `${(value / 1e6).toFixed(1)} million`;
+  return value.toLocaleString("en-US");
+}

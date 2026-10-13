@@ -13,8 +13,8 @@ What works today:
 - News headline sentiment (positive / negative / neutral / irrelevant) per company
 - A nightly refresh job that keeps all of the above up to date (you register it once, see below)
 - A read-only HTTP API (FastAPI) over all of it, for the web screens to use (see "The API" below)
-- A web app (React): a dashboard, a stock detail page (price chart, stats, news, filings, a copilot for that
-  company), and a full-page copilot with saved history (see "The web app" below)
+- A web app (React): a dashboard, a stock detail page (price chart, stats, fundamentals, news, filings, a copilot for
+  that company), and a full-page copilot with saved history (see "The web app" below)
 
 Everything runs locally and costs nothing. The AI uses a local model through Ollama.
 
@@ -195,6 +195,7 @@ every endpoint. The database must be running, and Ollama for the copilot.
 | `GET /api/stocks/{symbol}` | One company, plus 52-week range and volume |
 | `GET /api/stocks/{symbol}/prices?range=1M\|3M\|6M\|1Y\|5Y\|MAX` | Daily price bars for a chart |
 | `GET /api/stocks/{symbol}/news?days=7&limit=30` | Headlines with sentiment labels (add `include_irrelevant=true` to see all) |
+| `GET /api/stocks/{symbol}/fundamentals` | Revenue, profit, EPS, margins, market value, and P/E from the SEC filings, each with how it was built, its source filings, and cautions. `available` is false for a company with no figures |
 | `GET /api/stocks/{symbol}/filings` | Stored SEC filings and whether each is searchable |
 | `GET /api/filings/search?q=...&symbol=AAPL&form=10-K&latest=true` | Matching filing passages with source links |
 | `POST /api/copilot` with `{"question": "...", "symbols": ["NVDA"], "history": [...]}` | A cited answer from filings, prices, and headlines. Each source has a `kind` (`filing`, `price`, `headline`, or `sentiment`). `history` (optional, up to 4 earlier question and answer pairs) only helps understand a follow-up; the reply's `interpreted_question` says how it was read |
@@ -219,7 +220,9 @@ npm run dev        # opens at http://localhost:5173
 The dashboard shows the watchlist (price, daily change, one-month trend, news mood), the latest positive and negative
 headlines, a data-freshness line that warns about stale data or a failed refresh, and a box for asking the copilot
 questions with clickable numbered sources. Click a ticker to open its stock detail page: an interactive price chart
-(1M to MAX), key stats, that company's news and SEC filings, and a copilot limited to that company's data.
+(1M to MAX), key stats, fundamentals (revenue, profit, margins, market value, P/E, each with its calculation and
+source filings one click away, and cautions where a number could mislead), that company's news and SEC filings, and a
+copilot limited to that company's data.
 The Copilot page (`/copilot`) is a full-page chat: pick which companies to search, see your recent questions (saved
 in your browser), stop a slow answer, and retry a failed one. You can follow up ("and what about its risks?"): the
 last three questions of the current topic are sent along so the copilot can work out what "its" means, and the page
@@ -290,9 +293,9 @@ docker-compose.yml   The database container
 
 - Adding a company from the app (today it is one command, `python -m jobs.add_company`; see "Keeping data fresh")
 - Filings for foreign companies that file a 20-F (only 10-K and 10-Q are stored)
-- Fundamentals on the stock detail page and in the copilot. The figures are stored and computed (revenue, profit,
-  EPS, margins, market value, P/E: `python -m data.fundamentals AAPL`), but no screen or copilot answer uses them
-  yet, so the copilot still refuses those questions. Foreign filers (TSM, ASML) have none.
+- Fundamentals in the copilot. The figures are stored, computed, and shown on the stock detail page (and by
+  `python -m data.fundamentals AAPL`), but the copilot doesn't use them yet, so it still refuses P/E and revenue
+  questions. Foreign filers (TSM, ASML) have none.
 - Index data (S&P 500 level), so the copilot can answer those instead of refusing
 - Backups on a second disk or off this PC (they go to `BACKUP_DIR`; you have to point it somewhere safe), and an alert
   when no backup has happened for days (a PC that is off sends none)

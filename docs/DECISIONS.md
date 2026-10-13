@@ -55,6 +55,8 @@ benchmarks.
 | Trailing twelve months = last full year + this year so far - the same stretch last year | It is how the filings report (a 10-K total and year-to-date totals in each 10-Q). Done from the period dates, not the filings' own "Q1/Q2" labels, which companies with odd fiscal years (NVIDIA's ends in January) would break. Every figure shows its recipe, dates, and filings |
 | Cautions are part of the result, not an afterthought | A correct number can still mislead. Net income far above operating income (Alphabet, Amazon), a share count that disagrees with the earnings average (Tesla), a balance-sheet share count, old figures or price, and mismatched periods each produce a plain-language caution |
 | US-GAAP filers only; foreign filers show "not available" | TSMC and ASML report under IFRS, in another currency, with different concept names and (for TSMC) no earnings per share. Supporting them would be real work, and it matches the 20-F filings gap. Decided by the owner on 2026-10-13 |
+| A company with no fundamentals gets `200` with `available: false` and a reason, not a 404 | The company exists; only its figures don't (not downloaded yet, or a foreign filer). The page can then say why and how to fetch them instead of showing a generic error |
+| On the stock page, cautions come before the numbers, labeled "Caution:", and each calculation is one click away | A correct number can mislead (Alphabet's P/E looks cheap because of investment gains), so the warning must be read first and never rely on color. The recipe and source filings stay available without crowding the card |
 
 ## Gotchas we hit
 
@@ -317,6 +319,21 @@ benchmarks.
   Share counts for multi-class companies are totals from the balance sheet. Debt, cash, and ratios like price-to-book
   were left out on purpose. The caution thresholds (1.2x, 5%, 10%) were picked from these six companies and are not
   tuned on anything else. Steps 2 and 3 (the page and the copilot) are not built.
+- **Fundamentals (step 2 of 3: the endpoint and the stock page; 2026-10-13).** `GET /api/stocks/{symbol}/fundamentals`
+  returns the computed figures with their recipes, source filings, and cautions; the stock detail page shows them in a
+  "Fundamentals" card under Key stats. Checked: 4 new API tests (figures, cautions, `available: false`, 404/422), 11
+  component tests, a page test, and format tests, with two deliberate breakages caught (cautions never rendered; the P/E
+  recipe quoting the wrong price). **In a real browser** (live data, the API and dev server started and stopped): Alphabet
+  (both cautions, a recipe expanded and its three source filings read), Tesla at 375 px (no horizontal overflow, flat
+  EPS growth shown as "– 0.00%"), Amazon in light mode (automated contrast check: none of 58 text elements below 4.5:1),
+  and the API stopped (the card shows the standard "Can't reach the API" message with a retry). **Not checked in a
+  browser:** the "not available" state for a real foreign filer (none is tracked; covered by API and component tests),
+  and the dashboard (untouched). **Weak spots:** growth is shown per period compared (the latest 3, 6, 9 or 12 months vs
+  the same stretch a year earlier), so it is not the growth of the twelve-month total and the label says so, which is
+  wordy; EPS growth of 0.00% (Tesla) reads oddly but is correct; net income growth can be huge when the base is small
+  (Alphabet +178%, partly the same investment gains the caution describes). The card doesn't say which share-count
+  figure the market value would take under the other choice (Tesla's caution gives both counts but not both values).
+  The copilot still refuses these questions (step 3).
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

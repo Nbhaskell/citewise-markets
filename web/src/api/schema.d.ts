@@ -138,6 +138,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stocks/{symbol}/fundamentals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stock Fundamentals
+         * @description Revenue, profit, margins, market value, and P/E from the SEC filings, each with how it was built and any cautions.
+         *     `available` is false for a company with no figures (not downloaded yet, or a foreign filer).
+         */
+        get: operations["stock_fundamentals_api_stocks__symbol__fundamentals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stocks/{symbol}/news": {
         parameters: {
             query?: never;
@@ -296,6 +317,99 @@ export interface components {
             symbol: string;
             /** Unscored Headlines */
             unscored_headlines: number;
+        };
+        /** FundamentalFigure */
+        FundamentalFigure: {
+            /**
+             * Growth
+             * @description The latest period vs the same period a year earlier (0.12 = up 12%); null if it can't be told
+             */
+            growth?: number | null;
+            /**
+             * Growth Label
+             * @description Which two periods growth compares
+             */
+            growth_label?: string | null;
+            /**
+             * How
+             * @description How the figure was built, in plain words, with the dates
+             */
+            how: string;
+            /**
+             * Period End
+             * Format: date
+             * @description Where the latest filed period ends
+             */
+            period_end: string;
+            /**
+             * Sources
+             * @description The SEC filings it came from, e.g. '10-Q filed 2026-07-31 (9 months to 2026-06-27)'
+             */
+            sources: string[];
+            /** Value */
+            value: number;
+        };
+        /**
+         * FundamentalsOut
+         * @description Figures computed from the SEC filings. Every ratio is worked out in Python; cautions explain where a correct number could mislead.
+         */
+        FundamentalsOut: {
+            /** Available */
+            available: boolean;
+            /** Cautions */
+            cautions: string[];
+            /** @description Dollars per share over the last twelve months */
+            diluted_eps?: components["schemas"]["FundamentalFigure"] | null;
+            /**
+             * Gross Margin
+             * @description A fraction: 0.5 = 50%. Null if the company reports no gross profit
+             */
+            gross_margin?: number | null;
+            /**
+             * Market Value
+             * @description Shares times the latest close, in dollars
+             */
+            market_value?: number | null;
+            /** @description Dollars over the last twelve months, the part belonging to shareholders */
+            net_income?: components["schemas"]["FundamentalFigure"] | null;
+            /** Net Margin */
+            net_margin?: number | null;
+            /** @description Dollars over the last twelve months */
+            operating_income?: components["schemas"]["FundamentalFigure"] | null;
+            /** Operating Margin */
+            operating_margin?: number | null;
+            /**
+             * Pe
+             * @description Latest close divided by diluted EPS for the last twelve months; null when earnings are zero or negative
+             */
+            pe?: number | null;
+            /**
+             * Pe Note
+             * @description Why P/E is missing, when it is
+             */
+            pe_note?: string | null;
+            /**
+             * Period End
+             * @description End of the latest reported period behind the figures
+             */
+            period_end?: string | null;
+            /**
+             * Price
+             * @description The latest stored close, used for market value and P/E
+             */
+            price?: number | null;
+            /** Price Date */
+            price_date?: string | null;
+            /** @description Dollars over the last twelve months */
+            revenue?: components["schemas"]["FundamentalFigure"] | null;
+            shares?: components["schemas"]["SharesOut"] | null;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Unavailable Reason
+             * @description Why there are no figures (not downloaded yet, or a foreign filer), when available is false
+             */
+            unavailable_reason?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -457,6 +571,21 @@ export interface components {
              * @description -1 (all bad news) to +1 (all good); null if no scored headlines. Each story is counted once, and stock-quote and comparison pages are left out of every count
              */
             score?: number | null;
+        };
+        /** SharesOut */
+        SharesOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Source
+             * @description Where the count was read, in words
+             */
+            source: string;
+            /** Value */
+            value: number;
         };
         /** Source */
         Source: {
@@ -814,6 +943,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FilingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stock_fundamentals_api_stocks__symbol__fundamentals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticker, e.g. AAPL */
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FundamentalsOut"];
                 };
             };
             /** @description Validation Error */

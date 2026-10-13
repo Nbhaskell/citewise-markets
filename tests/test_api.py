@@ -61,7 +61,8 @@ def client(llm):
 def seeded():
     now = datetime.now(timezone.utc)
     with connect() as c:
-        c.execute("DELETE FROM instruments WHERE symbol = %s", (SYM,))  # leftovers from an interrupted run
+        c.execute("DELETE FROM financial_facts WHERE symbol = %s", (SYM,))  # leftovers from an interrupted run
+        c.execute("DELETE FROM instruments WHERE symbol = %s", (SYM,))
         c.execute(
             "INSERT INTO instruments (symbol, name, sector, industry, exchange) "
             "VALUES (%s, 'Zeta API Co', 'Tech', 'Software', 'NMS')", (SYM,))
@@ -90,9 +91,27 @@ def seeded():
             "INSERT INTO filing_chunks (accession_number, chunk_index, section, text, embedding, embedding_model) "
             "VALUES ('0-ZZAPI-K', 0, 'Part I, Item 1A', 'Supply chain risk text for Zeta.', %s::vector, 'fake-emb')",
             (vector_literal(vec(0)),))
+        # Reported figures (a calendar-year company): last twelve months = full year 2025 + first half 2026 - first half 2025
+        facts = []
+        for concept, unit, scale, fy, h1_now, h1_before in [
+            ("Revenues", "USD", 1e9, 100, 60, 40), ("NetIncomeLoss", "USD", 1e9, 40, 24, 16),
+            ("EarningsPerShareDiluted", "USD/shares", 1, 4.0, 2.4, 1.6), ("OperatingIncomeLoss", "USD", 1e9, 25, 15, 10),
+            ("GrossProfit", "USD", 1e9, 50, 30, 20),
+        ]:
+            facts += [(concept, unit, "taxonomy", "2025-01-01", "2025-12-31", fy * scale, "0-ZZAPI-FY", "10-K", "2026-02-05"),
+                      (concept, unit, "taxonomy", "2025-01-01", "2025-06-30", h1_before * scale, "0-ZZAPI-H125", "10-Q", "2025-07-30"),
+                      (concept, unit, "taxonomy", "2026-01-01", "2026-06-30", h1_now * scale, "0-ZZAPI-H126", "10-Q", "2026-07-30")]
+        facts += [("WeightedAverageNumberOfDilutedSharesOutstanding", "shares", "taxonomy", "2026-01-01", "2026-06-30", 10e9, "0-ZZAPI-H126", "10-Q", "2026-07-30"),
+                  ("EntityCommonStockSharesOutstanding", "shares", "dei", None, "2026-07-20", 10.1e9, "0-ZZAPI-H126", "10-Q", "2026-07-30")]
+        for concept, unit, taxonomy, start, end, value, accn, form, filed in facts:
+            c.execute(
+                "INSERT INTO financial_facts (symbol, taxonomy, concept, unit, period_start, period_end, value, accession_number, form, filed_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (SYM, "us-gaap" if taxonomy == "taxonomy" else taxonomy, concept, unit, start, end, value, accn, form, filed))
         c.commit()
     yield
     with connect() as c:
+        c.execute("DELETE FROM financial_facts WHERE symbol = %s", (SYM,))
         c.execute("DELETE FROM news_articles WHERE id LIKE 'fake:zzapi-%'")
         c.execute("DELETE FROM filings WHERE symbol = %s", (SYM,))
         c.execute("DELETE FROM prices_daily WHERE symbol = %s", (SYM,))
@@ -118,6 +137,50 @@ def test_stock_list_has_price_change_and_sentiment(client):
     # last 7 days: positive, negative, irrelevant; the 60-day-old story and unscored one don't count, and the neutral
     # "Zeta quote page" is shown in the news list but left out of the totals
     assert z["sentiment"] == {"days": 7, "positive": 1, "neutral": 0, "negative": 1, "irrelevant": 1, "score": 0.0}
+
+
+def test_fundamentals_are_computed_from_the_reported_figures(client):
+    d = client.get(f"/api/stocks/{SYM.lower()}/fundamentals").json()
+    assert d["symbol"] == SYM and d["available"] is True and d["unavailable_reason"] is None
+    assert d["period_end"] == "2026-06-30"
+    assert d["revenue"]["value"] == pytest.approx(120e9) and d["net_income"]["value"] == pytest.approx(48e9)
+    assert d["diluted_eps"]["value"] == pytest.approx(4.8) and d["operating_income"]["value"] == pytest.approx(30e9)
+    assert d["revenue"]["growth"] == pytest.approx(0.5) and "6 months to 2026-06-30" in d["revenue"]["growth_label"]
+    assert "the last full year (ended 2025-12-31)" in d["revenue"]["how"]
+    assert d["revenue"]["sources"] == ["10-K filed 2026-02-05 (the year ended 2025-12-31)",
+                                       "10-Q filed 2026-07-30 (6 months to 2026-06-30)",
+                                       "10-Q filed 2025-07-30 (the same 6 months a year earlier)"]
+    assert (d["gross_margin"], d["operating_margin"], d["net_margin"]) == (pytest.approx(0.5), pytest.approx(0.25), pytest.approx(0.4))
+    assert d["price"] == 499 and d["price_date"] == str(LATEST)
+    assert d["shares"]["value"] == pytest.approx(10.1e9) and "cover page" in d["shares"]["source"]
+    assert d["market_value"] == pytest.approx(10.1e9 * 499) and d["pe"] == pytest.approx(499 / 4.8) and d["pe_note"] is None
+
+
+def test_fundamentals_carry_their_cautions(client):
+    d = client.get(f"/api/stocks/{SYM}/fundamentals").json()
+    # net income (48B) is 1.6 times operating income (30B), so the response must say so
+    assert any("1.6 times operating income" in c and "may flatter" in c for c in d["cautions"])
+
+
+def test_a_company_without_figures_is_available_false_with_a_reason(client):
+    with connect() as c:
+        c.execute("INSERT INTO instruments (symbol, name) VALUES ('ZZAPN', 'No Figures Co') ON CONFLICT DO NOTHING")
+        c.commit()
+    try:
+        d = client.get("/api/stocks/ZZAPN/fundamentals")
+        assert d.status_code == 200
+        body = d.json()
+        assert body["available"] is False and "foreign filer" in body["unavailable_reason"]
+        assert body["revenue"] is None and body["pe"] is None and body["market_value"] is None and body["cautions"] == []
+    finally:
+        with connect() as c:
+            c.execute("DELETE FROM instruments WHERE symbol = 'ZZAPN'")
+            c.commit()
+
+
+def test_fundamentals_for_an_unknown_company_is_404_and_a_bad_symbol_422(client):
+    assert client.get("/api/stocks/NOPE/fundamentals").status_code == 404
+    assert client.get("/api/stocks/bad!symbol/fundamentals").status_code == 422
 
 
 def test_stock_detail_adds_52_week_range(client):

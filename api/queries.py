@@ -4,6 +4,7 @@ from typing import Optional
 import psycopg
 
 from ai.sentiment import SentimentSummary as Counts, label_counts
+from data.fundamentals import Flow, compute, latest_close, load_facts
 from data.headlines import title_key
 
 RANGE_DAYS: dict[str, Optional[int]] = {"1M": 31, "3M": 92, "6M": 183, "1Y": 366, "5Y": 1830, "MAX": None}
@@ -145,3 +146,25 @@ def filing_rows(conn: psycopg.Connection, symbol: str) -> list[dict]:
 
 def tracked_symbols(conn: psycopg.Connection) -> set[str]:
     return {r[0] for r in conn.execute("SELECT symbol FROM instruments")}
+
+
+def fundamentals(conn: psycopg.Connection, symbol: str) -> dict:
+    """The company's figures from its SEC filings, computed in Python (see data/fundamentals.py)."""
+    close, close_date = latest_close(conn, symbol)
+    f = compute(symbol, load_facts(conn, symbol), close, close_date)
+
+    def figure(flow: Optional[Flow]) -> Optional[dict]:
+        if flow is None:
+            return None
+        return {"value": flow.value, "how": flow.how, "period_end": flow.period_end, "sources": list(flow.sources),
+                "growth": flow.growth, "growth_label": flow.growth_label if flow.growth is not None else None}
+
+    return {
+        "symbol": f.symbol, "available": f.available, "unavailable_reason": f.unavailable_reason or None,
+        "period_end": f.period_end, "revenue": figure(f.revenue), "net_income": figure(f.net_income),
+        "diluted_eps": figure(f.diluted_eps), "operating_income": figure(f.operating_income),
+        "gross_margin": f.gross_margin, "operating_margin": f.operating_margin, "net_margin": f.net_margin,
+        "shares": {"value": f.shares.value, "source": f.shares.source, "as_of": f.shares.as_of} if f.shares else None,
+        "price": f.close, "price_date": f.close_date, "market_value": f.market_value, "pe": f.pe,
+        "pe_note": f.pe_note or None, "cautions": f.cautions,
+    }

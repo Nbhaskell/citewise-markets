@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { CopilotBox } from "../components/CopilotBox";
 import { FilingsList } from "../components/FilingsList";
+import { Fundamentals } from "../components/Fundamentals";
 import { KeyStats } from "../components/KeyStats";
 import { NewsPanel } from "../components/NewsPanel";
 import { PriceHistory } from "../components/PriceHistory";
@@ -90,6 +91,7 @@ function StockDetailView({ symbol }: { symbol: string }) {
         </div>
         <div className="col">
           {stock && <KeyStats stock={stock} />}
+          <Fundamentals symbol={symbol} />
           <NewsPanel symbol={symbol} />
         </div>
       </div>

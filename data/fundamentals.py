@@ -48,6 +48,7 @@ class Flow:
     growth: Optional[float]       # latest period vs the same period a year earlier (0.12 = up 12%)
     growth_label: str
     accessions: tuple[str, ...]   # the filings the pieces came from
+    sources: tuple[str, ...] = ()  # the same filings in words, e.g. "10-Q filed 2026-07-31 (9 months to 2026-06-27)"
 
 
 @dataclass(frozen=True)
@@ -139,7 +140,7 @@ def trailing(periods: dict[tuple[Optional[date], date], Fact]) -> tuple[Optional
         growth = last.value / prior.value - 1 if prior and prior.value > 0 else None
         return Flow(last.value, f"the 12 months ending {latest[1]}", latest[1], growth,
                     f"the 12 months ending {latest[1]} vs the 12 months a year earlier",
-                    (last.accession_number,)), ""
+                    (last.accession_number,), (f"{last.form} filed {last.filed_at} (12 months to {latest[1]})",)), ""
 
     months = round(_dur(latest) / 30.4)
     year = next((flows[k] for k in flows if _dur(k) >= 340 and _near(k[1], latest[0] - timedelta(days=1), 10)), None)
@@ -154,7 +155,10 @@ def trailing(periods: dict[tuple[Optional[date], date], Fact]) -> tuple[Optional
            f"- the same {months} months a year earlier")
     growth = last.value / prior.value - 1 if prior.value > 0 else None
     return Flow(value, how, latest[1], growth, f"the {months} months to {latest[1]} vs the same {months} months a year earlier",
-                (year.accession_number, last.accession_number, prior.accession_number)), ""
+                (year.accession_number, last.accession_number, prior.accession_number),
+                (f"{year.form} filed {year.filed_at} (the year ended {year.period_end})",
+                 f"{last.form} filed {last.filed_at} ({months} months to {latest[1]})",
+                 f"{prior.form} filed {prior.filed_at} (the same {months} months a year earlier)")), ""
 
 
 def _shares(facts: list[Fact]) -> Optional[Shares]:
