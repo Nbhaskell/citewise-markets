@@ -30,7 +30,7 @@ function Message({ exchange, busy, onRetry }: { exchange: Exchange; busy: boolea
 
       <div className="reply">
         {exchange.status === "pending" && (
-          <p className="muted">Searching the filings and writing an answer. This can take a few seconds…</p>
+          <p className="muted">Looking through the stored data and writing an answer. This can take a few seconds…</p>
         )}
         {exchange.status === "done" && exchange.result && <AnswerView result={exchange.result} />}
         {exchange.status === "error" && (

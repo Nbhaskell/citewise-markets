@@ -27,7 +27,7 @@ export function App() {
           </NavLink>
           <NavLink to="/copilot">Copilot</NavLink>
         </nav>
-        <span className="muted small">Research from public filings. Not financial advice.</span>
+        <span className="muted small">Research from public filings, prices, and headlines. Not financial advice.</span>
       </header>
       <main>
         <Routes>

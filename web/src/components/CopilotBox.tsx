@@ -59,9 +59,9 @@ export function CopilotBox({ symbol, examples = DEFAULT_EXAMPLES }: Props) {
 
   return (
     <section className="card" aria-labelledby="copilot-title">
-      <h2 id="copilot-title">{symbol ? `Ask about ${symbol}` : "Ask the filings"}</h2>
+      <h2 id="copilot-title">{symbol ? `Ask about ${symbol}` : "Ask the copilot"}</h2>
       <p className="muted small">
-        Answers come only from the 10-K and 10-Q filings stored here, with numbered sources. Not financial advice.
+        Answers come only from the stored filings, prices, and headlines, with numbered sources. Not financial advice.
       </p>
 
       <form onSubmit={onSubmit} className="ask-form">
@@ -107,7 +107,7 @@ export function CopilotBox({ symbol, examples = DEFAULT_EXAMPLES }: Props) {
 
       <div aria-live="polite">
         {state.kind === "loading" && (
-          <p className="muted">Searching the filings and writing an answer. This can take a few seconds…</p>
+          <p className="muted">Looking through the stored data and writing an answer. This can take a few seconds…</p>
         )}
         {state.kind === "error" && (
           <p role="alert" className="error">

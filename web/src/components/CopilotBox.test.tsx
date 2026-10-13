@@ -34,7 +34,7 @@ describe("CopilotBox", () => {
     expect(screen.getByRole("list", { name: "Sources" }).querySelector("li")).toHaveClass("highlight");
   });
 
-  it("warns when figures aren't found in the cited passages", async () => {
+  it("warns when figures aren't found in the cited sources", async () => {
     mockApi({ "POST /api/copilot": copilotAnswer({ unverified_numbers: ["49.9"], answer: "Revenue grew $49.9 billion [1]." }) });
     render(<CopilotBox />);
     await ask("How much did revenue grow?");
@@ -45,7 +45,7 @@ describe("CopilotBox", () => {
     mockApi({ "POST /api/copilot": copilotAnswer({ grounded: false, answer: "Probably fine.", sources: [] }) });
     render(<CopilotBox />);
     await ask("Is it fine?");
-    expect(await screen.findByRole("alert")).toHaveTextContent("doesn't cite any filing passages");
+    expect(await screen.findByRole("alert")).toHaveTextContent("doesn't cite any source");
   });
 
   it("treats a refusal as information, not an error or a warning", async () => {
@@ -58,7 +58,7 @@ describe("CopilotBox", () => {
     render(<CopilotBox />);
     await ask("What is the best pizza recipe?");
     expect(await screen.findByText(/I won't guess/)).toBeInTheDocument();
-    expect(screen.getByText("No matching passages found")).toBeInTheDocument();
+    expect(screen.getByText("No matching data found")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 

@@ -26,15 +26,24 @@ export const MAX_QUESTION = 500;
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null && !Array.isArray(x);
 const isStrings = (x: unknown): x is string[] => Array.isArray(x) && x.every((s) => typeof s === "string");
 
+const KINDS = ["filing", "price", "headline", "sentiment"];
+const isKinds = (x: unknown): boolean => Array.isArray(x) && x.every((k) => typeof k === "string" && KINDS.includes(k));
+const isTextOrAbsent = (x: unknown): boolean => x === undefined || x === null || typeof x === "string";
+
 function isSource(x: unknown): boolean {
   return (
     isObject(x) &&
     typeof x.number === "number" &&
     typeof x.symbol === "string" &&
-    typeof x.form === "string" &&
-    typeof x.filed_at === "string" &&
-    typeof x.url === "string" &&
-    typeof x.excerpt === "string"
+    typeof x.kind === "string" &&
+    KINDS.includes(x.kind) &&
+    typeof x.title === "string" &&
+    typeof x.as_of === "string" &&
+    typeof x.excerpt === "string" &&
+    isTextOrAbsent(x.url) &&
+    isTextOrAbsent(x.form) &&
+    isTextOrAbsent(x.filed_at) &&
+    isTextOrAbsent(x.section)
   );
 }
 
@@ -47,9 +56,32 @@ function isResult(x: unknown): x is CopilotResponse {
     typeof x.disclaimer === "string" &&
     isStrings(x.companies) &&
     isStrings(x.unverified_numbers) &&
+    isStrings(x.cautions) &&
+    isKinds(x.evidence_kinds) &&
     Array.isArray(x.sources) &&
     x.sources.every(isSource)
   );
+}
+
+/**
+ * Answers saved before the copilot used prices and headlines only had filing sources and no cautions. Give them the
+ * newer fields (filled in the only way they could have been) so they still show; the strict checks then run as usual.
+ */
+function upgradeSaved(x: unknown): unknown {
+  if (!isObject(x) || !isObject(x.result)) return x;
+  const r = x.result;
+  if (!Array.isArray(r.sources)) return x;
+  const sources = r.sources.map((s: unknown) => {
+    if (!isObject(s) || s.kind !== undefined) return s;
+    const title = typeof s.symbol === "string" && typeof s.form === "string" && typeof s.filed_at === "string"
+      ? `${s.symbol} ${s.form} filed ${s.filed_at}`
+      : undefined;
+    return { ...s, kind: "filing", title, as_of: s.filed_at };
+  });
+  return {
+    ...x,
+    result: { ...r, sources, cautions: r.cautions ?? [], evidence_kinds: r.evidence_kinds ?? (r.refused ? [] : ["filing"]) },
+  };
 }
 
 /** Saved data can be edited by anything with access to the browser, so every field the screen reads is checked. */
@@ -78,7 +110,7 @@ export function loadExchanges(): Exchange[] {
     if (!raw) return [];
     const data: unknown = JSON.parse(raw);
     if (!Array.isArray(data)) return [];
-    return data.filter(isSavedExchange).slice(-MAX_SAVED);
+    return data.map(upgradeSaved).filter(isSavedExchange).slice(-MAX_SAVED);
   } catch {
     return [];
   }
@@ -103,7 +135,7 @@ export const topicOf = (e: Exchange): number => e.topic ?? 0;
 /**
  * The earlier questions to send with a new one, so a follow-up like "and its risks?" can be understood.
  * Only finished, real answers from the same topic count, newest three, with citation markers removed.
- * The server uses this only to understand the question; answers are still written from the filings alone.
+ * The server uses this only to understand the question; answers are still written from the stored sources alone.
  */
 export function buildHistory(earlier: Exchange[], topic: number): HistoryTurn[] {
   return earlier

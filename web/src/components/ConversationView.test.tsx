@@ -35,7 +35,7 @@ describe("ConversationView", () => {
     expect(screen.getByText(/As of fiscal 2026 NVIDIA had/)).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("Start Ollama");
     expect(screen.getByText(/Stopped before an answer arrived/)).toBeInTheDocument();
-    expect(screen.getByText(/Searching the filings and writing an answer/)).toBeInTheDocument();
+    expect(screen.getByText(/Looking through the stored data and writing an answer/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenLastCalledWith("2");

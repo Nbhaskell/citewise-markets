@@ -23,7 +23,7 @@ describe("CopilotPage", () => {
     expect(screen.getByText(/You can follow up on your last few questions/)).toBeInTheDocument();
     expect(screen.getByText(/only to understand what you mean, never as evidence/)).toBeInTheDocument();
     expect(screen.getByText(/saved in this browser only/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Ask about the filings" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ask about your companies" })).toBeInTheDocument();
     expect(document.title).toBe("Copilot · stockMarket");
   });
 
@@ -32,7 +32,7 @@ describe("CopilotPage", () => {
     render(page());
     await userEvent.click(screen.getByRole("button", { name: "What are NVIDIA's biggest risks?" }));
     expect(await screen.findByText(/As of fiscal 2026 NVIDIA had/)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Ask about the filings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Ask about your companies" })).not.toBeInTheDocument();
     expect(posts(fetchMock)).toEqual([{ question: "What are NVIDIA's biggest risks?" }]);
   });
 
@@ -128,7 +128,7 @@ describe("CopilotPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Clear conversation" }));
     await userEvent.click(screen.getByRole("button", { name: "Yes, clear" }));
     expect(screen.queryByText("What are the risks?")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Ask about the filings" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ask about your companies" })).toBeInTheDocument();
     await waitFor(() => expect(window.localStorage.length).toBe(0));
   });
 
@@ -157,7 +157,7 @@ describe("CopilotPage", () => {
     window.localStorage.setItem("stockmarket.copilot.v1", JSON.stringify([{ id: 1, question: { evil: true }, status: "done" }, "junk", null]));
     mockApi(defaultRoutes());
     render(page());
-    expect(screen.getByRole("heading", { name: "Ask about the filings" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ask about your companies" })).toBeInTheDocument();
   });
 
   it("flags an answer to a follow-up that named no company, instead of letting it pass as about the last one", async () => {

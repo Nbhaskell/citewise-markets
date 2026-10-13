@@ -35,7 +35,7 @@ export function Composer({ busy, onAsk, onStop }: Props) {
         rows={2}
         maxLength={MAX_QUESTION}
         value={text}
-        placeholder="Ask about a company's filings…"
+        placeholder="Ask about a company's filings, prices, or news…"
         onChange={(e) => {
           setText(e.target.value);
           setProblem(null);

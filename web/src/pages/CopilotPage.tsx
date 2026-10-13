@@ -29,7 +29,7 @@ export function CopilotPage() {
 
   const empty = (
     <>
-      <h2>Ask about the filings</h2>
+      <h2>Ask about your companies</h2>
       <p className="muted">Try one of these, or type your own below.</p>
       <div className="chips">
         {EXAMPLES.map((example) => (
@@ -45,10 +45,12 @@ export function CopilotPage() {
     <div className="copilot-page">
       <h1 className="page-title">Copilot</h1>
       <p className="muted">
-        Answers come only from the 10-K and 10-Q filings stored here, with numbered sources you can check. Not financial
-        advice. You can follow up on your last few questions ("and its risks?"). The copilot uses them{" "}
+        Answers come only from what is stored here: the 10-K and 10-Q filings, daily prices, and news headlines, with
+        numbered sources you can check. It can't say why a price moved, predict prices, or give advice. You can follow up
+        on your last few questions ("and its risks?"). The copilot uses them{" "}
         <strong>only to understand what you mean, never as evidence</strong>, and every answer is still written from the
-        filings. Check the "Understood as" line to see how it read a follow-up, and start a new topic when you change subject.
+        stored sources. Check the "Understood as" line to see how it read a follow-up, and start a new topic when you change
+        subject.
       </p>
 
       {stocks.data && stocks.data.length > 0 && (

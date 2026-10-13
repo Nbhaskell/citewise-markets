@@ -34,7 +34,7 @@ export interface Conversation {
 /**
  * A running list of questions and answers, saved in this browser.
  * One question is in flight at a time (the AI model answers one at a time). Earlier questions in the current topic
- * are sent along so a follow-up can be understood; the copilot still answers only from the filings.
+ * are sent along so a follow-up can be understood; the copilot still answers only from the stored sources.
  */
 export function useConversation(): Conversation {
   const [initial] = useState(() => {
