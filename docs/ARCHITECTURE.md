@@ -101,6 +101,10 @@ prices -> news -> filings -> index (embed new filings) -> sentiment (score new h
 - **Isolation:** each (step, company) runs in its own try/except. A failure is recorded and the run continues.
 - **Status:** `success` if everything ran, `partial` if anything failed or was skipped, `failed` if every unit failed.
   Exit code 0 only for `success`, so Task Scheduler's "Last Run Result" is meaningful.
+- **Alerts:** a run that ends `partial` or `failed`, can't reach the database, or crashes shows a Windows toast
+  notification (`jobs/notify.py`, via PowerShell, no extra software or accounts). A run that finds another run in
+  progress does not alert. A notification that can't be shown is logged and never affects the job. Database
+  connections time out after 10 seconds, so a stopped Docker fails fast instead of hanging.
 - **Skips, not failures, for missing prerequisites:** no `SEC_USER_AGENT` skips filings, Ollama not answering skips
   sentiment, and an embedding model that won't load skips indexing. The run is marked `partial` so it isn't silent.
 - **Incremental prices:** asks for just enough history to cover the gap since the last stored day (1 month, 3 months,
@@ -196,5 +200,5 @@ Stock detail page (/stocks/:symbol)
 
 ## Not built yet
 
-Failure alerts for the nightly job, accounts and login, portfolios, alerts, the screener and AI-signal endpoints,
+Accounts and login, portfolios, alerts, the screener and AI-signal endpoints,
 the remaining web screens, a mobile app, a Claude implementation of `LLM`, and a licensed data feed.

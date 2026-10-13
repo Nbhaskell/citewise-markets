@@ -25,5 +25,8 @@ def database_url() -> str:
     return url
 
 
+CONNECT_TIMEOUT_SECONDS = 10  # without this, a database that isn't running can hang a connection for minutes
+
+
 def connect() -> psycopg.Connection:
-    return psycopg.connect(database_url())
+    return psycopg.connect(database_url(), connect_timeout=CONNECT_TIMEOUT_SECONDS)

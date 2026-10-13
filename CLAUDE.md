@@ -16,7 +16,7 @@ README's "What is not built yet" for the current list.
 The owner is building this step by step and is not a professional developer, so explain things plainly.
 
 - **After each technical step**, end with a short "in plain terms" summary written so a 12-year-old could follow it
-  (simple analogies, no jargon). Skip it for routine things like commits, pushes, and branch cleanup.
+  (simple analogies, no jargon). Skip it for anything that isn't a technical step: commits, pushes, pulls, branch cleanup, and reviewing or catching up on past work.
 - **At the start of each step**, say whether it deserves a feature branch and why. Small docs changes can go straight to
   `main`.
 - **Ask before you commit, push, or open a pull request.** The owner merges pull requests themselves on GitHub; once
@@ -56,6 +56,8 @@ The owner is building this step by step and is not a professional developer, so 
   chat models behind `LLM` in `ai/llm.py`. Don't call a provider directly from the copilot or ingest code.
 - **Free sources are prototype-only.** Yahoo Finance and Google News aren't licensed for a public product. Don't
   build features that assume they stay.
+- **Stay on the local model for now.** The owner can't pay for API usage, so don't propose or start a Claude provider;
+  keep using `qwen3` through Ollama.
 - **Don't claim untested things work.** Only a local `OllamaLLM` exists. There is no Claude provider until one is
   written and run against a real key.
 - **Verify AI output against its sources.** A citation doesn't prove a number is right. Keep the numbers check and

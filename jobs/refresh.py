@@ -8,7 +8,8 @@ Usage:
 
 Each (step, company) is isolated: one failure is recorded and the rest still run. A run is logged in the
 job_runs table and in logs/refresh.log. Exit code 0 = everything ran, 1 = something failed or was skipped,
-2 = the database was unreachable, 3 = another run is already in progress.
+2 = the database was unreachable, 3 = another run is already in progress, 4 = the job itself crashed.
+Exit codes 1, 2 and 4 also show a Windows desktop alert (pass --no-alert to turn that off).
 """
 import argparse
 import json
@@ -32,6 +33,8 @@ from data.ingest_news import ingest_news
 from data.sources.edgar import EdgarClient
 from data.sources.google_news import GoogleNewsSource
 from data.sources.yfinance_source import YFinanceSource
+
+from .notify import send_notification
 
 log = logging.getLogger("refresh")
 
@@ -215,6 +218,20 @@ def summarize(report: RunReport) -> str:
     return "\n".join(lines)
 
 
+def alert_message(report: RunReport) -> tuple[str, str]:
+    """A short title and body for the desktop alert about a run that had problems."""
+    parts = []
+    for step in STEPS:
+        rs = [r for r in report.results if r.step == step and r.status != "ok"]
+        if not rs:
+            continue
+        errors = sum(r.status == "error" for r in rs)
+        skipped = len(rs) - errors
+        bits = ([f"{errors} failed"] if errors else []) + ([f"skipped - {rs[0].detail}"] if skipped else [])
+        parts.append(f"{step}: {', '.join(bits)}")
+    return f"Nightly refresh: {report.status.upper()}", "; ".join(parts) + ". Run: python -m jobs.refresh --status"
+
+
 def setup_logging() -> None:
     (ROOT / "logs").mkdir(exist_ok=True)
     fmt = logging.Formatter("%(asctime)s %(levelname)-7s %(message)s")
@@ -224,31 +241,44 @@ def setup_logging() -> None:
     log.setLevel(logging.INFO)
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, notify: Callable[[str, str], object] = send_notification) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--symbols", nargs="+", help="default: every active company in the database")
     parser.add_argument("--steps", nargs="+", choices=STEPS, default=list(STEPS))
     parser.add_argument("--status", action="store_true", help="show recent runs and data freshness, then exit")
+    parser.add_argument("--no-alert", action="store_true", help="don't show a desktop alert if the run has problems")
     args = parser.parse_args(argv)
     setup_logging()
+
+    def alert(title: str, body: str) -> None:
+        if not args.no_alert:
+            notify(title, body)
 
     try:
         conn = connect()
     except Exception as exc:
         log.error("Can't reach the database (is Docker running?): %s", exc)
+        alert("Nightly refresh didn't run", "Can't reach the database. Is Docker Desktop running?")
         return 2
-    with conn:
-        if args.status:
-            from .status import print_status
+    try:
+        with conn:
+            if args.status:
+                from .status import print_status
 
-            print_status(conn, DEFAULT_MODEL, get_llm().name)
-            return 0
-        try:
-            report = run_refresh(conn, default_deps(), args.symbols, tuple(args.steps))
-        except AlreadyRunning as exc:
-            log.warning("%s; exiting", exc)
-            return 3
+                print_status(conn, DEFAULT_MODEL, get_llm().name)
+                return 0
+            try:
+                report = run_refresh(conn, default_deps(), args.symbols, tuple(args.steps))
+            except AlreadyRunning as exc:
+                log.warning("%s; exiting", exc)
+                return 3
+    except Exception as exc:  # a crash outside the per-company isolation; it still must not go unnoticed
+        log.exception("the refresh crashed")
+        alert("Nightly refresh crashed", f"{type(exc).__name__}: {exc}"[:200])
+        return 4
     log.info("\n%s", summarize(report))
+    if report.status != "success":
+        alert(*alert_message(report))
     return 0 if report.status == "success" else 1
 
 

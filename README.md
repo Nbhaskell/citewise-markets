@@ -105,7 +105,9 @@ recorded and the rest still run. A normal run on six companies takes well under 
 
 Add a new company once with `python -m data.ingest TICKER` (prices create the company record), and the nightly job
 picks it up from then on. Runs are logged to the `job_runs` table and to `logs/refresh.log`. Exit codes: 0 all good,
-1 something failed or was skipped, 2 database unreachable, 3 another run already in progress.
+1 something failed or was skipped, 2 database unreachable, 3 another run already in progress, 4 the job crashed.
+Exit codes 1, 2 and 4 also pop up a Windows desktop alert, so you hear about a bad night without checking. Test that
+alerts reach you with `.venv\Scripts\python -m jobs.notify`. Add `--no-alert` to a manual run to silence them.
 
 **Schedule it** (one time, changes your Windows Task Scheduler):
 
@@ -222,7 +224,6 @@ docker-compose.yml   The database container
 
 ## What is not built yet
 
-- Failure alerts for the nightly job (today you check `--status` or the log)
 - Accounts and login, portfolios, and alerts (the API so far is read-only)
 - A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
 - More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, and copilot exist.
