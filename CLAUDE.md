@@ -25,8 +25,10 @@ them (the owner hasn't confirmed the order):
    it bound to `127.0.0.1`. Checked on a real foreign filer (TSM): the SEC has 20-F for it and no 10-K or 10-Q, so it
    is added with no filings and the report says so. Whether to also store 20-F is an open decision for the owner.
 2. **Database backups.** Built as `python -m jobs.backup` (backup, list, verify, restore); the restore was tested into
-   a brand-new empty Postgres. Not yet scheduled (the owner decides; `scripts/register_backup_task.ps1` exists) and the
-   default folder is on the same disk, so the owner should set `BACKUP_DIR` to a drive that survives this one failing.
+   a brand-new empty Postgres. Scheduled daily at 6pm in Windows Task Scheduler (`StockMarketBackup`, registered
+   2026-10-13 at the owner's request), writing to `C:\Users\nbhas\stockmarket-backups` via `BACKUP_DIR` in `.env`.
+   That folder is outside the project but still on the only internal disk (`C:`), so it does not survive the disk
+   failing; an occasional copy to OneDrive or a USB drive is the owner's call. No "newest backup is old" warning yet.
 3. **Fundamentals** (P/E, market value, revenue, margins). The copilot refuses these questions today, and a screener
    can't exist without them. SEC EDGAR's structured company data is the likely source (public, so no licensing
    problem); that has not been checked yet. Python computes every ratio and the model only quotes it as a numbered

@@ -276,9 +276,11 @@ benchmarks.
   31 automated tests use real `pg_dump`/`pg_restore` on throwaway databases. Breaking the code on purpose was caught:
   skipping `timescaledb_pre_restore()` made 7 tests fail (the restore genuinely needs it), and a `verify` that ignored
   row counts failed its test.
-- **Backups: what was not tested or is weak.** Nothing is scheduled yet (the owner decides), so no backup has run by
-  itself, and the Task Scheduler scripts were only syntax-checked. The default folder is on the same disk as the
-  database, so it doesn't survive that disk failing until `BACKUP_DIR` points elsewhere. A PC that is off, or Docker not
+- **Backups: what was not tested or is weak.** The daily task (`StockMarketBackup`, 6pm) was registered on 2026-10-13
+  and one run through Task Scheduler succeeded (result 0, a verified backup in the new folder), but no 6pm run has
+  happened by itself yet. `BACKUP_DIR` is `C:\Users\nbhas\stockmarket-backups`, outside the project (so deleting or
+  re-cloning the repo doesn't take the backups with it) but on the same only internal disk, so it doesn't survive that
+  disk failing; a copy to OneDrive or an external drive was left to the owner. A PC that is off, or Docker not
   running, makes no backup and sends no alert; nothing yet warns that the newest backup is days old. `--replace` was
   exercised on scratch databases and on the empty database of the second container, not on the live `stockmarket`
   database with data in it (the safety-backup path is covered by a test that treats a scratch database as the live
