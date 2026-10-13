@@ -3,7 +3,7 @@
 Usage:
   python -m jobs.refresh                      refresh every active company, all steps
   python -m jobs.refresh --symbols AAPL NVDA  only these companies
-  python -m jobs.refresh --steps prices news  only these steps (prices news filings index sentiment)
+  python -m jobs.refresh --steps prices news  only these steps (prices news filings fundamentals index sentiment)
   python -m jobs.refresh --status             show recent runs and how fresh the data is
 
 Each (step, company) is isolated: one failure is recorded and the rest still run. A run is logged in the
@@ -29,6 +29,7 @@ from ai.sentiment import score_symbol
 from data.db import ROOT, connect, get_setting
 from data.ingest import ingest_symbol
 from data.ingest_filings import ingest_filings
+from data.ingest_fundamentals import ingest_fundamentals
 from data.ingest_news import ingest_news
 from data.sources.edgar import EdgarClient
 from data.sources.google_news import GoogleNewsSource
@@ -40,7 +41,7 @@ log = logging.getLogger("refresh")
 
 JOB_NAME = "nightly_refresh"
 LOCK_KEY = 7284001  # arbitrary number identifying this job's Postgres advisory lock
-STEPS = ("prices", "news", "filings", "index", "sentiment")
+STEPS = ("prices", "news", "filings", "fundamentals", "index", "sentiment")
 
 
 class AlreadyRunning(Exception):
@@ -156,14 +157,21 @@ def run_refresh(
             for sym in symbols:
                 attempt("news", sym, lambda sym=sym: ingest_news(conn, deps.news_source, sym, deps.news_days), "new headlines")
 
+        edgar = deps.edgar_factory() if ("filings" in steps or "fundamentals" in steps) else None  # one client for both
         if "filings" in steps:
-            edgar = deps.edgar_factory()
             if edgar is None:
                 skip("filings", "SEC_USER_AGENT is not set in .env")
             else:
                 for sym in symbols:
                     attempt("filings", sym, lambda sym=sym: ingest_filings(
                         conn, edgar, sym, list(deps.forms), deps.filings_per_form), "new filings")
+
+        if "fundamentals" in steps:
+            if edgar is None:
+                skip("fundamentals", "SEC_USER_AGENT is not set in .env")
+            else:
+                for sym in symbols:
+                    attempt("fundamentals", sym, lambda sym=sym: ingest_fundamentals(conn, edgar, sym), "new figures")
 
         if "index" in steps:
             pending = conn.execute(
@@ -220,7 +228,7 @@ def summarize(report: RunReport) -> str:
         total = sum(r.count for r in rs)
         bad = [r for r in rs if r.status != "ok"]
         what = "bars refreshed" if step == "prices" else "new"
-        line = f"  {step:<9} {total} {what}" + (f", {len(bad)} problem(s)" if bad else "")
+        line = f"  {step:<12} {total} {what}" + (f", {len(bad)} problem(s)" if bad else "")
         lines.append(line)
         lines += [f"    {r.symbol or '-'}: {r.status}: {r.detail}" for r in bad]
     return "\n".join(lines)

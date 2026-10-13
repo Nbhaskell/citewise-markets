@@ -51,6 +51,10 @@ benchmarks.
 | A backup only counts as good after `verify` restores it and matches the counts | A dump that was written but can't be loaded is worse than none: it feels safe. Verify restores into a temporary database, compares every table to the note, runs a vector-search query and checks the price history, then deletes the copy |
 | `restore` never overwrites an existing database without `--replace`, and replacing the live one saves a safety backup first | The restore command is the most dangerous one in the project. The safety backup (`stockmarket-prerestore-*`) is never trimmed |
 | Backups go to a folder, configurable with `BACKUP_DIR`; the default is on the same disk | Choosing the owner's external or cloud storage isn't ours to guess. The README says plainly that the default doesn't survive the disk failing |
+| Fundamentals come from the SEC's free "company facts" feed, stored raw in `financial_facts` | Public and unlicensed, one ~4 MB download per company, and the same contact rules as the filings. Raw figures are kept (concept, period, value, filing), and Python computes every ratio when asked, so a number can always be traced to a filing and recomputed if a rule changes |
+| Trailing twelve months = last full year + this year so far - the same stretch last year | It is how the filings report (a 10-K total and year-to-date totals in each 10-Q). Done from the period dates, not the filings' own "Q1/Q2" labels, which companies with odd fiscal years (NVIDIA's ends in January) would break. Every figure shows its recipe, dates, and filings |
+| Cautions are part of the result, not an afterthought | A correct number can still mislead. Net income far above operating income (Alphabet, Amazon), a share count that disagrees with the earnings average (Tesla), a balance-sheet share count, old figures or price, and mismatched periods each produce a plain-language caution |
+| US-GAAP filers only; foreign filers show "not available" | TSMC and ASML report under IFRS, in another currency, with different concept names and (for TSMC) no earnings per share. Supporting them would be real work, and it matches the 20-F filings gap. Decided by the owner on 2026-10-13 |
 
 ## Gotchas we hit
 
@@ -141,8 +145,10 @@ benchmarks.
   under Nvidia.
 - **Year-to-date and window figures use closing prices only,** from the free Yahoo feed. The latest day may be partial,
   and the 52-week range is of closes, not intraday highs and lows.
-- **No fundamentals.** Market value, P/E, and analyst targets aren't stored. The copilot says they aren't available, but
-  on a filings-route question the model sometimes answers uncited ("the sources don't include that").
+- **Fundamentals exist in the database but nothing shows them yet.** Revenue, profit, EPS, margins, market value, and P/E
+  are stored and computed (see "Fundamentals" below), but the stock detail page and the copilot don't use them, so the
+  copilot still says they aren't available, and on a filings-route question the model sometimes answers uncited ("the
+  sources don't include that"). Analyst targets are not stored.
 - **The "If the question assumes a decline, it contradicts the data" sentence** showed up in a real answer, copied
   from the prompt rule. Harmless, but it is the model repeating its instructions.
 - **Checked in a real browser:** a price question with a false premise, a sentiment question, an index question
@@ -287,6 +293,30 @@ benchmarks.
   one). A backup is only as current as its last run: anything added after it (headlines especially) is lost if the
   volume goes. Only the same Docker image (Postgres 17, TimescaleDB 2.30) was tried; a major upgrade needs a fresh
   restore test. `verify` proves the data loads and counts match; it doesn't compare the data's contents row by row.
+- **Fundamentals (step 1 of 3: data and calculations; 2026-10-13).** Checked first against the real SEC feed for the
+  six companies plus AMD and TSM, then built. What the probe found: revenue goes under four names depending on company
+  and year (Apple stopped using `Revenues` in 2018; Amazon only ever used a contract-revenue name), so the calculation
+  takes the first current name in a priority list and rejects a leftover; Amazon's stored "gross profit" ended in 2009
+  and gave a 0.7% margin before that rule; Alphabet has no cover-page share count (several share classes), so the
+  balance-sheet total is used and flagged; TSMC's feed stops at FY2024, in Taiwan dollars, with no EPS.
+  **Checked against filing text, not just for consistency:** Apple's nine-month net income (101,464 and 84,544),
+  Alphabet's half-year figures, Tesla's net income, NVIDIA's revenue (96,221 / 177,837 / 90,805, to the dollar), and
+  Amazon's twelve-month net income (135,281). Net income divided by EPS lands within about 1% of each company's reported
+  diluted share count (Tesla 0.6%). The cautions are real: Amazon's own cash-flow table shows about $80 billion of
+  non-operating income over the twelve months, and Alphabet's net income is 1.7 times its operating income.
+  Results on 2026-10-12 prices: Apple P/E 39.1, Microsoft 30.1, NVIDIA 28.6, Alphabet 17.7 (flattered by investment
+  gains, flagged), Amazon 20.9 (flagged), Tesla 350 (share count differs 12% from the earnings average, flagged).
+  25 new tests (and the refresh and add-company tests updated for the sixth step); four deliberate breakages (wrong sign in the formula, no stale-concept guard, no profit-vs-operating
+  caution, restatements ignored) were each caught. The refresh path was run end to end on a scratch database (AMD
+  stored 592 figures; TSM stored none and was reported as unavailable, not as an error).
+  **Weak spots:** TTM earnings per share is built by adding periods' EPS, which is the usual approach but is not exact
+  when the share count changed during the year. The "ok, 0 new figures" line for a foreign filer in the nightly
+  summary is quiet (only `add_company` explains it, as with filings). P/E divides today's price by figures that are
+  up to a quarter old, and the date of each is shown. A restated figure is kept as its own row, but nothing checks
+  whether restatements are common. One price (the latest close) is used; a partial trading day would shift market value.
+  Share counts for multi-class companies are totals from the balance sheet. Debt, cash, and ratios like price-to-book
+  were left out on purpose. The caution thresholds (1.2x, 5%, 10%) were picked from these six companies and are not
+  tuned on anything else. Steps 2 and 3 (the page and the copilot) are not built.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

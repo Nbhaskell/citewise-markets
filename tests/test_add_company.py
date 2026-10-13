@@ -30,6 +30,10 @@ class ForeignFilerEdgar(FakeEdgar):
             return [FilingRef("0-ZZR-20F", cik, "20-F", date(2026, 4, 16), date(2025, 12, 31), "https://x/f.htm")]
         return []
 
+    def company_facts(self, cik):  # the international accounting vocabulary: no US-GAAP figures at all
+        row = {"start": "2024-01-01", "end": "2024-12-31", "val": 1, "accn": "x", "form": "20-F", "filed": "2025-04-17"}
+        return {"facts": {"ifrs-full": {"Revenue": {"units": {"TWD": [row]}}}}}
+
 
 @pytest.fixture
 def conn(monkeypatch):
@@ -39,7 +43,7 @@ def conn(monkeypatch):
         c.rollback()
         c.execute("DELETE FROM job_runs WHERE job = 'test_add_company'")
         c.execute("DELETE FROM news_articles WHERE id LIKE 'fake:zzr-ZZAD%'")
-        for table in ("filings", "prices_daily", "instruments"):
+        for table in ("filings", "financial_facts", "prices_daily", "instruments"):
             c.execute(f"DELETE FROM {table} WHERE symbol = ANY(%s)", ([A, B],))
         c.commit()
 
@@ -56,7 +60,8 @@ def test_a_new_company_gets_every_step_and_a_clean_report(conn):
     nightly_before = count(conn, "SELECT count(*) FROM job_runs WHERE job = 'nightly_refresh'")
     report, (out,) = add_companies(conn, make_deps(), [A])
     assert out.complete and out.verdict == "ADDED" and out.name == f"{A} Co"
-    assert [lines(out)[s][0] for s in refresh.STEPS] == ["OK"] * 5
+    assert [lines(out)[s][0] for s in refresh.STEPS] == ["OK"] * 6
+    assert count(conn, "SELECT count(*) FROM financial_facts WHERE symbol = %s", A) == 1
     assert count(conn, "SELECT count(*) FROM prices_daily WHERE symbol = %s", A) == 3
     assert count(conn, "SELECT count(*) FROM filings WHERE symbol = %s", A) == 1
     assert "1 of 1 filings searchable" in lines(out)["index"][1]
@@ -72,7 +77,7 @@ def test_an_unknown_ticker_stores_nothing_and_does_not_try_the_other_steps(conn)
     _, (out,) = add_companies(conn, make_deps(price_source=FakePrices(fail=[A]), news_source=news), [A])
     assert not out.stored and not out.complete and out.verdict == "NOT ADDED"
     assert lines(out)["prices"][0] == "FAILED" and "price feed down" in lines(out)["prices"][1]
-    assert [lines(out)[s][0] for s in refresh.STEPS[1:]] == ["--"] * 4
+    assert [lines(out)[s][0] for s in refresh.STEPS[1:]] == ["--"] * 5
     assert news.calls == [] and count(conn, "SELECT count(*) FROM instruments WHERE symbol = %s", A) == 0
 
 
@@ -83,6 +88,8 @@ def test_a_foreign_filer_is_added_but_reported_as_having_no_filings(conn):
     assert status == "NONE" and "20-F" in text and "only 10-K and 10-Q" in text
     assert "no filings stored" in out.gaps
     assert lines(out)["prices"][0] == "OK" and lines(out)["sentiment"][0] == "OK"  # the rest still works
+    status, text = lines(out)["fundamentals"]
+    assert status == "NONE" and "no US-GAAP figures" in text and "no fundamentals stored" in out.gaps
 
 
 def test_no_filings_for_other_reasons_does_not_claim_a_foreign_filer(conn):
