@@ -14,7 +14,7 @@ from typing import Optional
 import psycopg
 
 from data.db import connect
-from data.headlines import is_quote_page, title_key
+from data.headlines import is_template_page, title_key
 
 from .llm import LLM, get_llm
 
@@ -122,8 +122,8 @@ def label_counts(
     conn: psycopg.Connection, model: str, days: int, symbol: Optional[str] = None
 ) -> dict[str, dict[str, int]]:
     """Labels per company for the totals and score. Each story counts once per company (the newest copy, as in the news
-    lists), and quote and comparison pages are left out: they are mostly neutral padding that dilutes the score.
-    The labels stay in the database, and the news lists still show quote pages."""
+    lists), and quote, comparison, and other data-page templates are left out: they are mostly neutral padding that
+    dilutes the score. The labels stay in the database, and the news lists still show these pages."""
     rows = conn.execute(
         "SELECT n.symbol, a.title, a.publisher, n.label FROM news_sentiment n JOIN news_articles a ON a.id = n.article_id "
         "WHERE n.model = %(m)s AND a.published_at >= now() - make_interval(days => %(d)s) "
@@ -134,7 +134,7 @@ def label_counts(
     counts: dict[str, dict[str, int]] = {}
     for sym, title, publisher, label in rows:
         key = (sym, title_key(title, publisher))
-        if key in seen or is_quote_page(title):
+        if key in seen or is_template_page(title):
             continue
         seen.add(key)
         by_label = counts.setdefault(sym, {})

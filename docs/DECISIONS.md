@@ -200,28 +200,64 @@ benchmarks.
 - **Sentiment totals count each story once and leave out quote pages.** The positive / neutral / negative / irrelevant
   counts and the score (dashboard, stock detail, and the copilot's sentiment summary) come from one function,
   `label_counts` in `ai/sentiment.py`. It counts a story once per company (the newest copy's label, as in the news
-  lists) and skips stock-quote and "X vs Y" pages, using the same pattern as the copilot's headlines. The labels stay
-  in the database and the news lists still show quote pages, so a list can show a neutral quote page that no total
-  counts. On the last 7 days of dev data, 30 of 706 labeled headlines were repeats (37 extra copies, and only one story
+  lists) and skips stock-quote, "X vs Y", and other data-page templates (rules in `data/headlines.py`, described in
+  the next entry). The labels stay in the database and the news lists still show these pages, so a list can show a
+  neutral quote page that no total counts. On the last 7 days of dev data, 30 of 706 labeled headlines were repeats (37 extra copies, and only one story
   had copies labeled differently) and 210 (30%) were quote or comparison pages, 90% of them neutral. Repeats hardly
   moved any score; quote pages did: Google went from +0.08 to +0.18, Tesla +0.10 to +0.14, Microsoft +0.11 to +0.15,
   Apple, Amazon, and Nvidia barely changed. **Google's dashboard mood word flips from Neutral to Positive** (the cutoff
   is 0.15), and Microsoft (0.145) and Tesla (0.140) sit just under it. The score now means "positives minus negatives over
-  real stories", so it moves further from zero than before; that is a change in meaning, not proof it is more accurate. The quote-page pattern is loose: in two
-  weeks of data it caught one real story ("Wells Fargo cuts Amazon stock price target", labeled negative) among 206
-  matches. If every headline for a company in the window is a quote page, its mood reads "No news". Checked with
+  real stories", so it moves further from zero than before; that is a change in meaning, not proof it is more accurate.
+  The first version's pattern was loose (it caught one real story, "Wells Fargo cuts Amazon stock price target", among
+  206 matches) and missed some templates; see the next entry. If every headline for a company in the window is a
+  template page, its mood reads "No news". Checked with
   tests (which fail without the change), the real data above, and the copilot's sentiment answers, which matched the
   database (Tesla: 15 positive, 35 neutral, 7 negative, 1 irrelevant, +0.14). `ai.eval_market --repeat 3 --show` scored
   121 of 129 before, 121 after the counting change, and 123 after the source text was reworded to say what is counted.
   The same cases fail at times (follow-up to another company and "price target" every time; "why did it move" and
   "should I sell" in some runs), none about sentiment. The two-point difference is run-to-run variation, not a gain.
+- **Quote-page rules: two sets, and the copilot keeps the narrow one.** `data/headlines.py` now holds named rules.
+  The core set (quote pages, "X vs Y" pages) is what the copilot leaves out of its sources; it is the original set
+  plus one fix: an analyst's "stock price target" is real news, so "Wells Fargo cuts Amazon stock price target" is no
+  longer treated as a quote page. The broader set adds data-page templates the original missed (fund "Holding History"
+  pages, "Options Chain" and "Quotes & News" pages, "Latest Stock Analysis", "Competitor Stock Analysis", "Market Cap
+  API", "Real-Time Odds", "Historical data", a bare "Company (TICKER)", and generic "Stock Forecast & Analyst
+  Predictions" pages, but not "Stock Forecast: <real headline>" articles), and only the sentiment totals use it.
+  Why two: using the broad set for the copilot too made its evaluation case "crashing premise" go from 8 of 8 passes
+  to 0 of 8 in a direct A/B (the options-chain page it used to see was replaced by a real article, "Is Apple a buy at
+  $337?", and it answered "the sources do not indicate Apple stock is crashing" instead of "the data cannot show the
+  cause"). That answer invented no cause, but I did not loosen the check to fit it. If the copilot should use the
+  broad set, that case's expected wording needs a decision first.
+  Measured on the 712 distinct headlines stored (after a read-through of all 198 the old pattern matched, and the 111
+  unmatched ones that looked like templates): the old pattern matched 198, of which one was clearly a real story and
+  a few borderline; the broad set matches 256. The copilot's set differs from the original on exactly two headlines
+  (the rescue; the second is the generated page "Wall Street analysts update Google (GOOGL) stock price target for 12
+  months", which now slips through because the rescue can't tell it from the real story). On the last 7 days the
+  totals now count 47 fewer stories (463 to 416; Apple 81 to 58, mostly "Holding History" pages), and **Microsoft's
+  mood word flips from Neutral to Positive** (+0.145 to +0.167); Tesla sits at +0.145, just under the 0.15 cutoff;
+  Google, Amazon, Nvidia, and Apple barely move. **Weak spots:** the rules were written from the same headlines they
+  were checked on, so there is no held-out result: the first fair test is how they handle headlines that arrive
+  after this change. New templates will keep appearing and need new rules; a few that appeared once or twice ("P/B
+  ratio" and "KPI charts" pages, "GARP candidate" screens) were left alone. The tests in `tests/test_headlines.py`
+  pin down both directions with real headlines (20 of the 43 cases fail on the old pattern). `ai.eval_market
+  --repeat 3 --show` scored 122 of 129 with the final rules (121 to 123 before); "follow-up to another company" and
+  "price target" fail every time, as before, and one run of "news and stock" tripped the cause check ("Apple stock
+  climbed due to JPMorgan lifting its target"), with the same Apple headlines the baseline saw.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
   range switching, the page's copilot, the not-found page, a 375 px phone width), in dark mode only.
 - **The dashboard was checked visually in dark mode at 780 px wide (single column) and by DOM and CSS checks at
-  desktop width.** My screenshots of the two-column desktop layout were cropped by the preview pane, and light mode
-  wasn't viewed. Look at both on a real screen.
+  desktop width.** My screenshots of the two-column desktop layout were cropped by the preview pane. Look at both on
+  a real screen.
+- **Light mode was checked** (browser emulation of `prefers-color-scheme: light`): the dashboard, a stock detail page
+  with its chart, and the copilot page with a warning banner, at 1280 px wide, plus the dashboard at 375 px. An
+  automated contrast check found no text below 4.5:1 (140 elements on the copilot page, none failing on the others),
+  the price line is 6:1 against the background, and the chart's gridlines are deliberately faint (1.3:1). Warnings
+  and pills carry words, not just color. Not checked in light mode: the stock detail page and the copilot at 375 px, and the filings list.
+- **On a phone-width screen the watchlist hides its last two columns.** At 375 px the table is about 500 px wide
+  inside a scrolling box, so the 1-month chart and the News mood column are off-screen until you scroll sideways,
+  with nothing hinting that you can. Found during the light-mode check; it is the same in dark mode. Not fixed.
 - **The dashboard is for local development only:** no login, no production build served anywhere, no HTTPS. The
   production build (`npm run build`) compiles but hasn't been deployed or served.
 - **Tests fake the network.** The web tests use a fake `fetch`. They were backed by one real browser session (watchlist
@@ -235,7 +271,9 @@ benchmarks.
 - Email or phone alerts for the nightly job (the desktop alert exists)
 - A Claude implementation of `LLM` (needs an Anthropic API key), then compare answers against Qwen on the same questions
 - Keyword plus vector hybrid search; a reranker
-- A narrower quote-page pattern, or skipping quote pages before labeling so the model isn't asked about them
+- Skipping quote and template pages before labeling, so the model isn't asked about them
+- Moving the copilot onto the broader template rules (needs a decision on the "crashing premise" case first)
+- Fixing the phone-width watchlist so the 1-month chart and News mood columns are reachable
 - A proper evaluation set of questions with known answers
 - Index and fundamentals data (S&P 500, P/E, market value) so those questions can be answered instead of refused
 - A code rule for bare "What about Tesla?" follow-ups that carries the previous question's topic over
