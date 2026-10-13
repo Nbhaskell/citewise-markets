@@ -4,6 +4,7 @@ from typing import Optional
 import psycopg
 
 from ai.sentiment import SentimentSummary as Counts
+from data.headlines import title_key
 
 RANGE_DAYS: dict[str, Optional[int]] = {"1M": 31, "3M": 92, "6M": 183, "1Y": 366, "5Y": 1830, "MAX": None}
 
@@ -80,6 +81,10 @@ def price_points(conn: psycopg.Connection, symbol: str, range_key: str) -> list[
     ]
 
 
+# The same story often arrives once per outlet. Fetch extra rows so that dropping repeats still leaves `limit` headlines.
+DEDUPE_OVERFETCH = 8
+
+
 def news_items(
     conn: psycopg.Connection, symbol: str, model: str, days: int, limit: int, include_irrelevant: bool
 ) -> list[dict]:
@@ -90,12 +95,19 @@ def news_items(
         "WHERE a.published_at >= now() - make_interval(days => %(d)s) "
         "AND (%(irr)s OR n.label IS DISTINCT FROM 'irrelevant') "
         "ORDER BY a.published_at DESC LIMIT %(l)s",
-        {"s": symbol, "m": model, "d": days, "irr": include_irrelevant, "l": limit},
+        {"s": symbol, "m": model, "d": days, "irr": include_irrelevant, "l": limit * DEDUPE_OVERFETCH},
     ).fetchall()
-    return [
-        {"id": i, "title": t, "publisher": p, "url": u, "published_at": at, "sentiment": label}
-        for i, t, p, u, at, label in rows
-    ]
+    seen: set[str] = set()
+    out = []
+    for i, t, p, u, at, label in rows:  # newest first, so the newest copy of a story is the one kept
+        key = title_key(t, p)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"id": i, "title": t, "publisher": p, "url": u, "published_at": at, "sentiment": label})
+        if len(out) == limit:
+            break
+    return out
 
 
 def news_feed(
@@ -112,12 +124,20 @@ def news_feed(
         "AND (%(symbols)s::text[] IS NULL OR s.symbol = ANY(%(symbols)s)) "
         "AND (%(labels)s::text[] IS NULL OR n.label = ANY(%(labels)s)) "
         "ORDER BY a.published_at DESC, s.symbol LIMIT %(l)s",
-        {"m": model, "d": days, "irr": include_irrelevant, "symbols": symbols, "labels": labels, "l": limit},
+        {"m": model, "d": days, "irr": include_irrelevant, "symbols": symbols, "labels": labels,
+         "l": limit * DEDUPE_OVERFETCH},
     ).fetchall()
-    return [
-        {"id": i, "title": t, "publisher": p, "url": u, "published_at": at, "symbol": sym, "sentiment": label}
-        for i, t, p, u, at, sym, label in rows
-    ]
+    seen: set[tuple[str, str]] = set()  # per company: a story about two companies still appears once for each
+    out = []
+    for i, t, p, u, at, sym, label in rows:
+        key = (sym, title_key(t, p))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"id": i, "title": t, "publisher": p, "url": u, "published_at": at, "symbol": sym, "sentiment": label})
+        if len(out) == limit:
+            break
+    return out
 
 
 def filing_rows(conn: psycopg.Connection, symbol: str) -> list[dict]:

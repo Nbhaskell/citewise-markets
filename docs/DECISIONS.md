@@ -188,8 +188,14 @@ benchmarks.
   and retry were checked by automated tests only. Dark mode only.
 - **The stock detail page has no AI signal or fundamentals.** Those need data and a model that don't exist. It shows what
   the stored data supports: prices, news mood, filings, and the filings copilot.
-- **Duplicate headlines:** the free news feed can return the same title from different sources or links, so a headline
-  can appear twice in a company's news list. Not deduplicated yet.
+- **Duplicate headlines are hidden in the news lists, not counted out of the totals.** The free news feed returns one
+  story once per outlet that carried it. `/api/stocks/{symbol}/news` and `/api/news` now show a story once per company
+  (newest copy kept), using the same rule as the copilot (`data/headlines.py`: case, spacing, and a trailing
+  " - Publisher" are ignored). A story about two companies still appears once for each. Only identical titles match:
+  two outlets that reword the same story still show twice. The rows stay in the database, and the sentiment counts and
+  score still count every copy, so those numbers can be higher than the list beside them. Checked with automated tests
+  (which fail without the change) and a query against the dev database (MSFT, TSLA, and the dashboard feed had repeats
+  before, none after, each still full at 30); not yet looked at in the browser.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
@@ -212,6 +218,7 @@ benchmarks.
 - Keyword plus vector hybrid search; a reranker
 - Filtering quote-page and comparison-page headlines out of sentiment scoring (the copilot already leaves them out of
   its headlines, but they still count in the labels and the dashboard)
+- Counting each story once in the sentiment totals and score (the news lists already hide repeats)
 - A proper evaluation set of questions with known answers
 - Index and fundamentals data (S&P 500, P/E, market value) so those questions can be answered instead of refused
 - A code rule for bare "What about Tesla?" follow-ups that carries the previous question's topic over

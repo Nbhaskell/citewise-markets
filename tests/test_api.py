@@ -175,6 +175,54 @@ def test_news_feed_spans_companies_and_filters(client):
     assert [i["published_at"] for i in everyone] == sorted((i["published_at"] for i in everyone), reverse=True)
 
 
+@pytest.fixture
+def duplicated_news():
+    """ZZDUP has one story carried by three outlets (one adding " - Wire" to the title), a second story carried
+    twice, and a third once. ZZAPI shares the first story, which is allowed to appear once for each company."""
+    now = datetime.now(timezone.utc)
+    rows = [  # (key, symbol, title, publisher, hours_ago)
+        ("a1", "ZZDUP", "Dup Co lands a big deal", "Yahoo", 1),
+        ("a2", "ZZDUP", "Dup Co lands a big deal", "TradingView", 2),
+        ("a3", "ZZDUP", "dup co lands  a big deal - Wire", "Wire", 3),
+        ("b1", "ZZDUP", "Dup Co faces a probe", "Yahoo", 4),
+        ("b2", "ZZDUP", "Dup Co faces a probe", "Wire", 5),
+        ("c1", "ZZDUP", "Dup Co opens a plant", "Wire", 6),
+        ("a4", SYM, "Dup Co lands a big deal", "Yahoo", 7),
+    ]
+    with connect() as c:
+        c.execute("DELETE FROM instruments WHERE symbol = 'ZZDUP'")
+        c.execute("INSERT INTO instruments (symbol, name, sector, industry, exchange) "
+                  "VALUES ('ZZDUP', 'Dup Co', 'Tech', 'Software', 'NMS')")
+        for key, sym, title, publisher, hours in rows:
+            aid = f"fake:zzapi-dup-{key}"
+            c.execute("INSERT INTO news_articles (id, source, title, publisher, url, published_at) "
+                      "VALUES (%s, 'fake', %s, %s, %s, %s)", (aid, title, publisher, f"https://x/{key}", now - timedelta(hours=hours)))
+            c.execute("INSERT INTO news_article_symbols (article_id, symbol) VALUES (%s, %s)", (aid, sym))
+        c.commit()
+    yield
+    with connect() as c:
+        c.execute("DELETE FROM news_articles WHERE id LIKE 'fake:zzapi-dup-%'")
+        c.execute("DELETE FROM instruments WHERE symbol = 'ZZDUP'")
+        c.commit()
+
+
+def test_company_news_shows_each_story_once_keeping_the_newest_copy(client, duplicated_news):
+    items = client.get("/api/stocks/ZZDUP/news").json()
+    assert [(i["title"], i["publisher"]) for i in items] == [
+        ("Dup Co lands a big deal", "Yahoo"), ("Dup Co faces a probe", "Yahoo"), ("Dup Co opens a plant", "Wire")]
+    # repeats must not use up the limit: asking for 2 gives 2 different stories, not 2 copies of the first
+    two = client.get("/api/stocks/ZZDUP/news", params={"limit": 2}).json()
+    assert [i["title"] for i in two] == ["Dup Co lands a big deal", "Dup Co faces a probe"]
+
+
+def test_news_feed_shows_each_story_once_per_company(client, duplicated_news):
+    feed = client.get("/api/news", params={"symbol": ["ZZDUP", SYM], "days": 7, "limit": 20}).json()
+    assert [(i["symbol"], i["title"]) for i in feed if i["title"].startswith("Dup Co")] == [
+        ("ZZDUP", "Dup Co lands a big deal"), ("ZZDUP", "Dup Co faces a probe"),
+        ("ZZDUP", "Dup Co opens a plant"), (SYM, "Dup Co lands a big deal")]  # the other company keeps its own copy
+    assert len(client.get("/api/news", params={"symbol": "ZZDUP", "limit": 2}).json()) == 2
+
+
 def test_news_feed_validates_input(client):
     assert client.get("/api/news", params={"sentiment": "great"}).status_code == 422
     assert client.get("/api/news", params={"symbol": "bad$"}).status_code == 422
