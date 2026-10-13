@@ -1,4 +1,4 @@
-import type { CopilotResponse } from "../api/types";
+import type { CopilotResponse, HistoryTurn } from "../api/types";
 
 export type ExchangeStatus = "pending" | "done" | "error" | "stopped";
 
@@ -9,11 +9,16 @@ export interface Exchange {
   symbols: string[];
   askedAt: string; // ISO time
   status: ExchangeStatus;
+  /** Which topic it belongs to. Follow-ups only use earlier questions from the same topic. Older saves have none (0). */
+  topic?: number;
   result?: CopilotResponse;
   error?: string;
 }
 
 export const STORAGE_KEY = "stockmarket.copilot.v1";
+export const TOPIC_KEY = "stockmarket.copilot.topic.v1";
+export const MAX_HISTORY_TURNS = 3; // how many earlier questions are sent along; the server uses the newest three
+const MAX_HISTORY_ANSWER = 1500; // the server accepts up to 2000 characters per answer
 export const MAX_SAVED = 20;
 export const MIN_QUESTION = 3;
 export const MAX_QUESTION = 500;
@@ -52,6 +57,7 @@ function isSavedExchange(x: unknown): x is Exchange {
   if (!isObject(x)) return false;
   if (typeof x.id !== "string" || typeof x.question !== "string" || typeof x.askedAt !== "string") return false;
   if (!isStrings(x.symbols)) return false;
+  if (x.topic !== undefined && (typeof x.topic !== "number" || !Number.isInteger(x.topic) || x.topic < 0)) return false;
   if (x.status === "done") return isResult(x.result);
   if (x.status === "error") return typeof x.error === "string";
   return x.status === "stopped";
@@ -89,6 +95,44 @@ export function saveExchanges(exchanges: Exchange[]): boolean {
     return true;
   } catch {
     return false; // storage full, or blocked
+  }
+}
+
+export const topicOf = (e: Exchange): number => e.topic ?? 0;
+
+/**
+ * The earlier questions to send with a new one, so a follow-up like "and its risks?" can be understood.
+ * Only finished, real answers from the same topic count, newest three, with citation markers removed.
+ * The server uses this only to understand the question; answers are still written from the filings alone.
+ */
+export function buildHistory(earlier: Exchange[], topic: number): HistoryTurn[] {
+  return earlier
+    .filter((e) => topicOf(e) === topic && e.status === "done" && e.result && !e.result.refused)
+    .slice(-MAX_HISTORY_TURNS)
+    .map((e) => ({
+      question: e.question,
+      answer: e.result!.answer.replace(/\[\d+(?:\s*,\s*\d+)*\]/g, "").trim().slice(0, MAX_HISTORY_ANSWER),
+      companies: e.result!.companies.slice(0, 5),
+    }));
+}
+
+/** The topic to continue in after a reload: the saved one, or the newest topic seen in the saved questions. */
+export function loadTopic(exchanges: Exchange[]): number {
+  let saved = 0;
+  try {
+    saved = Number.parseInt(storage()?.getItem(TOPIC_KEY) ?? "0", 10);
+  } catch {
+    saved = 0;
+  }
+  return Math.max(Number.isInteger(saved) && saved > 0 ? saved : 0, ...exchanges.map(topicOf), 0);
+}
+
+export function saveTopic(topic: number): void {
+  try {
+    if (topic > 0) storage()?.setItem(TOPIC_KEY, String(topic));
+    else storage()?.removeItem(TOPIC_KEY);
+  } catch {
+    // losing the topic marker only means a reload continues the previous topic
   }
 }
 

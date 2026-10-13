@@ -11,6 +11,7 @@ export type SentimentSummary = S["SentimentSummary"];
 export type PriceSeries = S["PriceSeries"];
 export type NewsFeedItem = S["NewsFeedItem"];
 export type CopilotRequest = S["CopilotRequest"];
+export type HistoryTurn = S["HistoryTurn"];
 export type CopilotResponse = S["CopilotResponse"];
 export type CopilotSource = S["Source"];
 export type StatusOut = S["StatusOut"];

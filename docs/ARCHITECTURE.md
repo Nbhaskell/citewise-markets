@@ -45,7 +45,8 @@ nothing downstream.
 ```
 filings text -> chunking.py -> embeddings.py -> filing_chunks (pgvector)
                                                       |
-question -> copilot.py: find companies -> rewrite the question into extra searches (LLM)
+question (+ earlier turns, optional) -> copilot.py: resolve_question: rewrite a follow-up into a standalone question (LLM)
+         -> find companies -> rewrite into extra searches (LLM)
          -> search.py (vector search, merged by reciprocal rank, near-duplicates dropped)
          -> relevance gate -> LLM answers from the passages with [n] citations
          -> citations and numbers check (one retry on failure) -> answer
@@ -61,6 +62,23 @@ headlines -> sentiment.py -> LLM labels in batches (strict JSON) -> news_sentime
 | LLM interface | `ai/llm.py` | `generate(system, user, json_schema=None)`. Only `OllamaLLM` (Qwen3) exists. Pick with `LLM_PROVIDER` |
 | Copilot | `ai/copilot.py` | See the safety behaviors below |
 | Sentiment | `ai/sentiment.py` | Labels each headline from an investor's view of one company |
+
+### Follow-up questions
+
+`answer_question` takes optional earlier turns (`Turn`: question, answer, companies). They are used in exactly one
+place, `condense_question`, which asks the model to rewrite the latest question so it stands alone ("And its risks?"
+becomes "What are Tesla's biggest risks?"). From then on the standalone question is what gets searched and answered;
+**the history never reaches the prompt that writes the answer**, so an earlier answer can't be used as evidence (a
+test checks this). Around the rewrite:
+
+- chosen companies always win; otherwise companies come from the standalone question;
+- if the question names no company, has a bare pronoun ("its", "that"), and the rewrite picked a company that was not
+  in the most recent turn, the code overrides the model with the most recent company and says "(assuming X)",
+  unless the question deliberately goes back ("the first one", "the other");
+- a rewrite that is empty, too short, over 300 characters, or fails falls back to the original question;
+- the reply carries `interpreted_question` (null when the question was used as written) so the screen can show it.
+
+`ai/eval_followups.py` measures this against 27 conversations (see DECISIONS for results).
 
 ### Copilot safety behaviors
 
@@ -155,7 +173,9 @@ Stock detail page (/stocks/:symbol)
   `src/lib/chart.ts`. The selected day is shown in a text readout (hover, touch, or arrow keys), which doubles as the
   accessible description. While a new range loads the old chart stays, dimmed, and its labels follow the data it was
   given, so they never mismatch.
-- **Copilot conversation:** `useConversation` keeps a list of exchanges (pending, done, error, stopped). It allows one
+- **Copilot conversation:** `useConversation` keeps a list of exchanges (pending, done, error, stopped), each tagged
+  with a topic. `buildHistory` picks the newest three finished, non-refused answers from the current topic to send
+  with a new question, and the topic number is saved under its own key. It allows one
   in flight at a time, checking a ref that updates instantly as well as state, so two sends in the same instant
   can't both go through. History persists in `localStorage` under a versioned key. Only finished exchanges are
   saved, loaded entries are validated field by field, and a blocked or full storage is reported, never thrown.

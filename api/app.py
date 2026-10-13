@@ -11,7 +11,7 @@ import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from ai.copilot import NO_EVIDENCE, answer_question
+from ai.copilot import NO_EVIDENCE, Turn, answer_question
 from ai.embeddings import DEFAULT_MODEL, Embedder
 from ai.llm import LLM
 from ai.search import search_filings
@@ -162,7 +162,8 @@ def copilot(
     if callable(check) and not check():
         raise HTTPException(503, "The AI model isn't running. Start Ollama and try again.")
     try:
-        ans = answer_question(conn, embedder, llm, req.question, req.symbols, req.limit)
+        history = [Turn(t.question, t.answer, tuple(t.companies)) for t in req.history]
+        ans = answer_question(conn, embedder, llm, req.question, req.symbols, req.limit, history=history)
     except RuntimeError as exc:
         raise HTTPException(502, str(exc)) from exc
     return {
@@ -173,6 +174,7 @@ def copilot(
         "companies": ans.symbols,
         "unverified_numbers": ans.unverified_numbers,
         "searches": ans.queries,
+        "interpreted_question": ans.interpreted_question,
         "disclaimer": ans.disclaimer,
         "sources": [
             {"number": n, "symbol": r.symbol, "form": r.form, "filed_at": r.filed_at,

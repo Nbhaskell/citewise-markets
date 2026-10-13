@@ -137,7 +137,7 @@ every endpoint. The database must be running, and Ollama for the copilot.
 | `GET /api/stocks/{symbol}/news?days=7&limit=30` | Headlines with sentiment labels (add `include_irrelevant=true` to see all) |
 | `GET /api/stocks/{symbol}/filings` | Stored SEC filings and whether each is searchable |
 | `GET /api/filings/search?q=...&symbol=AAPL&form=10-K&latest=true` | Matching filing passages with source links |
-| `POST /api/copilot` with `{"question": "...", "symbols": ["NVDA"]}` | A cited answer from the filings |
+| `POST /api/copilot` with `{"question": "...", "symbols": ["NVDA"], "history": [...]}` | A cited answer from the filings. `history` (optional, up to 4 earlier question and answer pairs) only helps understand a follow-up; the reply's `interpreted_question` says how it was read |
 
 The copilot can take several seconds, so show a loading state. Check `unverified_numbers` in its reply and warn
 the user if it isn't empty.
@@ -161,8 +161,10 @@ headlines, a data-freshness line that warns about stale data or a failed refresh
 questions with clickable numbered sources. Click a ticker to open its stock detail page: an interactive price chart
 (1M to MAX), key stats, that company's news and SEC filings, and a copilot limited to that company's filings.
 The Copilot page (`/copilot`) is a full-page chat: pick which companies to search, see your recent questions (saved
-in your browser), stop a slow answer, and retry a failed one. Each question is answered on its own, because the
-copilot has no memory of earlier ones. See [web/README.md](web/README.md) for details, tests, and how its types are
+in your browser), stop a slow answer, and retry a failed one. You can follow up ("and what about its risks?"): the
+last three questions of the current topic are sent along so the copilot can work out what "its" means, and the page
+shows an "Understood as" line with the standalone question it searched. Earlier answers are never used as evidence;
+every answer is still written only from the filings. "Start a new topic" stops earlier questions being used. See [web/README.md](web/README.md) for details, tests, and how its types are
 generated from the API.
 
 ## Command cheat sheet
@@ -175,6 +177,7 @@ generated from the API.
 | Embed filings | `python -m ai.index_filings [AAPL ...]` | no symbols means every filing |
 | Search filings | `python -m ai.search "supply chain risk" --symbol AAPL` | `--form 10-K` `--limit 5` `--latest` |
 | Ask the copilot | `python -m ai.copilot "What are Nvidia's biggest risks?"` | `--symbol NVDA` `--no-expand` `--show-prompt` |
+| Check follow-up understanding | `python -m ai.eval_followups` | `--repeat 3` for stability, `--held-out` for the untuned cases. Needs Ollama |
 | Score headlines | `python -m ai.sentiment AAPL` | `--days 7` `--no-score` (summary only) |
 | Refresh everything | `python -m jobs.refresh` | `--symbols AAPL` `--steps prices news filings index sentiment` |
 | Check freshness | `python -m jobs.refresh --status` | |
@@ -223,7 +226,6 @@ docker-compose.yml   The database container
 - Accounts and login, portfolios, and alerts (the API so far is read-only)
 - A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
 - More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, and copilot exist.
-- A copilot that remembers earlier questions (the API takes one question at a time)
 - Conversation history that follows a user between devices (it's saved per browser; there are no accounts)
 - The wireframe's market indices strip, portfolio value, and "AI daily brief" on the dashboard, because no data or
   accounts sit behind them yet
