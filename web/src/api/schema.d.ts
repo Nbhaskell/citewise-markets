@@ -196,6 +196,11 @@ export interface components {
         /** CopilotRequest */
         CopilotRequest: {
             /**
+             * History
+             * @description Earlier turns of the conversation, oldest first, so a follow-up like 'and its risks?' can be understood. The newest three are used
+             */
+            history?: components["schemas"]["HistoryTurn"][];
+            /**
              * Limit
              * @description Passages to give the model
              * @default 6
@@ -222,6 +227,11 @@ export interface components {
              * @description True when the answer cites at least one real passage
              */
             grounded: boolean;
+            /**
+             * Interpreted Question
+             * @description How a follow-up was understood (the standalone question that was searched). Null if the question was used as written
+             */
+            interpreted_question?: string | null;
             /** Question */
             question: string;
             /**
@@ -292,6 +302,18 @@ export interface components {
             database: boolean;
             /** Status */
             status: string;
+        };
+        /**
+         * HistoryTurn
+         * @description An earlier question and its answer. Only used to understand a follow-up; never treated as evidence.
+         */
+        HistoryTurn: {
+            /** Answer */
+            answer: string;
+            /** Companies */
+            companies?: string[];
+            /** Question */
+            question: string;
         };
         /** NewsFeedItem */
         NewsFeedItem: {

@@ -3,6 +3,15 @@
     "schemas": {
       "CopilotRequest": {
         "properties": {
+          "history": {
+            "description": "Earlier turns of the conversation, oldest first, so a follow-up like 'and its risks?' can be understood. The newest three are used",
+            "items": {
+              "$ref": "#/components/schemas/HistoryTurn"
+            },
+            "maxItems": 4,
+            "title": "History",
+            "type": "array"
+          },
           "limit": {
             "default": 6,
             "description": "Passages to give the model",
@@ -61,6 +70,18 @@
             "description": "True when the answer cites at least one real passage",
             "title": "Grounded",
             "type": "boolean"
+          },
+          "interpreted_question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How a follow-up was understood (the standalone question that was searched). Null if the question was used as written",
+            "title": "Interpreted Question"
           },
           "question": {
             "title": "Question",
@@ -262,6 +283,36 @@
           "ai_model_available"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "HistoryTurn": {
+        "description": "An earlier question and its answer. Only used to understand a follow-up; never treated as evidence.",
+        "properties": {
+          "answer": {
+            "maxLength": 2000,
+            "title": "Answer",
+            "type": "string"
+          },
+          "companies": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Companies",
+            "type": "array"
+          },
+          "question": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "answer"
+        ],
+        "title": "HistoryTurn",
         "type": "object"
       },
       "NewsFeedItem": {

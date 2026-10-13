@@ -16,12 +16,12 @@ const posts = (fetchMock: ReturnType<typeof mockApi>) =>
   fetchMock.mock.calls.filter(([, init]) => init?.method === "POST").map(([, init]) => JSON.parse(String(init?.body)));
 
 describe("CopilotPage", () => {
-  it("explains what it is, including that each question stands alone", async () => {
+  it("explains what it is, including that earlier questions only help understand a follow-up", async () => {
     mockApi(defaultRoutes());
     render(page());
     expect(screen.getByRole("heading", { level: 1, name: "Copilot" })).toBeInTheDocument();
-    expect(screen.getByText(/Each question is answered on its own/)).toBeInTheDocument();
-    expect(screen.getByText(/doesn't remember earlier ones/)).toBeInTheDocument();
+    expect(screen.getByText(/You can follow up on your last few questions/)).toBeInTheDocument();
+    expect(screen.getByText(/only to understand what you mean, never as evidence/)).toBeInTheDocument();
     expect(screen.getByText(/saved in this browser only/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Ask about the filings" })).toBeInTheDocument();
     expect(document.title).toBe("Copilot · stockMarket");
@@ -172,5 +172,46 @@ describe("CopilotPage", () => {
     render(page());
     await ask("And what about its biggest risks?");
     expect(await screen.findByText(/No company was named.*drew on AMZN/)).toBeInTheDocument();
+  });
+
+  it("lets a follow-up through with the earlier question, and shows how it was understood", async () => {
+    let n = 0;
+    const fetchMock = mockApi({
+      ...defaultRoutes(),
+      "POST /api/copilot": () =>
+        ++n === 1
+          ? copilotAnswer({ answer: "Tesla had 134,785 employees [1].", companies: ["TSLA"] })
+          : copilotAnswer({ answer: "Tesla's risks include X [1].", companies: ["TSLA"], interpreted_question: "What are Tesla's biggest risks?" }),
+    });
+    render(page());
+    await ask("How many employees does Tesla have?");
+    await screen.findByText(/Tesla had 134,785 employees/);
+    await ask("And what about its risks?");
+    expect(await screen.findByText(/Understood as:/)).toBeInTheDocument();
+    expect(document.querySelector(".interpreted")).toHaveTextContent("What are Tesla's biggest risks?");
+    expect(posts(fetchMock)[1].history).toEqual([
+      { question: "How many employees does Tesla have?", answer: "Tesla had 134,785 employees .", companies: ["TSLA"] },
+    ]);
+  });
+
+  it("says how many earlier questions a follow-up can use, and lets the user start a new topic", async () => {
+    const fetchMock = mockApi({ ...defaultRoutes(), "POST /api/copilot": copilotAnswer() });
+    render(page());
+    expect(screen.queryByRole("button", { name: "Start a new topic" })).not.toBeInTheDocument(); // nothing to continue yet
+
+    await ask("First question here");
+    await screen.findByText(/As of fiscal 2026 NVIDIA had/);
+    expect(screen.getByText("Follow-ups can use your last 1 question in this topic.")).toBeInTheDocument();
+    await ask("Second question here");
+    await waitFor(() => expect(screen.getByText("Follow-ups can use your last 2 questions in this topic.")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Start a new topic" }));
+    expect(screen.getByText(/nothing earlier in this topic to follow up on/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start a new topic" })).toBeDisabled();
+
+    await ask("Third question here");
+    await waitFor(() => expect(posts(fetchMock)).toHaveLength(3));
+    expect(posts(fetchMock)[2]).not.toHaveProperty("history");
+    expect(screen.getByLabelText("New topic")).toBeInTheDocument();
   });
 });

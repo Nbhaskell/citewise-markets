@@ -32,10 +32,12 @@ describe("useConversation", () => {
     await waitFor(() => expect(result.current.busy).toBe(false));
     act(() => void result.current.ask("Second question?", []));
     await waitFor(() => expect(result.current.busy).toBe(false));
-    expect(bodies(fetchMock)).toEqual([
-      { question: "First question?", symbols: ["NVDA", "TSLA"] },
-      { question: "Second question?" },
-    ]);
+    const [first, second] = bodies(fetchMock);
+    expect(first).toEqual({ question: "First question?", symbols: ["NVDA", "TSLA"] }); // nothing earlier to follow up on
+    expect(second).toMatchObject({ question: "Second question?" });
+    expect(second).not.toHaveProperty("symbols"); // no companies chosen means all
+    expect(second.history).toHaveLength(1); // the first question comes along so a follow-up can be understood
+    expect(second.history[0]).toMatchObject({ question: "First question?" });
   });
 
   it("rejects bad questions without calling the API", () => {
@@ -148,5 +150,94 @@ describe("useConversation", () => {
     act(() => void result.current.ask("What are the risks?", []));
     unmount();
     expect(signal?.aborted).toBe(true);
+  });
+
+  describe("follow-ups", () => {
+    const reply = (n: number) => copilotAnswer({ answer: `Answer ${n} [1].`, companies: ["TSLA"] });
+
+    async function askAndWait(result: { current: ReturnType<typeof useConversation> }, q: string, symbols: string[] = []) {
+      act(() => void result.current.ask(q, symbols));
+      await waitFor(() => expect(result.current.busy).toBe(false));
+    }
+
+    it("sends the earlier questions of this topic so a follow-up can be understood", async () => {
+      let n = 0;
+      const fetchMock = mockApi({ "POST /api/copilot": () => reply(++n) });
+      const { result } = renderHook(() => useConversation());
+      await askAndWait(result, "How many employees does Tesla have?");
+      await askAndWait(result, "And what about its risks?");
+      await askAndWait(result, "What about its competition?");
+
+      const [first, second, third] = bodies(fetchMock);
+      expect(first).not.toHaveProperty("history");
+      expect(second.history).toEqual([{ question: "How many employees does Tesla have?", answer: "Answer 1 .", companies: ["TSLA"] }]);
+      expect(third.history.map((t: { question: string }) => t.question)).toEqual(["How many employees does Tesla have?", "And what about its risks?"]);
+      expect(result.current.contextTurns).toBe(3);
+    });
+
+    it("starts a new topic: earlier questions stay on screen but are no longer sent", async () => {
+      const fetchMock = mockApi({ "POST /api/copilot": () => reply(1) });
+      const { result } = renderHook(() => useConversation());
+      await askAndWait(result, "How many employees does Tesla have?");
+      expect(result.current.contextTurns).toBe(1);
+
+      act(() => result.current.newTopic());
+      expect(result.current.topic).toBe(1);
+      expect(result.current.contextTurns).toBe(0);
+      expect(result.current.exchanges).toHaveLength(1); // still on screen
+
+      await askAndWait(result, "What are NVIDIA's risks?");
+      expect(bodies(fetchMock)[1]).not.toHaveProperty("history");
+      expect(result.current.exchanges.map((e) => e.topic)).toEqual([0, 1]);
+      expect(result.current.contextTurns).toBe(1);
+    });
+
+    it("remembers the topic after a reload, even before another question is asked", async () => {
+      mockApi({ "POST /api/copilot": () => reply(1) });
+      const first = renderHook(() => useConversation());
+      await askAndWait(first.result, "How many employees does Tesla have?");
+      act(() => first.result.current.newTopic());
+      first.unmount();
+
+      const second = renderHook(() => useConversation());
+      expect(second.result.current.topic).toBe(1);
+      expect(second.result.current.contextTurns).toBe(0);
+    });
+
+    it("doesn't change topic while an answer is being written", () => {
+      mockApi({ "POST /api/copilot": () => new Promise(() => undefined) });
+      const { result } = renderHook(() => useConversation());
+      act(() => void result.current.ask("How many employees does Tesla have?", []));
+      act(() => result.current.newTopic());
+      expect(result.current.topic).toBe(0);
+    });
+
+    it("retries a question with only what came before it, in its own topic", async () => {
+      let calls = 0;
+      const fetchMock = mockApi({
+        "POST /api/copilot": () => (++calls === 2 ? json({ detail: "boom" }, 500) : reply(calls)),
+      });
+      const { result } = renderHook(() => useConversation());
+      await askAndWait(result, "First question here?");
+      await askAndWait(result, "Second question here?"); // fails
+      await askAndWait(result, "Third question here?");
+      expect(result.current.exchanges.map((e) => e.status)).toEqual(["done", "error", "done"]);
+
+      act(() => result.current.retry(result.current.exchanges[1].id));
+      await waitFor(() => expect(result.current.exchanges[1].status).toBe("done"));
+      const retryBody = bodies(fetchMock).at(-1);
+      expect(retryBody.question).toBe("Second question here?");
+      expect(retryBody.history.map((t: { question: string }) => t.question)).toEqual(["First question here?"]); // not the third
+    });
+
+    it("clearing resets the topic as well", async () => {
+      mockApi({ "POST /api/copilot": () => reply(1) });
+      const { result } = renderHook(() => useConversation());
+      await askAndWait(result, "How many employees does Tesla have?");
+      act(() => result.current.newTopic());
+      act(() => result.current.clear());
+      expect(result.current.topic).toBe(0);
+      await waitFor(() => expect(window.localStorage.length).toBe(0));
+    });
   });
 });

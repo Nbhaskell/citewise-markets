@@ -7,7 +7,7 @@ history see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md]
 
 An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
 refresh job (`jobs/`, scheduled in Windows Task Scheduler for 5pm Pacific), a read-only FastAPI backend (`api/`), and a
-React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot. Not built: accounts and
+React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot that understands follow-ups. Not built: accounts and
 login, portfolios, alerts, a screener, a Claude (Anthropic API) provider, and anything that puts it online. See the
 README's "What is not built yet" for the current list.
 
@@ -82,9 +82,11 @@ The owner is building this step by step and is not a professional developer, so 
   `unverified_numbers`) and never rely on color alone. Run `npm run typecheck` and `npm test` before committing.
   Node.js lives in `C:\Program Files\nodejs`; add it to `PATH` if a tool can't find `node`. Stop any dev servers you
   start (ports 5173 and 8000).
-- **Copilot page:** it must keep telling users that each question stands alone (the API has no conversation memory),
-  keep the notice for answers where no company was named, and validate anything read back from `localStorage`.
-  Don't write a feature that implies memory without changing the API and evaluating the result.
+- **Copilot follow-ups:** earlier turns may only be used to understand the latest question (`condense_question`). Never
+  put them in the prompt that writes the answer, or an earlier answer could become evidence; a test guards this. Keep
+  showing "Understood as", keep the "No company was named" notice, and validate anything read back from
+  `localStorage`. After changing the rewrite prompt or the pronoun safeguard, run `python -m ai.eval_followups` (needs
+  Ollama) and `--held-out`; don't tune against the held-out cases, add fresh ones instead.
 - **Branches:** do new feature work on a `feature/...` branch and tell the user when a step warrants one. The nightly job
   runs whatever code is checked out, so don't leave half-finished work checked out at 5pm.
 - **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` (it changes Windows Task Scheduler)

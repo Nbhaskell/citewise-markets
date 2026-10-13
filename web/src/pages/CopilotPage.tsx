@@ -46,8 +46,9 @@ export function CopilotPage() {
       <h1 className="page-title">Copilot</h1>
       <p className="muted">
         Answers come only from the 10-K and 10-Q filings stored here, with numbered sources you can check. Not financial
-        advice. <strong>Each question is answered on its own</strong>: the copilot doesn't remember earlier ones, so name
-        the company every time.
+        advice. You can follow up on your last few questions ("and its risks?"). The copilot uses them{" "}
+        <strong>only to understand what you mean, never as evidence</strong>, and every answer is still written from the
+        filings. Check the "Understood as" line to see how it read a follow-up, and start a new topic when you change subject.
       </p>
 
       {stocks.data && stocks.data.length > 0 && (
@@ -56,6 +57,18 @@ export function CopilotPage() {
 
       <section className="card chat" aria-label="Conversation">
         <ConversationView exchanges={chat.exchanges} busy={chat.busy} onRetry={chat.retry} empty={empty} />
+        {chat.exchanges.length > 0 && (
+          <div className="context-bar muted small">
+            <span>
+              {chat.contextTurns > 0
+                ? `Follow-ups can use your last ${chat.contextTurns} ${chat.contextTurns === 1 ? "question" : "questions"} in this topic.`
+                : "A new question starts fresh: there is nothing earlier in this topic to follow up on."}
+            </span>
+            <button onClick={chat.newTopic} disabled={chat.busy || chat.contextTurns === 0}>
+              Start a new topic
+            </button>
+          </div>
+        )}
         <Composer busy={chat.busy} onAsk={(q) => chat.ask(q, companies)} onStop={chat.stop} />
       </section>
 

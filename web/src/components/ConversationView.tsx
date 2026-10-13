@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import type { Exchange } from "../lib/conversation";
+import { Fragment, useEffect, useRef } from "react";
+import { topicOf, type Exchange } from "../lib/conversation";
 import { formatDateTime } from "../lib/format";
 import { AnswerView } from "./AnswerView";
 
@@ -20,6 +20,12 @@ function Message({ exchange, busy, onRetry }: { exchange: Exchange; busy: boolea
           {formatDateTime(exchange.askedAt)}
           {exchange.symbols.length > 0 ? ` · searching ${exchange.symbols.join(", ")}` : " · all companies"}
         </p>
+        {exchange.result?.interpreted_question && (
+          // How a follow-up was read, so a wrong guess is visible instead of silently shaping the answer.
+          <p className="interpreted small">
+            <span className="muted">Understood as:</span> {exchange.result.interpreted_question}
+          </p>
+        )}
       </div>
 
       <div className="reply">
@@ -62,8 +68,15 @@ export function ConversationView({ exchanges, busy, onRetry, empty }: Props) {
   return (
     <div className="thread">
       <ol role="log" aria-label="Conversation" aria-live="polite" className="exchanges">
-        {exchanges.map((e) => (
-          <Message key={e.id} exchange={e} busy={busy} onRetry={onRetry} />
+        {exchanges.map((e, i) => (
+          <Fragment key={e.id}>
+            {i > 0 && topicOf(exchanges[i - 1]) !== topicOf(e) && (
+              <li className="topic-break" aria-label="New topic">
+                <span>New topic</span>
+              </li>
+            )}
+            <Message exchange={e} busy={busy} onRetry={onRetry} />
+          </Fragment>
         ))}
       </ol>
       <div ref={end} />

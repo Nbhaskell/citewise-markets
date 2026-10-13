@@ -182,3 +182,10 @@ details summary { cursor: pointer; color: var(--muted); }
 .composer-note { flex-basis: 100%; margin: 0; }
 .chat-footer { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 10px 2px; }
 .chat-footer button { padding: 2px 10px; font-size: 0.82rem; }
+
+/* Follow-ups: how a question was understood, topic breaks, and the context bar */
+.interpreted { margin: 4px 0 0; padding-top: 4px; border-top: 1px dashed var(--border); overflow-wrap: anywhere; }
+.topic-break { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.topic-break::before, .topic-break::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+.context-bar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 6px 18px; border-top: 1px solid var(--border); }
+.context-bar button { padding: 2px 10px; font-size: 0.82rem; }

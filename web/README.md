@@ -68,16 +68,20 @@ at or above where it started, red if below. The math lives in `src/lib/chart.ts`
 
 ## The copilot page
 
-- **Each question is answered on its own.** The API takes one question and no earlier messages, so the copilot has no
-  memory. The page says so. The history is a record for the reader, not context for the model.
+- **Follow-ups work, with limits.** Each new question is sent with the last three finished questions of the current
+  topic (citation markers removed, answers trimmed). The server uses them only to rewrite a follow-up into a
+  standalone question; the answer is written from the filings alone. The page shows "Understood as: ..." under a
+  question that was rewritten, so a wrong reading is visible.
+- **Topics:** "Start a new topic" keeps earlier questions on screen (with a divider) but stops them being sent. The
+  topic is saved, so a reload doesn't quietly resume the old one. Only finished, real answers count as history, not
+  refusals, errors, or stopped questions. A retry uses only what came before that question.
 - **History is saved in this browser only** (`localStorage`, the newest 20). Unfinished questions aren't saved. Saved
   data is validated field by field on load, because anything with access to the browser can edit it; damaged
   entries are dropped. If the browser refuses to save (private window, full storage), the page says so.
 - **One question at a time**, because the AI model answers one at a time. While one is running the button becomes
   Stop, and a stopped or failed question can be asked again in place.
 - **Company filter:** pick up to five companies (the API's limit), or none for all. When no company is named or
-  chosen, the answer carries a notice listing the companies it actually drew on, so a follow-up like "what about its
-  risks?" can't quietly pass as being about the previous company.
+  chosen, the answer carries a notice listing the companies it actually drew on.
 
 ## Things to keep true
 

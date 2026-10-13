@@ -24,6 +24,11 @@ benchmarks.
 | Web types generated from the API's OpenAPI file | The contract can't drift silently: a Python test fails if `web/openapi.json` is stale, and a type error appears if a screen uses a field that no longer exists |
 | Price chart is hand-drawn SVG, not a charting library | The chart needs only a line, axes, and a selected-day readout. Hand-drawn SVG tests in jsdom (a canvas library wouldn't), follows the dark and light themes through CSS, is keyboard and screen-reader friendly, and adds no dependency. The cost: we own the tick and scale math (covered by tests). Candlesticks, volume bars, or indicators would be the moment to reconsider a library |
 | Copilot history is saved in the browser, not on the server | There are no accounts, so the server can't tell users apart. Browser storage needs no backend change and stays private to the browser. The cost: history doesn't follow you between browsers or devices |
+| Follow-ups are understood by rewriting them, and history is never evidence | The common approach for retrieval systems: rewrite "and its risks?" into a standalone question, then search and answer as usual. Keeping history out of the answering prompt means an earlier (possibly wrong) answer can't be used as a fact, and the citation and numbers checks still apply unchanged |
+| The browser sends the history; the server stores nothing | There are no accounts, so the server can't tell users apart. Sending at most four short turns keeps requests small and bounded (validated: 4 turns, 500-character questions, 2,000-character answers, tickers only) |
+| The page shows "Understood as: ..." | The rewrite is a model guess. Showing it makes a wrong reading visible to the person instead of silently shaping the answer |
+| A bare pronoun means the most recent company, enforced in code | The model sometimes picked an older company. The rule is overridden only when the question names no company and the rewrite picked a company absent from the most recent turn, never for "the first one" and similar |
+| "Start a new topic" instead of guessing when the subject changed | Detecting a topic change reliably is hard; one explicit button is predictable, and standalone questions already weren't bent by history in the evaluation |
 | The copilot page does not pretend to remember | The API takes one question and no earlier messages. Sending earlier turns to the model would be a real feature (prompt changes, retrieval that understands "its", new evaluation), not a UI change. The page says each question stands alone |
 | One question at a time on the copilot page | The local model answers one at a time, and a queue of slow answers is worse than a Stop button |
 | Stock detail reuses the dashboard's news panel and copilot box | One component each, with an optional company, instead of two near-copies that would drift apart |
@@ -44,6 +49,7 @@ benchmarks.
 | 82% of NVIDIA's headlines were one site's auto-generated "Fund X bought N shares" posts | Excluded `marketbeat.com` in the Google News query (`EXCLUDED_SITES` in `google_news.py`) |
 | Search tests failed intermittently, returning 1 result instead of 10 | Tests insert and delete vectors constantly. Dead entries in the HNSW vector index crowded out live results until a `VACUUM`. `tests/conftest.py` now vacuums first. In normal use autovacuum handles it |
 | `openapi-typescript` crashed with "Cannot read properties of undefined (reading 'createKeywordTypeNode')" | npm installed TypeScript 7 (the new native compiler), which lacks the compiler interface that tool uses. TypeScript is pinned to 5.9 (`typescript@~5.9.3`), which the tool officially supports. Don't upgrade past 5.x until the tool supports it |
+| The first evaluation scored 14 of 16 | Two real misreadings: a comparison ("how does that compare to Amazon's?") dropped the company just discussed, and a bare "its" picked an older company. The prompt now says pronouns mean the most recent company and comparisons name both, which fixed the first. The second survived the prompt change, so a code-level safeguard was added |
 | A follow-up with no company ("And what about its biggest risks?") was answered about Amazon | With no company named, the copilot searches every company and returned Amazon's passages. Found by trying it in the browser. The answer now carries a notice that no company was named and lists the companies it drew on. It doesn't fix the cause (no memory); that needs conversation-aware retrieval |
 | A saved-history test passed even with a bug in saving | It checked what loads back, and loading also discards unfinished entries, which hid the bug. Found by deliberately breaking the code. The test now reads the raw saved data |
 | After a test made `localStorage` throw, cleanup crashed and broke later tests | The test setup cleared storage before undoing the mock. It now restores mocks first |
@@ -101,11 +107,23 @@ benchmarks.
 - **The wireframes show things the API can't supply yet:** a natural-language screener (no fundamentals data) and an
   "AI signal: bullish, 72%" (no forecasting model exists, and we haven't decided one should).
 - **A latest price bar can be a partial day** if requested while the market is open. `as_of` shows its date.
-- **The copilot has no memory.** Follow-ups that depend on an earlier answer ("its risks", "compare that to Apple")
-  don't work. The page says so and flags answers where no company was named, but a user can still be confused.
+- **Follow-ups are understood by a small local model.** On 17 tuned conversations it got 17 right, and on 10 written
+  afterwards in different wording it got 10 right, with identical results across repeats. Both sets are small, self-
+  written, cover a handful of company and topic patterns, and one set was used to tune the prompt and safeguard, so
+  treat this as encouraging, not proven. Run `python -m ai.eval_followups --held-out` after any prompt change, and
+  write new held-out cases before tuning against them.
+- **Only the last three questions are used,** answers are trimmed to 1,500 characters, and the model sees a 400-character
+  excerpt of each. A follow-up that depends on something further back, or on detail in a long answer, can be missed.
+- **Still one company-less guess:** if a question names no company and has no pronoun ("What about the legal side?"),
+  it relies on the model carrying the company; the safeguard only covers bare pronouns. The "No company was named"
+  notice and the "Understood as" line are the backstop.
+- **Each follow-up costs one extra model call** (the rewrite), a fraction of a second on a warm model here.
 - **History is per browser.** Clearing site data, a private window, or another browser loses it. Nothing is stored on
   the server, and nothing stops someone else using the same browser from reading it.
 - **No streaming.** An answer appears all at once after several seconds, with only a "working" message until then.
+- **Follow-ups were checked in a real browser** with the exact case that had failed (Tesla employees, then "And what
+  about its biggest risks?"): it was understood as Tesla, searched only Tesla, and cited only Tesla filings. A new
+  topic, the divider, and the saved topic were also checked. Dark mode only.
 - **The copilot page was checked in a real browser:** a company-filtered question, a reload that restored history,
   an unnamed follow-up (which exposed the Amazon problem above), the clear flow, and a 375 px phone width. Stop
   and retry were checked by automated tests only. Dark mode only.

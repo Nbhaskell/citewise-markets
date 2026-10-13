@@ -98,3 +98,34 @@ describe("AnswerView when no company was named", () => {
     expect(screen.queryByText(/No company was named/)).not.toBeInTheDocument();
   });
 });
+
+describe("follow-up display", () => {
+  const ex = (id: string, q: string, topic: number, interpreted: string | null = null): Exchange => ({
+    id, question: q, symbols: [], askedAt: "2026-10-12T20:00:00.000Z", status: "done", topic,
+    result: copilotAnswer({ interpreted_question: interpreted }),
+  });
+
+  it("shows how a follow-up was understood, and nothing for a question used as written", () => {
+    render(
+      <ConversationView
+        exchanges={[ex("1", "How many employees does Tesla have?", 0), ex("2", "And its risks?", 0, "What are Tesla's biggest risks?")]}
+        busy={false} onRetry={vi.fn()} empty={null}
+      />,
+    );
+    const followUp = screen.getByText("And its risks?").closest(".exchange") as HTMLElement;
+    expect(followUp).toHaveTextContent("Understood as: What are Tesla's biggest risks?");
+    expect(screen.getByText("How many employees does Tesla have?").closest(".exchange")).not.toHaveTextContent("Understood as");
+  });
+
+  it("shows a divider where the topic changes, and only there", () => {
+    render(
+      <ConversationView
+        exchanges={[ex("1", "First?", 0), ex("2", "Second?", 0), ex("3", "Third?", 1), ex("4", "Fourth?", 1)]}
+        busy={false} onRetry={vi.fn()} empty={null}
+      />,
+    );
+    expect(screen.getAllByLabelText("New topic")).toHaveLength(1);
+    const items = [...screen.getByRole("log").querySelectorAll(":scope > li")].map((li) => li.getAttribute("aria-label") ?? "message");
+    expect(items).toEqual(["message", "message", "New topic", "message", "message"]);
+  });
+});

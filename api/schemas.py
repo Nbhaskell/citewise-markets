@@ -1,8 +1,9 @@
 """Response and request shapes. These are the API's contract with the screens."""
+import re
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Health(BaseModel):
@@ -89,10 +90,33 @@ class SearchHit(BaseModel):
     text: str
 
 
+TICKER_PATTERN = r"^[A-Za-z][A-Za-z0-9.\-]{0,9}$"
+
+
+class HistoryTurn(BaseModel):
+    """An earlier question and its answer. Only used to understand a follow-up; never treated as evidence."""
+
+    question: str = Field(min_length=1, max_length=500)
+    answer: str = Field(max_length=2000)
+    companies: list[str] = Field(default_factory=list, max_length=5)
+
+    @field_validator("companies")
+    @classmethod
+    def _tickers_only(cls, value: list[str]) -> list[str]:
+        if not all(re.match(TICKER_PATTERN, c) for c in value):
+            raise ValueError("companies must be tickers like AAPL")
+        return [c.upper() for c in value]
+
+
 class CopilotRequest(BaseModel):
     question: str = Field(min_length=3, max_length=500)
     symbols: Optional[list[str]] = Field(None, max_length=5, description="Tickers to restrict to. Default: detected from the question")
     limit: int = Field(6, ge=1, le=10, description="Passages to give the model")
+    history: list[HistoryTurn] = Field(
+        default_factory=list,
+        max_length=4,
+        description="Earlier turns of the conversation, oldest first, so a follow-up like 'and its risks?' can be understood. The newest three are used",
+    )
 
 
 class Source(BaseModel):
@@ -116,6 +140,9 @@ class CopilotResponse(BaseModel):
     unverified_numbers: list[str] = Field(description="Figures in the answer that are not in the cited passages. Show a warning if non-empty")
     sources: list[Source]
     searches: list[str]
+    interpreted_question: Optional[str] = Field(
+        None, description="How a follow-up was understood (the standalone question that was searched). Null if the question was used as written"
+    )
     disclaimer: str
 
 
