@@ -9,8 +9,8 @@ An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, 
 refresh job (`jobs/`, scheduled in Windows Task Scheduler for 5pm Pacific), a read-only FastAPI backend (`api/`), and a
 React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot that understands follow-ups
 and answers from filings, daily prices, and news headlines. Not built: accounts and
-login, portfolios, a screener, fundamentals data (P/E, market value, revenue), adding a company from the app, database
-backups, email or phone alerts, a Claude (Anthropic API) provider, and anything that puts it online. See the
+login, portfolios, a screener, fundamentals data (P/E, market value, revenue), adding a company from the app, backups
+kept anywhere but this PC's disk, email or phone alerts, a Claude (Anthropic API) provider, and anything that puts it online. See the
 README's "What is not built yet" for the current list.
 
 ## Current direction
@@ -24,8 +24,9 @@ them (the owner hasn't confirmed the order):
    background job. That is a deliberate exception to the read-only API rule: confirm it with the owner first and keep
    it bound to `127.0.0.1`. Checked on a real foreign filer (TSM): the SEC has 20-F for it and no 10-K or 10-Q, so it
    is added with no filings and the report says so. Whether to also store 20-F is an open decision for the owner.
-2. **Database backups.** Nothing backs up the Docker volume. Prices and filings can be re-downloaded; news headlines
-   can't (the free feed only returns recent items), and re-labeling them costs model time.
+2. **Database backups.** Built as `python -m jobs.backup` (backup, list, verify, restore); the restore was tested into
+   a brand-new empty Postgres. Not yet scheduled (the owner decides; `scripts/register_backup_task.ps1` exists) and the
+   default folder is on the same disk, so the owner should set `BACKUP_DIR` to a drive that survives this one failing.
 3. **Fundamentals** (P/E, market value, revenue, margins). The copilot refuses these questions today, and a screener
    can't exist without them. SEC EDGAR's structured company data is the likely source (public, so no licensing
    problem); that has not been checked yet. Python computes every ratio and the model only quotes it as a numbered
@@ -136,8 +137,13 @@ The owner is building this step by step and is not a professional developer, so 
   name, `add_company`, and its report is checked against what is stored, not just the step results. Keep "no filings",
   "skipped", and "failed" visible as gaps; never let a ticker that wasn't stored read as OK. Tests set `ADD_JOB` to
   `test_add_company`, use `ZZADD`/`ZZADE` tickers, and inject fakes through `Deps`.
-- **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` (it changes Windows Task Scheduler)
-  without being asked.
+- **Backups (`jobs/backup.py`):** a backup counts as good only after `verify` has restored it and matched every table's
+  row count. Keep the TimescaleDB steps in `restore_into` (`timescaledb_pre_restore()` before `pg_restore`, `post_restore()`
+  after; without them the restore fails), keep sharing the refresh lock, and keep `restore` from overwriting an existing
+  database without `--replace` and a safety backup. Only files named exactly `stockmarket-<date>-<time>.dump` are ever
+  trimmed. Tests use real `pg_dump`/`pg_restore` on throwaway `zz_backup_*` databases, never the dev data.
+- **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` or `scripts/register_backup_task.ps1`
+  (they change Windows Task Scheduler) without being asked.
 
 ## Conventions
 

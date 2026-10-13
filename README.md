@@ -134,6 +134,47 @@ Remove it with `powershell -File scripts\unregister_nightly_task.ps1`. The task 
 and if the PC was off at the scheduled time it runs when you next log in. **Docker Desktop and Ollama must be running**
 at that time. If Docker is down the run exits with code 2, and if Ollama is down only the sentiment step is skipped.
 
+## Backups
+
+Everything lives in one Docker volume, and nothing else keeps a copy. Prices and filings can be downloaded again, but
+**news headlines can't** (the free feed only returns recent items) and re-labeling them costs model time. So:
+
+```bash
+.venv\Scripts\python -m jobs.backup                 # take a backup now (about 12 MB, a few seconds)
+.venv\Scripts\python -m jobs.backup list            # what exists, newest first
+.venv\Scripts\python -m jobs.backup verify          # prove the newest one restores (uses a temporary database)
+```
+
+A backup is a `.dump` file plus a `.json` note (checksum, row counts) in the `backups` folder (git-ignored), or in
+`BACKUP_DIR` if you set it in `.env`. **The default folder is on the same disk as the database**, so it protects
+against a deleted volume or a bad migration, not against the disk dying: point `BACKUP_DIR` at a synced or external
+drive for that. The newest 30 automatic backups are kept. It waits for a running nightly refresh to finish first, and
+`verify` restores into a temporary database, compares every table's row count with the note, checks the search index and
+price history work, then deletes the copy. Your live database is not touched. A failed backup shows a desktop alert.
+
+**Schedule it** (one time, changes your Windows Task Scheduler; default 6pm, after the 5pm refresh):
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts\register_backup_task.ps1
+powershell -File scripts\unregister_backup_task.ps1          # to remove it
+```
+
+**If the database is lost** (volume deleted, new PC): start a fresh database, then restore the newest backup into it.
+
+```bash
+docker compose up -d                                          # creates an empty database
+.venv\Scripts\python -m jobs.backup list                      # pick a file
+.venv\Scripts\python -m jobs.backup restore backups\stockmarket-YYYYMMDD-HHMMSS.dump --into stockmarket --replace
+.venv\Scripts\python -m jobs.backup verify backups\stockmarket-YYYYMMDD-HHMMSS.dump
+```
+
+`restore` refuses to touch a database that already exists unless you add `--replace`, and replacing a database that has
+data first saves it as `stockmarket-prerestore-....dump` (never deleted automatically). To look at a backup without
+risk, restore it under another name (`--into stockmarket_old`). Stop the API and any running job first; `--replace`
+closes their connections. After restoring, run `jobs.refresh` to catch up on anything newer than the backup.
+Backups hold prices, filings, and headlines only (no passwords). They need the same Docker image; a newer Postgres
+major version would need a fresh restore test.
+
 ## The API
 
 ```bash
@@ -218,10 +259,11 @@ data/        Ingest tools and data sources
 ai/          Chunking, embeddings, search, copilot, sentiment, and the LLM interface
 api/         The FastAPI app (app.py), response shapes (schemas.py), SQL (queries.py), per-request setup (deps.py)
 web/         The React web app (see web/README.md)
-jobs/        The nightly refresh runner (refresh.py) and its status report (status.py)
+jobs/        The nightly refresh (refresh.py), its status report (status.py), adding companies (add_company.py), backups (backup.py)
 db/          migrate.py and numbered SQL migrations (never edit one that has been applied)
-scripts/     PowerShell scripts to schedule and unschedule the nightly job
-logs/        refresh.log (git-ignored)
+scripts/     PowerShell scripts to schedule and unschedule the nightly job and the backup
+logs/        refresh.log, backup.log (git-ignored)
+backups/     Database backups (git-ignored; created on first backup)
 tests/       pytest tests (run against the real database with ZZ-prefixed test tickers)
 docker-compose.yml   The database container
 .env         Your private settings (git-ignored, never commit it)
@@ -236,6 +278,8 @@ docker-compose.yml   The database container
 | `SEC_USER_AGENT` | for filings | "Your Name your@email.com", sent to sec.gov |
 | `LLM_PROVIDER` | no | Defaults to `ollama`. No other provider exists yet |
 | `OLLAMA_MODEL` | no | Defaults to `qwen3:latest` |
+| `BACKUP_DIR` | no | Where backups are written. Defaults to the `backups` folder in the project |
+| `DB_CONTAINER` | no | Name of the database container the backup runs `pg_dump` in. Defaults to `stockmarket-db` |
 | `API_PORT` | no | Port for the API. Defaults to `8000` |
 | `CORS_ORIGINS` | no | Comma-separated web app addresses the API accepts. Defaults to localhost on ports 5173 and 3000 |
 
@@ -245,7 +289,8 @@ docker-compose.yml   The database container
 - Filings for foreign companies that file a 20-F (only 10-K and 10-Q are stored)
 - Fundamentals and index data (P/E, market value, revenue, S&P 500 level), so the copilot can answer those instead of
   refusing
-- Database backups (nothing backs up the Docker volume; news headlines can't be re-downloaded)
+- Backups on a second disk or off this PC (they go to `BACKUP_DIR`; you have to point it somewhere safe), and an alert
+  when no backup has happened for days (a PC that is off sends none)
 - Accounts and login, portfolios, and alerts (the API so far is read-only)
 - A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
 - More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, and copilot exist.

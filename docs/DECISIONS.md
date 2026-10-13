@@ -46,6 +46,11 @@ benchmarks.
 
 | Adding a company reuses the nightly job's code (`jobs/add_company.py` calls `run_refresh`) | Same lock, same per-step isolation, same skipped-means-partial rules, so there is one pipeline to trust, not two. It logs under its own job name so `--status` still shows only nightly runs. A ticker whose prices fail and was never stored is left out of the later steps (otherwise each would add a confusing "not in instruments" error) |
 | The add report is checked against the database, not just the step results | The refresh counts "ok, 0 new filings" as a success. For a company the SEC knows only as a 20-F filer, that is a quiet gap. The report counts what is stored and says "no filings" with the reason |
+| Backups are `pg_dump` files made inside the Docker container (`jobs/backup.py`) | No Postgres tools to install on Windows, and the dump is the same version as the server. The database is about 46 MB, so a full dump (12 MB, a few seconds) every day is simpler and safer than incremental backup tooling |
+| A backup holds the nightly job's lock while it counts rows and dumps | A refresh half-way through a company can't end up in a backup, and the row counts in the note match the dump exactly, so a restore can be checked precisely instead of "roughly" |
+| A backup only counts as good after `verify` restores it and matches the counts | A dump that was written but can't be loaded is worse than none: it feels safe. Verify restores into a temporary database, compares every table to the note, runs a vector-search query and checks the price history, then deletes the copy |
+| `restore` never overwrites an existing database without `--replace`, and replacing the live one saves a safety backup first | The restore command is the most dangerous one in the project. The safety backup (`stockmarket-prerestore-*`) is never trimmed |
+| Backups go to a folder, configurable with `BACKUP_DIR`; the default is on the same disk | Choosing the owner's external or cloud storage isn't ours to guess. The README says plainly that the default doesn't survive the disk failing |
 
 ## Gotchas we hit
 
@@ -261,6 +266,25 @@ benchmarks.
   knows and the SEC doesn't (an ETF), a company with no news, and a run while the PC sleeps or Ollama is down (the
   last two are covered by fake-source tests only). The local model skipped 1 of 99 headlines for BRK-B; that is shown
   as a note, not a gap, and the nightly refresh retries it. Tickers outside the US (`0700.HK`) are rejected up front.
+- **Backups: what was tested (2026-10-13).** A real backup of the dev database (11.9 MB, 10 tables, 16,799 rows)
+  passed `verify` (checksum, every row count, 6 migrations, extensions, vector search, 6 price time-chunks). The
+  harder test was a disaster restore: a second, brand-new Postgres container with an empty volume (a different
+  password), the backup restored into it with `restore --into stockmarket --replace`, then the real API run against it.
+  The copilot answered "NVIDIA had approximately 42,000 employees" from the restored vector index, the price endpoint
+  returned the latest prices, and `jobs.refresh` wrote new prices and headlines into it (sequences carried over: the next
+  run id was 976 after 975). Restoring without `--replace` refused. The temporary container and volume were removed.
+  31 automated tests use real `pg_dump`/`pg_restore` on throwaway databases. Breaking the code on purpose was caught:
+  skipping `timescaledb_pre_restore()` made 7 tests fail (the restore genuinely needs it), and a `verify` that ignored
+  row counts failed its test.
+- **Backups: what was not tested or is weak.** Nothing is scheduled yet (the owner decides), so no backup has run by
+  itself, and the Task Scheduler scripts were only syntax-checked. The default folder is on the same disk as the
+  database, so it doesn't survive that disk failing until `BACKUP_DIR` points elsewhere. A PC that is off, or Docker not
+  running, makes no backup and sends no alert; nothing yet warns that the newest backup is days old. `--replace` was
+  exercised on scratch databases and on the empty database of the second container, not on the live `stockmarket`
+  database with data in it (the safety-backup path is covered by a test that treats a scratch database as the live
+  one). A backup is only as current as its last run: anything added after it (headlines especially) is lost if the
+  volume goes. Only the same Docker image (Postgres 17, TimescaleDB 2.30) was tried; a major upgrade needs a fresh
+  restore test. `verify` proves the data loads and counts match; it doesn't compare the data's contents row by row.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
