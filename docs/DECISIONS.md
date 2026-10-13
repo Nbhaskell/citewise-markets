@@ -44,6 +44,9 @@ benchmarks.
 | Index and market-wide questions are refused | No index data is stored. Asked "What is the S&P 500 at?", the model answered "$217" from a filing's total-return chart (scaled from $100). Refusing is better than a confident wrong number |
 | A cause hint is retried, then shown as a caution | The prompt alone didn't stop the model hedging ("may have influenced market sentiment"), so the code checks for it, retries once, and the reply carries a visible `cautions` entry if it persists |
 
+| Adding a company reuses the nightly job's code (`jobs/add_company.py` calls `run_refresh`) | Same lock, same per-step isolation, same skipped-means-partial rules, so there is one pipeline to trust, not two. It logs under its own job name so `--status` still shows only nightly runs. A ticker whose prices fail and was never stored is left out of the later steps (otherwise each would add a confusing "not in instruments" error) |
+| The add report is checked against the database, not just the step results | The refresh counts "ok, 0 new filings" as a success. For a company the SEC knows only as a 20-F filer, that is a quiet gap. The report counts what is stored and says "no filings" with the reason |
+
 ## Gotchas we hit
 
 | Problem | Cause and fix |
@@ -243,6 +246,21 @@ benchmarks.
   --repeat 3 --show` scored 122 of 129 with the final rules (121 to 123 before); "follow-up to another company" and
   "price target" fail every time, as before, and one run of "news and stock" tripped the cause check ("Apple stock
   climbed due to JPMorgan lifting its target"), with the same Apple headlines the baseline saw.
+- **Foreign companies (20-F filers) have no filings here.** Checked on 2026-10-13 against the real SEC and Yahoo:
+  TSM and ASML have 20-F and 6-K filings and no 10-K or 10-Q; AMD and BRK-B have both kinds. Adding TSM with
+  `jobs.add_company` stored 1,255 daily prices and 100 headlines (all labeled) and no filings; the report said why. In
+  the app, a price question about TSM was answered correctly, and a question about its annual-report risks got "I
+  couldn't find anything in the stored filings, prices, or headlines... so I won't guess" (honest, but generic: it
+  tells you to name a company when one was named). Storing 20-F is possible (the SEC client would need the form list
+  and probably a different text cleaner; 20-Fs are long) but was not tried, and the copilot's "annual report" form
+  detection assumes 10-K. Left as the owner's decision. The nightly job still reports such a company's filings step
+  as "ok (0 new filings)"; only `add_company` explains it.
+- **Add-company checks.** Real runs against a scratch database (so the dev data was untouched): a made-up ticker
+  (nothing stored, the other four steps not tried), TSM, AMD and BRK-B together (4 filings each, all indexed, headlines
+  labeled), and AMD again (22 bars, 5 new headlines, 0 filings, nothing re-indexed). Not checked: a ticker that Yahoo
+  knows and the SEC doesn't (an ETF), a company with no news, and a run while the PC sleeps or Ollama is down (the
+  last two are covered by fake-source tests only). The local model skipped 1 of 99 headlines for BRK-B; that is shown
+  as a note, not a gap, and the nightly refresh retries it. Tickers outside the US (`0700.HK`) are rejected up front.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

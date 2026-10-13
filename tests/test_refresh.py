@@ -132,6 +132,28 @@ def test_one_failing_company_does_not_stop_the_others(conn):
     assert count(conn, "SELECT count(*) FROM job_runs WHERE id = %s AND status = 'partial'", report.run_id) == 1
 
 
+def test_a_never_stored_ticker_whose_prices_fail_is_left_out_of_the_later_steps(conn):
+    report = run_refresh(conn, make_deps(price_source=FakePrices(fail=[B])), [A, B], today=TODAY)
+    assert {(r.step, r.symbol) for r in report.results if r.symbol == B} == {("prices", B)}  # no "not in instruments" noise
+    assert ("news", A) in {(r.step, r.symbol) for r in report.results}
+
+
+def test_a_stored_company_whose_prices_fail_still_gets_the_other_steps(conn):
+    run_refresh(conn, make_deps(), [A], today=TODAY)
+    report = run_refresh(conn, make_deps(price_source=FakePrices(fail=[A])), [A], today=TODAY)
+    assert [(r.step, r.status) for r in report.results if r.symbol == A] == [
+        ("prices", "error"), ("news", "ok"), ("filings", "ok"), ("sentiment", "ok")]
+
+
+def test_the_job_name_can_be_chosen_for_a_run(conn):
+    report = run_refresh(conn, make_deps(), [A], steps=("prices",), today=TODAY, job="test_refresh_other")
+    try:
+        assert count(conn, "SELECT job FROM job_runs WHERE id = %s", report.run_id) == "test_refresh_other"
+    finally:
+        conn.execute("DELETE FROM job_runs WHERE job = 'test_refresh_other'")
+        conn.commit()
+
+
 def test_everything_failing_is_reported_as_failed(conn):
     report = run_refresh(conn, make_deps(price_source=FakePrices(fail=[A])), [A], steps=("prices",), today=TODAY)
     assert report.status == "failed" and report.results[0].status == "error"

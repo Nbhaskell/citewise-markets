@@ -108,6 +108,7 @@ def run_refresh(
     symbols: Optional[list[str]] = None,
     steps: tuple = STEPS,
     today: Optional[date] = None,
+    job: Optional[str] = None,
 ) -> RunReport:
     if not conn.execute("SELECT pg_try_advisory_lock(%s)", (LOCK_KEY,)).fetchone()[0]:
         raise AlreadyRunning("another refresh is already running")
@@ -116,7 +117,7 @@ def run_refresh(
         symbols = [s.upper() for s in symbols] if symbols else active_symbols(conn)
         today = today or date.today()
         run_id = conn.execute(
-            "INSERT INTO job_runs (job, status) VALUES (%s, 'running') RETURNING id", (JOB_NAME,)
+            "INSERT INTO job_runs (job, status) VALUES (%s, 'running') RETURNING id", (job or JOB_NAME,)
         ).fetchone()[0]
         conn.commit()
         log.info("run %s: %d companies, steps: %s", run_id, len(symbols), ", ".join(steps))
@@ -143,6 +144,13 @@ def run_refresh(
                     last = conn.execute("SELECT max(ts) FROM prices_daily WHERE symbol = %s", (sym,)).fetchone()[0]
                     return ingest_symbol(conn, deps.price_source, sym, choose_period(last, today))
                 attempt("prices", sym, prices, "bars")
+            # A ticker whose prices failed and that was never stored (a typo, say) would only add "not in
+            # instruments" errors to every later step; the prices error already says what went wrong.
+            stored = {r[0] for r in conn.execute("SELECT symbol FROM instruments WHERE symbol = ANY(%s)", (symbols,))}
+            for sym in symbols:
+                if sym not in stored:
+                    log.warning("%-6s not stored (prices failed); leaving it out of the other steps", sym)
+            symbols = [s for s in symbols if s in stored]
 
         if "news" in steps:
             for sym in symbols:

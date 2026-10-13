@@ -104,8 +104,22 @@ recorded and the rest still run. A normal run on six companies takes well under 
 .venv\Scripts\python -m jobs.refresh --symbols AAPL --steps news sentiment   # just part of it
 ```
 
-Add a new company once with `python -m data.ingest TICKER` (prices create the company record), and the nightly job
-picks it up from then on. Runs are logged to the `job_runs` table and to `logs/refresh.log`. Exit codes: 0 all good,
+**Add a company** with one command, then the nightly job keeps it fresh from then on:
+
+```bash
+.venv\Scripts\python -m jobs.add_company TSM       # one or more tickers; repeating one just brings it up to date
+```
+
+It runs all five steps for that ticker (needs Docker and Ollama running; takes a minute or two, longer for a company
+with several big filings to index) and prints a per-step report ending in ADDED, ADDED WITH GAPS, or NOT ADDED. Only
+US-listed tickers work; write a share class with a dash (`BRK-B`, and `brk.b` is tidied to that). **Foreign companies
+that file a 20-F instead of a 10-K (TSM, ASML) are added with prices, headlines, and sentiment, but no filings:** the
+app stores only 10-K and 10-Q, so the report says so and the copilot can't answer filing questions for them. It uses the
+same lock as the nightly job, so it refuses to run while a refresh is in progress (exit code 3). Runs show in
+`job_runs` as `add_company`, not in `--status`. Same exit codes as above, except 1 also means "added with gaps".
+(`python -m data.ingest TICKER` still works for prices alone.)
+
+Runs are logged to the `job_runs` table and to `logs/refresh.log`. Exit codes: 0 all good,
 1 something failed or was skipped, 2 database unreachable, 3 another run already in progress, 4 the job crashed.
 Exit codes 1, 2 and 4 also pop up a Windows desktop alert, so you hear about a bad night without checking. Test that
 alerts reach you with `.venv\Scripts\python -m jobs.notify`. Add `--no-alert` to a manual run to silence them.
@@ -227,7 +241,8 @@ docker-compose.yml   The database container
 
 ## What is not built yet
 
-- Adding a company from the app (today it is a command-line step; see "Keeping data fresh (nightly job)")
+- Adding a company from the app (today it is one command, `python -m jobs.add_company`; see "Keeping data fresh")
+- Filings for foreign companies that file a 20-F (only 10-K and 10-Q are stored)
 - Fundamentals and index data (P/E, market value, revenue, S&P 500 level), so the copilot can answer those instead of
   refusing
 - Database backups (nothing backs up the Docker volume; news headlines can't be re-downloaded)

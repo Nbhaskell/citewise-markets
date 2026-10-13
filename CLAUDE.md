@@ -19,12 +19,11 @@ The owner uses this privately, on their own PC, for **daily research on companie
 accounts, login, portfolios, holdings, and putting it online; none of that is wanted now. Roughly in the order to do
 them (the owner hasn't confirmed the order):
 
-1. **Easier adding of companies.** Today it is `python -m data.ingest TICKER` (prices only), then the nightly job or
-   `python -m jobs.refresh --symbols TICKER` for news, filings, index, and sentiment. First step: one command that
-   does it all. Later: an "Add company" box in the web app, which needs the first write endpoint and a background
-   job. That is a deliberate exception to the read-only API rule: confirm it with the owner first and keep it bound
-   to `127.0.0.1`. Filings are 10-K and 10-Q only, so foreign filers (20-F) would show no filings; check on a real
-   example before promising otherwise.
+1. **Easier adding of companies.** Done as a command: `python -m jobs.add_company TICKER` (all five steps, then a
+   per-step report). Later: an "Add company" box in the web app, which needs the first write endpoint and a
+   background job. That is a deliberate exception to the read-only API rule: confirm it with the owner first and keep
+   it bound to `127.0.0.1`. Checked on a real foreign filer (TSM): the SEC has 20-F for it and no 10-K or 10-Q, so it
+   is added with no filings and the report says so. Whether to also store 20-F is an open decision for the owner.
 2. **Database backups.** Nothing backs up the Docker volume. Prices and filings can be re-downloaded; news headlines
    can't (the free feed only returns recent items), and re-labeling them costs model time.
 3. **Fundamentals** (P/E, market value, revenue, margins). The copilot refuses these questions today, and a screener
@@ -133,6 +132,10 @@ The owner is building this step by step and is not a professional developer, so 
   headlines they are tested on, so new templates need a new rule plus a case in `tests/test_headlines.py`.
 - **Branches:** do new feature work on a `feature/...` branch and tell the user when a step warrants one. The nightly job
   runs whatever code is checked out, so don't leave half-finished work checked out at 5pm.
+- **Adding companies (`jobs/add_company.py`):** it reuses `run_refresh` (same lock, same isolation) under its own job
+  name, `add_company`, and its report is checked against what is stored, not just the step results. Keep "no filings",
+  "skipped", and "failed" visible as gaps; never let a ticker that wasn't stored read as OK. Tests set `ADD_JOB` to
+  `test_add_company`, use `ZZADD`/`ZZADE` tickers, and inject fakes through `Deps`.
 - **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` (it changes Windows Task Scheduler)
   without being asked.
 
