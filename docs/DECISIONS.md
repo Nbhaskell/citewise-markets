@@ -37,6 +37,12 @@ benchmarks.
 | Feature branches for the web screens | A new codebase with many commits shouldn't land on `main` half-finished, and the nightly job runs whatever is checked out |
 | One database connection per request | Simple and fast enough locally (a connect takes a few milliseconds on `127.0.0.1`). A connection pool is the upgrade if load ever matters |
 | Migrations are append-only numbered SQL files | `db/migrate.py` applies each once. Never edit one that has been applied; add a new file |
+| The copilot picks prices, headlines, or filings with keyword rules, not a model call | Predictable, testable, and instant. A model call would add a delay and a new way to be wrong. The cost is vocabulary gaps: a fresh set of 14 questions found three phrasings the rules missed. Gaps fall back to the filings route, which says "the sources don't provide that" |
+| Python computes every price figure; the model only copies | Matches the rule that the model never calculates. Changes, highs, lows, and ranges are written into the source text, with the direction in words ("a rise"), so the numbers check can verify the answer |
+| Headlines are context, never a cause | They are titles only. The copilot is told, and checked, not to say a headline explains a price move. "Why did it move?" is answered with the move, the headlines of the period, and "the stored data can't show the cause" |
+| Quote pages and "X vs Y" pages are left out of the copilot's headlines | They are most of the neutral labels, say nothing new, and quote intraday prices that read like closing prices. The news panel is unchanged |
+| Index and market-wide questions are refused | No index data is stored. Asked "What is the S&P 500 at?", the model answered "$217" from a filing's total-return chart (scaled from $100). Refusing is better than a confident wrong number |
+| A cause hint is retried, then shown as a caution | The prompt alone didn't stop the model hedging ("may have influenced market sentiment"), so the code checks for it, retries once, and the reply carries a visible `cautions` entry if it persists |
 
 ## Gotchas we hit
 
@@ -56,7 +62,11 @@ benchmarks.
 | One-year chart labels read "Oct 25" and "Jan 26" | That looks like October 25th and January 26th, but meant October 2025. Found while looking at the real page. The one-year axis now says "Oct 2025" |
 | The 52-week range marker's position was a long float in the page (`88.10625000000002%`) | Harmless to look at, but sloppy. It's rounded to one decimal |
 | Generated types marked the copilot's `limit` as required | The generator treats fields with defaults as required. The `gen:api` script passes `--default-non-nullable false` |
-| With the API stopped, the page said "The API returned an error (502)" | In development the Vite proxy answers 502 or 504 when the API is down, so the browser never sees a network failure. The client now maps a 502 or 504 with no API message to "Can't reach the API. Is it running? python -m api" |
+| Asked "Why did Nvidia stock fall this month?", the copilot wrote "fell by -3.68%" when the stock rose 3.68% | The model accepted the question's wrong premise. The digits matched, so the numbers check passed. Found by running the traps against the real model. Now the data says "a rise" in words, a prompt rule says to contradict a wrong premise, and a direction check and a minus-sign check flag it (with the usual retry) |
+| "Since the start of the year" was read as the past 365 days | My period rules only knew "this year". The answer looked right and passed a check that only looked for the word "year". The rules now cover "start of the year" and "since January", and the evaluation checks for year-to-date wording |
+| A headline "Stock Price Today: $226.19" sat next to a real close of 226.32 | A model could quote the headline as the close. Quote pages are now left out of the copilot's headlines |
+| My first attempt at fixing "What about Tesla?" made things worse | A rewrite-prompt rule for bare "What about X?" follow-ups didn't fix that phrasing and flipped a held-out case ("How about Amazon?") from pass to fail. Reverted, per the rule not to tune against held-out cases. The follow-up scores are unchanged (17/17 and 10/10) |
+| The browser kept showing old page text after I edited a file | Vite's file watcher missed the change. Restarting `npm run dev` fixed it. Check what the server really serves before blaming the code || With the API stopped, the page said "The API returned an error (502)" | In development the Vite proxy answers 502 or 504 when the API is down, so the browser never sees a network failure. The client now maps a 502 or 504 with no API message to "Can't reach the API. Is it running? python -m api" |
 | `node` was "not found" right after installing Node.js | Terminals and tools opened before the install don't see the new PATH. Open a new terminal (tools started earlier need `PATH` extended with `C:\Program Files\nodejs`) |
 | Python patch scripts wrote broken strings and regexes into files | Escapes like `\n` and `\b` were mangled by shell heredocs. Edit files directly, or build such characters explicitly |
 
@@ -75,6 +85,20 @@ benchmarks.
   the search.
 - **Near-duplicate passages.** Companies repeat paragraphs across filings, which filled the top results with copies.
   Search drops them and offers `--latest`.
+- **Price, news, and sentiment answers** (`python -m ai.eval_market`, 43 cases: routing, traps, and unchanged filing
+  questions). The cases were written in three rounds, each run against the real model, read by hand, and used to fix
+  things, so the final number flatters it: the first run of the final set scored 40 of 43 and 119 of 129 over three
+  runs. Everything the traps check passed in all runs: no invented cause, no advice or prediction, the false-premise
+  question corrected, no index guess. The known misses are in the weak spots below.
+- **The fair number.** The third round was written before any of it had been run, and was the one honest held-out
+  test: it scored 12 of 14 on the automatic checks. Reading the answers showed one of those passes was wrong (the
+  year-to-date case), so the real figure was 11 of 14. Its misses ("press coverage", "how's the stock?", "since the
+  start of the year") exposed three wording gaps, which are fixed and tested, so those cases now count as tuning
+  material. **No untouched held-out cases are left.** `--held-out` says so; write new ones, in different wording,
+  before claiming a fair score again.
+- **Checks that were too loose gave false passes.** A check for the word "year" passed a one-year answer to a
+  year-to-date question, and the wrong-sign answer passed the digits check. Both were found by reading answers, not
+  by the score. Read the answers (`--show`), not just the totals.
 
 ## Known weak spots
 
@@ -87,7 +111,34 @@ benchmarks.
   good or bad news is often labeled neutral, and headlines about other companies are often labeled neutral instead of
   irrelevant. About two-thirds of labels are neutral, mostly quote pages and "X vs Y" comparison pages, so scores sit
   near zero. Consistency across re-runs was not measured.
-- **The copilot reads filings only.** It does not use prices, news, or sentiment yet.
+- **Which sources a question gets is decided by keyword rules**, and about one fresh phrasing in five is missed (see
+  the fair number above). A missed one falls back to the filings route. That is usually an honest "the sources don't
+  provide that", but not always: asked "Why is Apple stock crashing?" before "crashing" was a known word, it answered
+  from a filing chart and said price data wasn't provided. Rules are patched as gaps are found, which won't end.
+- **"What about Tesla?" after a price question is still answered from filings.** The follow-up rewrite returns the
+  question unchanged, so the price topic isn't carried over ("And Tesla?" and "How about Tesla?" work). It passes 0 of
+  5 runs in the evaluation and is left in as a known failure. A prompt fix made another case worse and was reverted.
+- **The local model is not steady.** The same question can pass 2 runs in 5 (hedging about causes, before the cause
+  check existed). Checks in code, not the prompt, are what hold the line: the numbers, direction, minus-sign, and
+  cause checks, and the refusals.
+- **The numbers check can warn about a figure the user typed.** "Will Microsoft hit $600 by December?" is answered
+  correctly, but the model repeats "$600" and the check flags it as not in the sources. Left as is: a spurious warning
+  is the safer way to fail than trusting numbers a user supplies.
+- **The cause check only looks for certain wording** ("due to", "may have contributed", "driven by"). A cause implied
+  in other words would pass, and it only runs when the answer was given both prices and headlines.
+- **Headlines in answers are shallow.** Titles only, the newest six (so usually all from one day, whatever period was
+  asked about), some not really about the company (the model labels "irrelevant" only a few), and the labels are two
+  thirds neutral. Answers repeat that, but a "Dating app Bumble is in talks to go private" headline can still appear
+  under Nvidia.
+- **Year-to-date and window figures use closing prices only,** from the free Yahoo feed. The latest day may be partial,
+  and the 52-week range is of closes, not intraday highs and lows.
+- **No fundamentals.** Market value, P/E, and analyst targets aren't stored. The copilot says they aren't available, but
+  on a filings-route question the model sometimes answers uncited ("the sources don't include that").
+- **The "If the question assumes a decline, it contradicts the data" sentence** showed up in a real answer, copied
+  from the prompt rule. Harmless, but it is the model repeating its instructions.
+- **Checked in a real browser:** a price question with a false premise, a sentiment question, an index question
+  (refused), a reload (history restored, in the new shape), old saved answers (still showing), and a 375 px phone
+  width. Dark mode only. The browser pane's own history was used, so these answers sit in that pane's saved history.
 - **Search is vector-only.** A keyword (full-text) search was considered for exact-term lookups and not built.
 - **The nightly job needs the PC on and you logged in, with Docker Desktop and Ollama running.** Otherwise it
   catches up the next time it can. A bad run shows a desktop alert (see below), but if the PC is off or you aren't
@@ -159,5 +210,10 @@ benchmarks.
 - Email or phone alerts for the nightly job (the desktop alert exists)
 - A Claude implementation of `LLM` (needs an Anthropic API key), then compare answers against Qwen on the same questions
 - Keyword plus vector hybrid search; a reranker
-- Filtering quote-page and comparison-page headlines out of sentiment
+- Filtering quote-page and comparison-page headlines out of sentiment scoring (the copilot already leaves them out of
+  its headlines, but they still count in the labels and the dashboard)
 - A proper evaluation set of questions with known answers
+- Index and fundamentals data (S&P 500, P/E, market value) so those questions can be answered instead of refused
+- A code rule for bare "What about Tesla?" follow-ups that carries the previous question's topic over
+- Choosing headlines spread across the period asked about, not just the newest six
+- Streaming answers, so the screen isn't blank for several seconds

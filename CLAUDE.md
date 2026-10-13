@@ -7,7 +7,8 @@ history see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md]
 
 An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
 refresh job (`jobs/`, scheduled in Windows Task Scheduler for 5pm Pacific), a read-only FastAPI backend (`api/`), and a
-React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot that understands follow-ups. Not built: accounts and
+React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot that understands follow-ups
+and answers from filings, daily prices, and news headlines. Not built: accounts and
 login, portfolios, alerts, a screener, a Claude (Anthropic API) provider, and anything that puts it online. See the
 README's "What is not built yet" for the current list.
 
@@ -83,12 +84,21 @@ The owner is building this step by step and is not a professional developer, so 
   outside URL through `safeHttpUrl`. Keep warnings visible (stale data, failed refresh, offline model,
   `unverified_numbers`) and never rely on color alone. Run `npm run typecheck` and `npm test` before committing.
   Node.js lives in `C:\Program Files\nodejs`; add it to `PATH` if a tool can't find `node`. Stop any dev servers you
-  start (ports 5173 and 8000).
+  start (ports 5173 and 8000). If the browser shows old text after you edit a file, check what Vite serves
+  (`curl http://localhost:5173/src/...`) and restart `npm run dev`; its file watcher has missed edits.
 - **Copilot follow-ups:** earlier turns may only be used to understand the latest question (`condense_question`). Never
   put them in the prompt that writes the answer, or an earlier answer could become evidence; a test guards this. Keep
   showing "Understood as", keep the "No company was named" notice, and validate anything read back from
   `localStorage`. After changing the rewrite prompt or the pronoun safeguard, run `python -m ai.eval_followups` (needs
   Ollama) and `--held-out`; don't tune against the held-out cases, add fresh ones instead.
+- **Copilot market data (`ai/market.py`):** prices, headlines, and sentiment reach the model only as numbered sources, with
+  every figure computed in Python (the model never calculates) and the direction written in words. Keep the numbers,
+  direction, minus-sign, and cause checks, the "no company named" and index refusals, and the rule that headlines never
+  explain a price move. Before changing the prompt, `detect_intent`, or `parse_window`, run `python -m ai.eval_market
+  --repeat 3 --show` (needs Ollama) and read the answers, not just the totals; checks that are too loose give false
+  passes. `HELD_OUT` in that file is empty on purpose: write fresh cases in different wording before claiming a fair
+  score, and don't tune against them once run. Don't change the follow-up rewrite prompt without running
+  `ai.eval_followups` and `--held-out` (a change for "What about X?" once made it worse and was reverted).
 - **Branches:** do new feature work on a `feature/...` branch and tell the user when a step warrants one. The nightly job
   runs whatever code is checked out, so don't leave half-finished work checked out at 5pm.
 - **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` (it changes Windows Task Scheduler)

@@ -7,8 +7,9 @@ What works today:
 
 - Daily prices, news headlines, and SEC filings (10-K / 10-Q) stored in one Postgres database
 - Semantic search over the filings
-- A copilot that answers questions from the filings, with `[1]`-style citations, and a check that flags figures
-  not found in the cited passages
+- A copilot that answers questions from the filings, the stored daily prices, and news headlines (with their
+  sentiment labels), with `[1]`-style citations. It flags figures not found in the cited sources and price moves
+  described the wrong way, and it can't say why a price moved, predict prices, or give advice
 - News headline sentiment (positive / negative / neutral / irrelevant) per company
 - A nightly refresh job that keeps all of the above up to date (you register it once, see below)
 - A read-only HTTP API (FastAPI) over all of it, for the web screens to use (see "The API" below)
@@ -19,7 +20,7 @@ Everything runs locally and costs nothing. The AI uses a local model through Oll
 
 > **Prototype data only.** Yahoo Finance (prices) and Google News (headlines) are free, unofficial sources and are
 > not licensed for a public product. Replace them with licensed feeds before any launch. SEC EDGAR is public and fine.
-> The copilot summarizes public filings. It is not financial advice and it can be wrong.
+> The copilot summarizes stored public filings, prices, and headlines. It is not financial advice and it can be wrong.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and [docs/DECISIONS.md](docs/DECISIONS.md) for why
 things are the way they are, including known weak spots.
@@ -139,10 +140,10 @@ every endpoint. The database must be running, and Ollama for the copilot.
 | `GET /api/stocks/{symbol}/news?days=7&limit=30` | Headlines with sentiment labels (add `include_irrelevant=true` to see all) |
 | `GET /api/stocks/{symbol}/filings` | Stored SEC filings and whether each is searchable |
 | `GET /api/filings/search?q=...&symbol=AAPL&form=10-K&latest=true` | Matching filing passages with source links |
-| `POST /api/copilot` with `{"question": "...", "symbols": ["NVDA"], "history": [...]}` | A cited answer from the filings. `history` (optional, up to 4 earlier question and answer pairs) only helps understand a follow-up; the reply's `interpreted_question` says how it was read |
+| `POST /api/copilot` with `{"question": "...", "symbols": ["NVDA"], "history": [...]}` | A cited answer from filings, prices, and headlines. Each source has a `kind` (`filing`, `price`, `headline`, or `sentiment`). `history` (optional, up to 4 earlier question and answer pairs) only helps understand a follow-up; the reply's `interpreted_question` says how it was read |
 
-The copilot can take several seconds, so show a loading state. Check `unverified_numbers` in its reply and warn
-the user if it isn't empty.
+The copilot can take several seconds, so show a loading state. Check `unverified_numbers` and `cautions` in its reply
+and show them to the user if they aren't empty.
 
 **It is read-only and has no login.** It only listens on this computer (`127.0.0.1`) and only allows requests from
 the local web app's address (`localhost:5173` or `:3000`). Don't expose it to a network until accounts exist.
@@ -161,12 +162,12 @@ npm run dev        # opens at http://localhost:5173
 The dashboard shows the watchlist (price, daily change, one-month trend, news mood), the latest positive and negative
 headlines, a data-freshness line that warns about stale data or a failed refresh, and a box for asking the copilot
 questions with clickable numbered sources. Click a ticker to open its stock detail page: an interactive price chart
-(1M to MAX), key stats, that company's news and SEC filings, and a copilot limited to that company's filings.
+(1M to MAX), key stats, that company's news and SEC filings, and a copilot limited to that company's data.
 The Copilot page (`/copilot`) is a full-page chat: pick which companies to search, see your recent questions (saved
 in your browser), stop a slow answer, and retry a failed one. You can follow up ("and what about its risks?"): the
 last three questions of the current topic are sent along so the copilot can work out what "its" means, and the page
 shows an "Understood as" line with the standalone question it searched. Earlier answers are never used as evidence;
-every answer is still written only from the filings. "Start a new topic" stops earlier questions being used. See [web/README.md](web/README.md) for details, tests, and how its types are
+every answer is still written only from the stored sources. "Start a new topic" stops earlier questions being used. See [web/README.md](web/README.md) for details, tests, and how its types are
 generated from the API.
 
 ## Command cheat sheet
@@ -179,7 +180,9 @@ generated from the API.
 | Embed filings | `python -m ai.index_filings [AAPL ...]` | no symbols means every filing |
 | Search filings | `python -m ai.search "supply chain risk" --symbol AAPL` | `--form 10-K` `--limit 5` `--latest` |
 | Ask the copilot | `python -m ai.copilot "What are Nvidia's biggest risks?"` | `--symbol NVDA` `--no-expand` `--show-prompt` |
+| See the price and headline evidence | `python -m ai.market NVDA "How has Nvidia stock done this year?"` | `--model` picks whose sentiment labels to use |
 | Check follow-up understanding | `python -m ai.eval_followups` | `--repeat 3` for stability, `--held-out` for the untuned cases. Needs Ollama |
+| Check price, news and sentiment answers | `python -m ai.eval_market` | `--repeat 3`, `--show` (print every answer), `--held-out` (none left right now). Needs Ollama |
 | Score headlines | `python -m ai.sentiment AAPL` | `--days 7` `--no-score` (summary only) |
 | Refresh everything | `python -m jobs.refresh` | `--symbols AAPL` `--steps prices news filings index sentiment` |
 | Check freshness | `python -m jobs.refresh --status` | |
