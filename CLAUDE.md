@@ -9,8 +9,31 @@ An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, 
 refresh job (`jobs/`, scheduled in Windows Task Scheduler for 5pm Pacific), a read-only FastAPI backend (`api/`), and a
 React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot that understands follow-ups
 and answers from filings, daily prices, and news headlines. Not built: accounts and
-login, portfolios, alerts, a screener, a Claude (Anthropic API) provider, and anything that puts it online. See the
+login, portfolios, a screener, fundamentals data (P/E, market value, revenue), adding a company from the app, database
+backups, email or phone alerts, a Claude (Anthropic API) provider, and anything that puts it online. See the
 README's "What is not built yet" for the current list.
+
+## Current direction
+
+The owner uses this privately, on their own PC, for **daily research on companies**, and holds no stocks. So skip
+accounts, login, portfolios, holdings, and putting it online; none of that is wanted now. Roughly in the order to do
+them (the owner hasn't confirmed the order):
+
+1. **Easier adding of companies.** Today it is `python -m data.ingest TICKER` (prices only), then the nightly job or
+   `python -m jobs.refresh --symbols TICKER` for news, filings, index, and sentiment. First step: one command that
+   does it all. Later: an "Add company" box in the web app, which needs the first write endpoint and a background
+   job. That is a deliberate exception to the read-only API rule: confirm it with the owner first and keep it bound
+   to `127.0.0.1`. Filings are 10-K and 10-Q only, so foreign filers (20-F) would show no filings; check on a real
+   example before promising otherwise.
+2. **Database backups.** Nothing backs up the Docker volume. Prices and filings can be re-downloaded; news headlines
+   can't (the free feed only returns recent items), and re-labeling them costs model time.
+3. **Fundamentals** (P/E, market value, revenue, margins). The copilot refuses these questions today, and a screener
+   can't exist without them. SEC EDGAR's structured company data is the likely source (public, so no licensing
+   problem); that has not been checked yet. Python computes every ratio and the model only quotes it as a numbered
+   source.
+4. **A daily "what changed" view** (new filings, big moves, notable headlines) from data already stored.
+5. **Copilot trust.** "Follow-up to another company" and "price target" fail in `ai.eval_market` every time, and the
+   evaluation set is small.
 
 ## Working with the owner
 
@@ -97,8 +120,17 @@ The owner is building this step by step and is not a professional developer, so 
   explain a price move. Before changing the prompt, `detect_intent`, or `parse_window`, run `python -m ai.eval_market
   --repeat 3 --show` (needs Ollama) and read the answers, not just the totals; checks that are too loose give false
   passes. `HELD_OUT` in that file is empty on purpose: write fresh cases in different wording before claiming a fair
-  score, and don't tune against them once run. Don't change the follow-up rewrite prompt without running
+  score, and don't tune against them once run. Over three runs it scores about 121 to 123 of 129; a swing of two is
+  normal model variation, and a case that drops to 0 of 3 is not (A/B it with the old code before explaining it away).
+  Don't change the follow-up rewrite prompt without running
   `ai.eval_followups` and `--held-out` (a change for "What about X?" once made it worse and was reverted).
+- **Headline rules and sentiment totals (`data/headlines.py`, `ai/sentiment.py`):** "the same headline" (`title_key`) and
+  "a quote page" are defined once. `is_quote_page` is the narrow set the copilot uses; `is_template_page` is the broader
+  set only the sentiment totals use. Don't point the copilot at the broad set without first deciding what to do about
+  the "crashing premise" eval case, which dropped from 8 of 8 passes to 0 of 8 when it was tried; don't loosen the
+  check to fit. Totals and score come only from `label_counts` (each story once per company, templates left out), and
+  the API news lists show each story once; don't add another counting query. The rules were written from the same
+  headlines they are tested on, so new templates need a new rule plus a case in `tests/test_headlines.py`.
 - **Branches:** do new feature work on a `feature/...` branch and tell the user when a step warrants one. The nightly job
   runs whatever code is checked out, so don't leave half-finished work checked out at 5pm.
 - **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` (it changes Windows Task Scheduler)

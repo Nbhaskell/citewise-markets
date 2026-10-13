@@ -1,7 +1,7 @@
 # stockMarket
 
-An AI stock market app, built bottom-up. So far the **data layer** and **AI layer** exist as command-line tools;
-the backend API and the screens are not built yet.
+An AI stock market app, built bottom-up and used privately on one PC for company research. The **data layer**, the
+**AI layer**, a nightly refresh job, a read-only API, and a web app (dashboard, stock detail, copilot) all exist.
 
 What works today:
 
@@ -227,6 +227,10 @@ docker-compose.yml   The database container
 
 ## What is not built yet
 
+- Adding a company from the app (today it is a command-line step; see "Keeping data fresh (nightly job)")
+- Fundamentals and index data (P/E, market value, revenue, S&P 500 level), so the copilot can answer those instead of
+  refusing
+- Database backups (nothing backs up the Docker volume; news headlines can't be re-downloaded)
 - Accounts and login, portfolios, and alerts (the API so far is read-only)
 - A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
 - More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, and copilot exist.
