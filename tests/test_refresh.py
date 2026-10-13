@@ -48,6 +48,10 @@ class FakeEdgar:
     def fetch_text(self, ref):
         return "\n".join(f"Item 1.\nrow {i} " + "z" * 80 for i in range(30))
 
+    def company_facts(self, cik):
+        row = {"start": "2025-01-01", "end": "2025-12-31", "val": 1000, "accn": "0-ZZR-FACT", "form": "10-K", "filed": "2026-01-30"}
+        return {"facts": {"us-gaap": {"Revenues": {"units": {"USD": [row]}}}}}
+
 
 class FakeEmbedder:
     name = "fake-emb"
@@ -87,6 +91,7 @@ def conn(monkeypatch):
         c.execute("DELETE FROM job_runs WHERE job = 'test_refresh'")
         c.execute("DELETE FROM news_articles WHERE id LIKE 'fake:zzr-%'")
         c.execute("DELETE FROM filings WHERE symbol = ANY(%s)", ([A, B],))
+        c.execute("DELETE FROM financial_facts WHERE symbol = ANY(%s)", ([A, B],))
         c.execute("DELETE FROM prices_daily WHERE symbol = ANY(%s)", ([A, B],))
         c.execute("DELETE FROM instruments WHERE symbol = ANY(%s)", ([A, B],))
         c.commit()
@@ -102,14 +107,14 @@ def by_step(report, step):
 
 def test_full_run_fills_every_table_and_logs_the_run(conn):
     report = run_refresh(conn, make_deps(), [A], today=TODAY)
-    assert report.status == "success" and [r.status for r in report.results] == ["ok"] * 5
+    assert report.status == "success" and [r.status for r in report.results] == ["ok"] * 6
     assert count(conn, "SELECT count(*) FROM prices_daily WHERE symbol = %s", A) == 3
     assert count(conn, "SELECT count(*) FROM news_article_symbols WHERE symbol = %s", A) == 2
     assert count(conn, "SELECT count(*) FROM filings WHERE symbol = %s", A) == 1
     assert count(conn, "SELECT count(*) FROM filing_chunks c JOIN filings f USING (accession_number) WHERE f.symbol = %s", A) > 1
     assert count(conn, "SELECT count(*) FROM news_sentiment WHERE symbol = %s AND model = 'fake-llm'", A) == 2
     status, finished, details = conn.execute("SELECT status, finished_at, details FROM job_runs WHERE id = %s", (report.run_id,)).fetchone()
-    assert status == "success" and finished is not None and len(details) == 5
+    assert status == "success" and finished is not None and len(details) == 6
 
 
 def test_second_run_finds_nothing_new_and_only_asks_for_recent_prices(conn):
@@ -142,7 +147,7 @@ def test_a_stored_company_whose_prices_fail_still_gets_the_other_steps(conn):
     run_refresh(conn, make_deps(), [A], today=TODAY)
     report = run_refresh(conn, make_deps(price_source=FakePrices(fail=[A])), [A], today=TODAY)
     assert [(r.step, r.status) for r in report.results if r.symbol == A] == [
-        ("prices", "error"), ("news", "ok"), ("filings", "ok"), ("sentiment", "ok")]
+        ("prices", "error"), ("news", "ok"), ("filings", "ok"), ("fundamentals", "ok"), ("sentiment", "ok")]
 
 
 def test_the_job_name_can_be_chosen_for_a_run(conn):
@@ -228,7 +233,7 @@ def test_choose_period_covers_the_gap(last, expected):
 def test_summary_and_status_report_are_readable(conn, capsys):
     report = run_refresh(conn, make_deps(llm=FakeLLM(up=False)), [A], today=TODAY)
     text = summarize(report)
-    assert "PARTIAL" in text and "prices    3 bars refreshed" in text
+    assert "PARTIAL" in text and "prices       3 bars refreshed" in text
     assert "1 problem(s)" in text and "skipped" in text and "Ollama" in text
     print_status(conn, "fake-emb", "fake-llm")
     out = capsys.readouterr().out

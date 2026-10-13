@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 TICKER_MAP_URL = "https://www.sec.gov/files/company_tickers.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
+COMPANY_FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 ARCHIVE_URL = "https://www.sec.gov/Archives/edgar/data/{cik_int}/{accession_nodash}/{document}"
 
 
@@ -92,3 +93,58 @@ class EdgarClient:
 
     def fetch_text(self, ref: FilingRef) -> str:
         return html_to_text(self._get(ref.url).text)
+
+    def company_facts(self, cik: str) -> dict:
+        """Every figure the company has reported in structured form (about 4 MB), as the SEC serves it."""
+        return self._get(COMPANY_FACTS_URL.format(cik=cik)).json()
+
+
+# Only these figures are kept: what the fundamentals need and nothing else. Revenue goes by several names depending on
+# the company and the year, so every name in use is listed; the calculations pick the one that is current.
+WANTED_FACTS: dict[str, dict[str, str]] = {
+    "us-gaap": {
+        "Revenues": "USD",
+        "RevenueFromContractWithCustomerExcludingAssessedTax": "USD",
+        "RevenueFromContractWithCustomerIncludingAssessedTax": "USD",
+        "SalesRevenueNet": "USD",
+        "NetIncomeLoss": "USD",
+        "ProfitLoss": "USD",
+        "EarningsPerShareDiluted": "USD/shares",
+        "OperatingIncomeLoss": "USD",
+        "GrossProfit": "USD",
+        "WeightedAverageNumberOfDilutedSharesOutstanding": "shares",
+        "CommonStockSharesOutstanding": "shares",
+    },
+    "dei": {"EntityCommonStockSharesOutstanding": "shares"},
+}
+FACT_FORMS = ("10-K", "10-Q", "10-K/A", "10-Q/A")
+
+
+@dataclass(frozen=True)
+class Fact:
+    taxonomy: str
+    concept: str
+    unit: str
+    period_start: Optional[date]  # None for a point in time
+    period_end: date
+    value: float
+    accession_number: str
+    form: str
+    filed_at: date
+
+
+def parse_company_facts(data: dict, since: date) -> list[Fact]:
+    """Pick the wanted figures out of the SEC's company-facts JSON, from 10-K and 10-Q filings, for periods ending on or
+    after `since`. A company that reports in another accounting vocabulary (a foreign filer using IFRS) has none of the
+    US-GAAP concepts, so the result is empty."""
+    facts = []
+    for taxonomy, concepts in WANTED_FACTS.items():
+        for concept, unit in concepts.items():
+            for row in data.get("facts", {}).get(taxonomy, {}).get(concept, {}).get("units", {}).get(unit, []):
+                if row.get("form") not in FACT_FORMS or row["end"] < since.isoformat():
+                    continue
+                facts.append(Fact(
+                    taxonomy, concept, unit, _date(row.get("start")), date.fromisoformat(row["end"]), float(row["val"]),
+                    row["accn"], row["form"], date.fromisoformat(row["filed"]),
+                ))
+    return facts

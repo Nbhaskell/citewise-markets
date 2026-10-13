@@ -19,7 +19,7 @@ The owner uses this privately, on their own PC, for **daily research on companie
 accounts, login, portfolios, holdings, and putting it online; none of that is wanted now. Roughly in the order to do
 them (the owner hasn't confirmed the order):
 
-1. **Easier adding of companies.** Done as a command: `python -m jobs.add_company TICKER` (all five steps, then a
+1. **Easier adding of companies.** Done as a command: `python -m jobs.add_company TICKER` (all six steps, then a
    per-step report). Later: an "Add company" box in the web app, which needs the first write endpoint and a
    background job. That is a deliberate exception to the read-only API rule: confirm it with the owner first and keep
    it bound to `127.0.0.1`. Checked on a real foreign filer (TSM): the SEC has 20-F for it and no 10-K or 10-Q, so it
@@ -29,10 +29,11 @@ them (the owner hasn't confirmed the order):
    2026-10-13 at the owner's request), writing to `C:\Users\nbhas\stockmarket-backups` via `BACKUP_DIR` in `.env`.
    That folder is outside the project but still on the only internal disk (`C:`), so it does not survive the disk
    failing; an occasional copy to OneDrive or a USB drive is the owner's call. No "newest backup is old" warning yet.
-3. **Fundamentals** (P/E, market value, revenue, margins). The copilot refuses these questions today, and a screener
-   can't exist without them. SEC EDGAR's structured company data is the likely source (public, so no licensing
-   problem); that has not been checked yet. Python computes every ratio and the model only quotes it as a numbered
-   source.
+3. **Fundamentals** (P/E, market value, revenue, margins), in three steps the owner approved on 2026-10-13: (1) data
+   and calculations, built: SEC "company facts" stored in `financial_facts`, ratios computed in `data/fundamentals.py`,
+   a nightly `fundamentals` step; (2) an API endpoint and a stock detail page section, not started; (3) the copilot
+   answering from them, not started (it still refuses). US-GAAP filers only; foreign filers show "not available".
+   Python computes every ratio and the model only quotes it as a numbered source. A screener can't exist without these.
 4. **A daily "what changed" view** (new filings, big moves, notable headlines) from data already stored.
 5. **Copilot trust.** "Follow-up to another company" and "price target" fail in `ai.eval_market` every time, and the
    evaluation set is small.
@@ -146,6 +147,13 @@ The owner is building this step by step and is not a professional developer, so 
   after; without them the restore fails), keep sharing the refresh lock, and keep `restore` from overwriting an existing
   database without `--replace` and a safety backup. Only files named exactly `stockmarket-<date>-<time>.dump` are ever
   trimmed. Tests use real `pg_dump`/`pg_restore` on throwaway `zz_backup_*` databases, never the dev data.
+- **Fundamentals (`data/fundamentals.py`, `data/ingest_fundamentals.py`):** store raw SEC figures, never ratios; Python
+  computes everything on read. Trailing-twelve-month figures are last full year + this year so far - the same stretch
+  last year, and every figure carries its recipe, dates, and filings. Keep the cautions (net income far above operating
+  income, a share count that disagrees with the earnings average, a balance-sheet share count, old figures or price,
+  mismatched periods); a correct number can still mislead. Keep rejecting a leftover concept (Amazon's 2009 gross
+  profit). Figures are checked against the filing text, not just for self-consistency. Tests use fake SEC data and
+  `ZZFUN`.
 - **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` or `scripts/register_backup_task.ps1`
   (they change Windows Task Scheduler) without being asked.
 

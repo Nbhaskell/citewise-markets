@@ -127,6 +127,15 @@ def describe(conn: psycopg.Connection, deps: Deps, symbol: str, results: list[St
             else:
                 out.lines.append((step, "NONE", filings_gap_reason(conn, deps, symbol)))
                 out.gaps.append("no filings stored")
+        elif step == "fundamentals":
+            total = _scalar(conn, "SELECT count(*) FROM financial_facts WHERE symbol = %s", symbol)
+            if total:
+                out.lines.append((step, "OK", f"{n} new figures ({total} stored)"))
+            else:
+                out.lines.append((step, "NONE", f"the SEC has no US-GAAP figures for {symbol}: companies based outside the US "
+                                  "report under another accounting standard that isn't supported, so there is no revenue, "
+                                  "P/E, or margin for it"))
+                out.gaps.append("no fundamentals stored")
         elif step == "index":
             total = _scalar(conn, "SELECT count(*) FROM filings WHERE symbol = %s", symbol)
             ready = _scalar(

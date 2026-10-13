@@ -85,6 +85,7 @@ Run these in order. Each is safe to re-run: existing rows are updated or skipped
 .venv\Scripts\python -m data.ingest AAPL MSFT NVDA GOOGL AMZN TSLA
 .venv\Scripts\python -m data.ingest_news AAPL MSFT NVDA GOOGL AMZN TSLA
 .venv\Scripts\python -m data.ingest_filings AAPL MSFT NVDA GOOGL AMZN TSLA
+.venv\Scripts\python -m data.ingest_fundamentals AAPL MSFT NVDA GOOGL AMZN TSLA
 .venv\Scripts\python -m ai.index_filings
 .venv\Scripts\python -m ai.sentiment AAPL MSFT NVDA GOOGL AMZN TSLA
 ```
@@ -95,7 +96,8 @@ takes about 8 minutes and scoring about 700 headlines takes about 2.5 minutes on
 ## Keeping data fresh (nightly job)
 
 `python -m jobs.refresh` runs the whole pipeline for every active company in the database: recent prices, news,
-new filings, embedding of any new filings, and sentiment for new headlines. A company or step that fails is
+new filings, reported figures from the SEC (revenue, profit, earnings per share, share counts), embedding of any new
+filings, and sentiment for new headlines. A company or step that fails is
 recorded and the rest still run. A normal run on six companies takes well under a minute when nothing big is new.
 
 ```bash
@@ -110,7 +112,7 @@ recorded and the rest still run. A normal run on six companies takes well under 
 .venv\Scripts\python -m jobs.add_company TSM       # one or more tickers; repeating one just brings it up to date
 ```
 
-It runs all five steps for that ticker (needs Docker and Ollama running; takes a minute or two, longer for a company
+It runs all six steps for that ticker (needs Docker and Ollama running; takes a minute or two, longer for a company
 with several big filings to index) and prints a per-step report ending in ADDED, ADDED WITH GAPS, or NOT ADDED. Only
 US-listed tickers work; write a share class with a dash (`BRK-B`, and `brk.b` is tidied to that). **Foreign companies
 that file a 20-F instead of a 10-K (TSM, ASML) are added with prices, headlines, and sentiment, but no filings:** the
@@ -239,7 +241,8 @@ generated from the API.
 | Check follow-up understanding | `python -m ai.eval_followups` | `--repeat 3` for stability, `--held-out` for the untuned cases. Needs Ollama |
 | Check price, news and sentiment answers | `python -m ai.eval_market` | `--repeat 3`, `--show` (print every answer), `--held-out` (none left right now). Needs Ollama |
 | Score headlines | `python -m ai.sentiment AAPL` | `--days 7` `--no-score` (summary only) |
-| Refresh everything | `python -m jobs.refresh` | `--symbols AAPL` `--steps prices news filings index sentiment` |
+| Fundamentals (revenue, profit, EPS, margins, market value, P/E) | `python -m data.fundamentals AAPL` | shows where each figure came from and any cautions |
+| Refresh everything | `python -m jobs.refresh` | `--symbols AAPL` `--steps prices news filings fundamentals index sentiment` |
 | Check freshness | `python -m jobs.refresh --status` | |
 | Start the API | `python -m api` | docs at `http://127.0.0.1:8000/docs` |
 | Start the web app | `cd web` then `npm run dev` | needs the API running; `npm test` for its tests |
@@ -287,8 +290,10 @@ docker-compose.yml   The database container
 
 - Adding a company from the app (today it is one command, `python -m jobs.add_company`; see "Keeping data fresh")
 - Filings for foreign companies that file a 20-F (only 10-K and 10-Q are stored)
-- Fundamentals and index data (P/E, market value, revenue, S&P 500 level), so the copilot can answer those instead of
-  refusing
+- Fundamentals on the stock detail page and in the copilot. The figures are stored and computed (revenue, profit,
+  EPS, margins, market value, P/E: `python -m data.fundamentals AAPL`), but no screen or copilot answer uses them
+  yet, so the copilot still refuses those questions. Foreign filers (TSM, ASML) have none.
+- Index data (S&P 500 level), so the copilot can answer those instead of refusing
 - Backups on a second disk or off this PC (they go to `BACKUP_DIR`; you have to point it somewhere safe), and an alert
   when no backup has happened for days (a PC that is off sends none)
 - Accounts and login, portfolios, and alerts (the API so far is read-only)
