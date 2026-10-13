@@ -16,6 +16,7 @@ from typing import Optional
 import psycopg
 
 from data.db import connect
+from data.headlines import title_key
 
 from .sentiment import summarize
 
@@ -201,13 +202,6 @@ def price_evidence(conn: psycopg.Connection, symbol: str, window: Window, today:
     return MarketEvidence("price", symbol, header, "\n".join(lines), None, last_ts, change=change, change_pct=pct)
 
 
-def _title_key(title: str, publisher: Optional[str]) -> str:
-    t = " ".join(title.lower().split())
-    if publisher and t.endswith(f" - {publisher.lower()}"):
-        t = t[: -len(publisher) - 3]
-    return t
-
-
 # Quote pages and "X vs Y" comparison pages are the bulk of the neutral labels. They say nothing new, and a quoted
 # price in a title (an intraday figure) could be mistaken for the stored close, so the copilot leaves them out.
 QUOTE_PAGE_RE = re.compile(
@@ -226,7 +220,7 @@ def headline_evidence(conn: psycopg.Connection, symbol: str, model: str, days: i
     ).fetchall()
     seen, out = set(), []
     for title, publisher, url, published, label in rows:  # the same story often arrives from several sources
-        key = _title_key(title, publisher)
+        key = title_key(title, publisher)
         if key in seen or QUOTE_PAGE_RE.search(title):
             continue
         seen.add(key)

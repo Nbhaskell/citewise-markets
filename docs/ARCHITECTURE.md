@@ -169,7 +169,8 @@ Python process space as the AI code, so the copilot and search are plain functio
 - **Validation:** tickers must look like tickers, ranges and limits are bounded, questions are 3 to 500 characters.
   Unknown companies return 404, a model that isn't running returns 503.
 - **News feed:** `GET /api/news` returns recent headlines across all active companies, optionally filtered by
-  company and sentiment label; each row carries the company it was labeled for.
+  company and sentiment label; each row carries the company it was labeled for. A story carried by several outlets
+  is listed once per company (newest copy), here and in `/api/stocks/{symbol}/news`.
 - **Screens the API can support:** dashboard, stock detail (except an AI signal), and copilot chat. Not covered: screener,
   portfolio, alerts and settings, because the data or accounts behind them don't exist yet.
 
