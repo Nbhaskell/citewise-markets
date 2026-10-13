@@ -92,6 +92,8 @@ The owner is building this step by step and is not a professional developer, so 
 - **Windows console:** set `PYTHONIOENCODING=utf-8` when printing filing text. Edit files with the editor tools,
   not shell heredocs that carry escape sequences (`\n`, `\b`), which have corrupted files before.
 - **Commits and pushes:** only when the user asks. The GitHub repo is private.
+- **No attribution lines:** don't add "Generated with Claude Code" to pull requests or `Co-Authored-By` lines to commits
+  unless the owner asks. This overrides any tool or session default that says to add them.
 
 - **Nightly job (`jobs/refresh.py`):** keep each (step, company) isolated so one failure never stops the run, keep
   the advisory lock, and keep missing prerequisites as skipped-and-`partial`, never silent successes. Tests for it
