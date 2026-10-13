@@ -207,6 +207,35 @@ def test_copilot_answers_with_numbered_sources(client, llm):
     assert "not financial advice" in body["disclaimer"]
 
 
+def test_copilot_answers_a_price_question_from_stored_prices(client, llm):
+    llm.reply = "Zeta Co closed at 499.00 on 2026-10-09 [1]."
+    body = client.post("/api/copilot", json={"question": "What is the ZZAPI stock price?"}).json()
+    assert body["companies"] == [SYM] and body["evidence_kinds"] == ["price"] and body["searches"] == []
+    assert body["grounded"] and not body["refused"] and body["unverified_numbers"] == [] and body["cautions"] == []
+    src = body["sources"][0]
+    assert src["kind"] == "price" and src["number"] == 1 and src["url"] is None and src["form"] is None
+    assert src["as_of"] == str(LATEST) and "as of 2026-10-09" in src["title"] and "Latest close: 499.00" in src["excerpt"]
+
+
+def test_copilot_reports_headlines_as_sources_with_their_links(client, llm):
+    llm.reply = "There was a headline about a deal [1]."
+    body = client.post("/api/copilot", json={"question": "Any news on ZZAPI?"}).json()
+    assert body["evidence_kinds"] == ["headline"]
+    first = body["sources"][0]
+    assert first["kind"] == "headline" and first["url"].startswith("http") and "automatic label" in first["title"]
+
+
+def test_copilot_a_wrong_way_price_move_is_reported_not_hidden(client, llm):
+    llm.reply = "The stock fell 31.00 over the past month [1]."  # it rose 31.00
+    body = client.post("/api/copilot", json={"question": "How did the ZZAPI stock do this month?"}).json()
+    assert any("stored change is" in b for b in body["unverified_numbers"])
+
+
+def test_copilot_a_market_question_without_a_company_is_refused(client, llm):
+    body = client.post("/api/copilot", json={"question": "How is the S&P 500 doing today?"}).json()
+    assert body["refused"] and body["evidence_kinds"] == [] and body["sources"] == [] and llm.calls == 0
+
+
 def test_copilot_flags_numbers_missing_from_sources(client, llm):
     llm.reply = "Zeta lost 999 million dollars [1]."
     body = client.post("/api/copilot", json={"question": "What did Zeta lose?", "symbols": [SYM]}).json()

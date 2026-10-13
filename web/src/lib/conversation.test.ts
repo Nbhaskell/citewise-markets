@@ -191,3 +191,34 @@ describe("topic storage", () => {
     expect(loadExchanges().map((e) => e.id)).toEqual(["a"]);
   });
 });
+
+describe("answers saved before prices and headlines were added", () => {
+  const oldSave = () => {
+    const { evidence_kinds, cautions, ...rest } = copilotAnswer();
+    void evidence_kinds; void cautions;
+    const oldSource = { number: 1, symbol: "NVDA", form: "10-K", filed_at: "2026-02-25", period_of_report: "2026-01-25",
+      section: "Part I, Item 1", url: "https://www.sec.gov/x", score: 0.76, excerpt: "42,000 employees" };
+    return { ...done(1), result: { ...rest, sources: [oldSource] } };
+  };
+
+  it("still load, with the newer fields filled in", () => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([oldSave()]));
+    const [loaded] = loadExchanges();
+    expect(loaded.result?.cautions).toEqual([]);
+    expect(loaded.result?.evidence_kinds).toEqual(["filing"]);
+    expect(loaded.result?.sources[0]).toMatchObject({ kind: "filing", title: "NVDA 10-K filed 2026-02-25", as_of: "2026-02-25" });
+  });
+
+  it("are dropped if they are damaged rather than repaired", () => {
+    const bad = oldSave();
+    (bad.result.sources[0] as Record<string, unknown>).form = 42;
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([bad, done(2)]));
+    expect(loadExchanges().map((e) => e.id)).toEqual(["id-2"]);
+  });
+
+  it("reject a source kind the app doesn't know", () => {
+    const e = done(3);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([{ ...e, result: { ...e.result, evidence_kinds: ["rumour"] } }]));
+    expect(loadExchanges()).toEqual([]);
+  });
+});

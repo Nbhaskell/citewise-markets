@@ -17,7 +17,7 @@ describe("App", () => {
     renderAt("/");
     expect(await screen.findByRole("heading", { name: "Watchlist" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Latest news" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Ask the filings" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ask the copilot" })).toBeInTheDocument();
     expect(await screen.findByRole("rowheader", { name: /NVDA/ })).toBeInTheDocument();
     expect(await screen.findByText(/Prices through/)).toBeInTheDocument();
     expect(screen.getByText(/Not financial advice/, { selector: "header span" })).toBeInTheDocument();

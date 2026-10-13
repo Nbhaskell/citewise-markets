@@ -2,7 +2,7 @@
 
 The browser screens for stockMarket. React 19, TypeScript, built with Vite. Three screens so far:
 
-- **Dashboard** (`/`): a watchlist, a combined news panel, and a box for asking the filing-grounded copilot questions.
+- **Dashboard** (`/`): a watchlist, a combined news panel, and a box for asking the copilot questions (it answers from stored filings, prices, and headlines).
 - **Stock detail** (`/stocks/AAPL`): an interactive price chart, key stats with a 52-week range bar, that company's news,
   its SEC filings, and the copilot limited to that company. Click a ticker on the dashboard to get there.
 - **Copilot** (`/copilot`): a full-page chat with a saved history, a company filter, and Stop and retry.
@@ -70,7 +70,7 @@ at or above where it started, red if below. The math lives in `src/lib/chart.ts`
 
 - **Follow-ups work, with limits.** Each new question is sent with the last three finished questions of the current
   topic (citation markers removed, answers trimmed). The server uses them only to rewrite a follow-up into a
-  standalone question; the answer is written from the filings alone. The page shows "Understood as: ..." under a
+  standalone question; the answer is written from the stored sources alone. The page shows "Understood as: ..." under a
   question that was rewritten, so a wrong reading is visible.
 - **Topics:** "Start a new topic" keeps earlier questions on screen (with a divider) but stops them being sent. The
   topic is saved, so a reload doesn't quietly resume the old one. Only finished, real answers count as history, not
@@ -86,7 +86,7 @@ at or above where it started, red if below. The math lives in `src/lib/chart.ts`
 ## Things to keep true
 
 - Show warnings instead of hiding problems: stale data, a refresh that had errors, the AI model being offline, and
-  `unverified_numbers` in copilot answers.
+  `unverified_numbers` and `cautions` in copilot answers.
 - Never render API text as HTML. Answers go through `AnswerText`, which outputs plain text only.
-- Links that come from outside data (news, filings) go through `safeHttpUrl`, which allows only `http(s)`.
+- Links that come from outside data (headlines, filings) go through `safeHttpUrl`, which allows only `http(s)`.
 - A change is never shown with color alone: arrows, signs, and words come with it.

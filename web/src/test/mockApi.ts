@@ -72,11 +72,14 @@ export const copilotAnswer = (over: Partial<CopilotResponse> = {}): CopilotRespo
   refused: false,
   grounded: true,
   companies: ["NVDA"],
+  evidence_kinds: ["filing"],
   unverified_numbers: [],
+  cautions: [],
   searches: ["How many employees does NVIDIA have?"],
-  disclaimer: "This is a summary of public filings, not financial advice.",
-  sources: [{ number: 1, symbol: "NVDA", form: "10-K", filed_at: "2026-02-25", period_of_report: "2026-01-25",
-    section: "Part I, Item 1", url: "https://www.sec.gov/x", score: 0.76, excerpt: "approximately 42,000 employees in 38 countries" }],
+  disclaimer: "This summarizes stored public filings, prices, and news headlines. It is not financial advice.",
+  sources: [{ number: 1, kind: "filing", symbol: "NVDA", title: "NVDA 10-K filed 2026-02-25", as_of: "2026-02-25", form: "10-K",
+    filed_at: "2026-02-25", period_of_report: "2026-01-25", section: "Part I, Item 1", url: "https://www.sec.gov/x", score: 0.76,
+    excerpt: "approximately 42,000 employees in 38 countries" }],
   ...over,
 });
 

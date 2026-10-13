@@ -1,4 +1,4 @@
-"""Answer questions about companies using their SEC filings, with citations.
+"""Answer questions about companies from their SEC filings, stored prices, and news headlines, with citations.
 
 Usage: python -m ai.copilot "What are Nvidia's biggest risks?" [--symbol NVDA] [--show-prompt]
 """
@@ -13,30 +13,43 @@ from data.db import connect
 
 from .embeddings import Embedder, FastEmbedder
 from .llm import LLM, get_llm
+from .market import MarketEvidence, detect_intent, gather_market_evidence, parse_window
 from .search import SearchResult, search_filings
 
 DISCLAIMER = (
-    "This is a summary of public filings, not financial advice. "
+    "This summarizes stored public filings, prices, and news headlines. It is not financial advice. "
     "It can contain mistakes, so check the cited sources."
 )
 NO_EVIDENCE = (
-    "I couldn't find passages in the stored filings that address that question, "
+    "I couldn't find anything in the stored filings, prices, or headlines that addresses that question, "
     "so I won't guess. Try naming a company (or ticker) and a topic such as risks, "
-    "competition, revenue, or legal proceedings."
+    "competition, revenue, legal proceedings, recent price moves, or news."
+)
+NO_COMPANY = (
+    "Tell me which company you mean (a name or ticker) and I can look at its stored prices and headlines. "
+    "I only have data for the companies tracked here, and nothing for the market as a whole."
 )
 MIN_SCORE = 0.62  # below this, the best passage for the question is judged unrelated and the model isn't asked
+CAUSE_CAUTION = (
+    "This answer may suggest a reason for the price move. The stored headlines are only titles, so they cannot show "
+    "why a price moved. Treat any such explanation as a guess."
+)
 ALIASES = {"google": "GOOGL"}
 RRF_K = 60  # reciprocal-rank-fusion constant used when merging several searches
 
-SYSTEM_PROMPT = """You answer questions about public companies using ONLY the numbered passages from SEC filings that the user provides.
+SYSTEM_PROMPT = """You answer questions about public companies using ONLY the numbered sources that the user provides. Sources are passages from SEC filings, price data worked out from stored daily closes, news headlines (titles only, with an automatic sentiment label), and headline sentiment summaries.
 
 Rules:
-1. Use only facts stated in the passages. Never use outside knowledge, and never guess.
-2. After every sentence that states a fact, cite the passage number(s) in square brackets, like [1] or [2][3].
-3. If the passages do not contain the answer, say so plainly. Do not fill gaps.
+1. Use only facts stated in the sources. Never use outside knowledge, and never guess.
+2. After every sentence that states a fact, cite the source number(s) in square brackets, like [1] or [2][3].
+3. If the sources do not contain the answer, say so plainly. Do not fill gaps. If asked for something no source provides (market value, P/E ratio, analyst targets), say it isn't available.
 4. Copy figures exactly as written, with their units and the period they refer to. Never calculate, convert, round, or combine numbers. If a figure is not stated directly, say that instead of working it out.
-5. Do not give investment advice, price predictions, or buy/sell/hold recommendations. If asked for one, say you can't give it, then summarize what the filings say that is relevant.
-6. Be concise: a short paragraph or a few bullet points. Mention the filing form and date when comparing across filings."""
+5. Do not give investment advice, price predictions, or buy/sell/hold recommendations. If asked for one, say you can't give it, then summarize the relevant facts from the sources.
+6. A headline is only a title. Never say or hint that a headline caused, explains, or drove a price move, and do not use "may have", "might have", "likely", or "suggests" about why a price moved. If asked why a stock moved, say the stored data can't show the cause, give the price move, and list the headlines published in that period as context only.
+7. Prices and sentiment are history. Never say what they mean for the future.
+8. If the question assumes something the sources contradict (for example it asks why a stock fell when the data shows it rose), say so first, then state what the sources show.
+9. Sentiment labels come from an automatic model and are imperfect. Say "labeled", not "is", and mention that most headlines are labeled neutral when you quote a summary.
+10. Be concise: a short paragraph or a few bullet points. Mention the filing form and date when comparing across filings, and the date range when quoting prices or sentiment."""
 
 EXPAND_PROMPT = """Rewrite a question about a company into short search queries for finding the answer inside its SEC filings (10-K and 10-Q).
 Write 2 queries, one per line, no numbering and no commentary. Use wording and section names a filing would use (for example "human capital management employees headcount" or "legal proceedings litigation contingencies"). Do not include the company name."""
@@ -74,16 +87,18 @@ class Answer:
     question: str
     text: str
     symbols: list[str]
-    retrieved: list[SearchResult]
+    retrieved: list[SearchResult | MarketEvidence]
     cited: list[int] = field(default_factory=list)  # 1-based numbers of passages the answer cites
     grounded: bool = False  # True only if the answer cites at least one real passage
     unverified_numbers: list[str] = field(default_factory=list)  # figures not found in the cited passages
     queries: list[str] = field(default_factory=list)  # searches run (the question plus any rewrites)
     interpreted_question: str | None = None  # how a follow-up was understood; None if it was used as written
     disclaimer: str = DISCLAIMER
+    refused: bool = False  # True when nothing relevant was found (or no company was named), so the model wasn't asked
+    cautions: list[str] = field(default_factory=list)  # plain-language warnings the app must show with the answer
 
     @property
-    def sources(self) -> list[tuple[int, SearchResult]]:
+    def sources(self) -> list[tuple[int, SearchResult | MarketEvidence]]:
         return [(n, self.retrieved[n - 1]) for n in self.cited]
 
 
@@ -100,7 +115,9 @@ def detect_symbols(conn: psycopg.Connection, question: str) -> list[str]:
     return found
 
 
-def passage_block(number: int, r: SearchResult) -> str:
+def passage_block(number: int, r: SearchResult | MarketEvidence) -> str:
+    if isinstance(r, MarketEvidence):
+        return f"[{number}] {r.header}\n{r.text}"
     header = f"[{number}] {r.symbol} {r.form} filed {r.filed_at}"
     if r.period_of_report:
         header += f" (period ending {r.period_of_report})"
@@ -109,9 +126,9 @@ def passage_block(number: int, r: SearchResult) -> str:
     return f"{header}\n{r.text}"
 
 
-def build_prompt(question: str, passages: list[SearchResult]) -> str:
+def build_prompt(question: str, passages: list[SearchResult | MarketEvidence]) -> str:
     blocks = [passage_block(i, r) for i, r in enumerate(passages, 1)]
-    return "Passages:\n\n" + "\n\n".join(blocks) + f"\n\nQuestion: {question}"
+    return "Sources:\n\n" + "\n\n".join(blocks) + f"\n\nQuestion: {question}"
 
 
 CITE_RE = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
@@ -140,11 +157,53 @@ def _numbers(text: str) -> set[str]:
     return out
 
 
-def unverified_numbers(answer: str, cited: list[int], passages: list[SearchResult]) -> list[str]:
-    """Figures in the answer that appear nowhere in the passages it cites (or the headers above them)."""
-    blocks = [passage_block(n, passages[n - 1]) for n in (cited or range(1, len(passages) + 1))]
-    known = _numbers("\n".join(blocks))
-    return sorted(_numbers(CITE_RE.sub("", answer)) - known)
+SIGNED_RE = re.compile(r"(?:(?<=\s)|(?<=\()|^)([-−–])\s?\$?(\d[\d,]*(?:\.\d+)?)")  # "-3.68", but not the dashes in dates or "10-K"
+DOWN_RE = re.compile(
+    r"\b(?:fell|fall(?:s|en|ing)?|drop(?:s|ped|ping)?|declin\w+|decreas\w+|down|lower|lost|loss|slump\w*|dip(?:s|ped)?|sank|plung\w+)\b",
+    re.IGNORECASE,
+)
+UP_RE = re.compile(
+    r"\b(?:rose|ris(?:e|es|en|ing)|gain(?:s|ed)?|increas\w+|up|higher|climb\w*|rall(?:y|ied|ies)|jump\w*|surg\w+|advanc\w+)\b",
+    re.IGNORECASE,
+)
+
+
+def _negatives(text: str) -> set[str]:
+    return {m.group(2).replace(",", "") for m in SIGNED_RE.finditer(text)}
+
+
+def direction_errors(plain: str, evidence: list[MarketEvidence]) -> list[str]:
+    """Price moves the answer describes in the wrong direction: a sentence that gives the stored change figure
+    but says it fell when the data shows a rise (or the reverse). The digits alone would pass the figures check."""
+    out = []
+    sentences = re.split(r"(?<=[.!?])\s+|\n+", plain)
+    for ev in evidence:
+        if ev.kind != "price" or ev.change is None or ev.change_pct is None or round(ev.change_pct, 2) == 0:
+            continue
+        rose = ev.change_pct > 0
+        figures = {f"{abs(ev.change):.2f}", f"{abs(ev.change_pct):.2f}"}
+        for s in sentences:
+            if not any(re.search(rf"(?<![\d.]){re.escape(f)}(?![\d])", s) for f in figures):
+                continue
+            wrong, right = (DOWN_RE, UP_RE) if rose else (UP_RE, DOWN_RE)
+            if wrong.search(s) and not right.search(s):
+                label = f"{abs(ev.change_pct):.2f} ({ev.symbol}'s stored change is {ev.change_pct:+.2f}%, {'a rise' if rose else 'a fall'})"
+                if label not in out:
+                    out.append(label)
+    return out
+
+
+def unverified_numbers(answer: str, cited: list[int], passages: list[SearchResult | MarketEvidence]) -> list[str]:
+    """Figures in the answer that appear nowhere in the passages it cites (or the headers above them), a minus sign
+    the sources don't have, and price moves described in the wrong direction."""
+    used = list(cited or range(1, len(passages) + 1))
+    blocks = [passage_block(n, passages[n - 1]) for n in used]
+    known, plain = _numbers("\n".join(blocks)), CITE_RE.sub("", answer)
+    missing = _numbers(plain) - known
+    known_negatives = _negatives("\n".join(blocks))
+    missing |= {f"-{v}" for v in _negatives(plain) if len(v) >= 2 and v not in known_negatives}
+    market = [passages[n - 1] for n in used if isinstance(passages[n - 1], MarketEvidence)]
+    return sorted(missing) + direction_errors(plain, market)
 
 
 ANNUAL_RE = re.compile(r"\b(annual|10-?K|fiscal year|full[- ]year)\b", re.IGNORECASE)
@@ -242,20 +301,58 @@ def retrieve(
     return results, best
 
 
-def _generate_checked(llm: LLM, question: str, passages: list[SearchResult]) -> tuple[str, list[int], list[str]]:
+CAUSE_HINT_RE = re.compile(
+    r"\b(?:due to|because of|driven by|as a result of|attributed to|thanks to|caused by|led to|resulted from)\b"
+    r"|\b(?:may|might|could|possibly|probably|likely|perhaps)\b[^.]{0,40}\b(?:influenc|contribut|caus|driv|impact|affect|explain|factor|behind)\w*",
+    re.IGNORECASE,
+)
+NEGATION_RE = re.compile(r"\b(?:not|no|never|cannot|unable)\b|n't", re.IGNORECASE)
+QUOTED_RE = re.compile(r'"[^"]*"|“[^”]*”')
+
+
+def causal_claims(text: str, evidence: list[SearchResult | MarketEvidence]) -> list[str]:
+    """Statements that put a price move down to something. Headlines are only titles, so the data can't support any
+    cause. Only checked when the answer was given both price data and headlines. Quoted headline text is ignored, and
+    so are clauses that deny a cause ("the data does not show why")."""
+    kinds = {e.kind for e in evidence if isinstance(e, MarketEvidence)}
+    if not {"price", "headline"} <= kinds:
+        return []
+    plain = QUOTED_RE.sub("", CITE_RE.sub("", text))
+    clauses = re.split(r"(?<=[.!?])\s+|\n+|;\s*|,\s*(?:but|however|though|although|while)\s+", plain)
+    return [c.strip()[:120] for c in clauses if CAUSE_HINT_RE.search(c) and not NEGATION_RE.search(c)]
+
+
+def _generate_checked_full(
+    llm: LLM, question: str, passages: list[SearchResult | MarketEvidence]
+) -> tuple[str, list[int], list[str], list[str]]:
+    """The answer, its citations, figures/directions that don't match the sources, and causes it implies. One retry
+    when anything is wrong: the model must stop doing its own arithmetic and stop explaining price moves."""
     prompt = build_prompt(question, passages)
     text, cited = clean_citations(strip_thinking(llm.generate(SYSTEM_PROMPT, prompt)), len(passages))
-    bad = unverified_numbers(text, cited, passages)
-    if bad:  # one retry: the model must stop doing its own arithmetic
-        correction = (
-            f"{prompt}\n\nYour previous answer:\n{text}\n\n"
-            f"It contains figures that do not appear in the passages: {', '.join(bad)}. "
-            "Rewrite the answer using only figures copied exactly from the passages. "
-            "Do no arithmetic. Leave out anything you can't support."
-        )
+    bad, causes = unverified_numbers(text, cited, passages), causal_claims(text, passages)
+    if bad or causes:
+        complaints = []
+        if bad:
+            complaints.append(
+                f"It contains figures or directions that do not match the sources: {', '.join(bad)}. "
+                "Rewrite the answer using only figures copied exactly from the sources, with the direction (rise or fall) "
+                "the sources state, even if the question assumed otherwise. Do no arithmetic."
+            )
+        if causes:
+            complaints.append(
+                f"It suggests a cause for the price move ({'; '.join(causes)}). Headlines are only titles and cannot "
+                "show why a price moved. Remove that and say only that the stored data can't show the cause."
+            )
+        correction = f"{prompt}\n\nYour previous answer:\n{text}\n\n{' '.join(complaints)} Leave out anything you can't support."
         text, cited = clean_citations(strip_thinking(llm.generate(SYSTEM_PROMPT, correction)), len(passages))
-        bad = unverified_numbers(text, cited, passages)
-    return text, cited, bad
+        bad, causes = unverified_numbers(text, cited, passages), causal_claims(text, passages)
+    return text, cited, bad, causes
+
+
+def _generate_checked(
+    llm: LLM, question: str, passages: list[SearchResult | MarketEvidence]
+) -> tuple[str, list[int], list[str]]:
+    return _generate_checked_full(llm, question, passages)[:3]
 
 
 def resolve_question(
@@ -302,24 +399,44 @@ def answer_question(
     expand: bool = True,
     history: list[Turn] | None = None,
 ) -> Answer:
-    """Answer from the filings. `history` only helps understand a follow-up; the answer itself is written from
-    retrieved passages alone, so earlier answers can never be used as evidence."""
+    """Answer from filings, stored prices, and headlines. `history` only helps understand a follow-up; the answer
+    itself is written from the retrieved sources alone, so earlier answers can never be used as evidence."""
     search_question, symbols, interpreted = resolve_question(conn, llm, question, symbols, history)
+    intent = detect_intent(search_question)
 
-    forms = detect_forms(search_question)
-    passages, best = retrieve(conn, embedder, [search_question], symbols, limit, forms)
-    if not passages or best < MIN_SCORE:
-        return Answer(question, NO_EVIDENCE, symbols, passages, queries=[search_question], interpreted_question=interpreted)
+    def refuse(text: str, found=(), queries=()) -> Answer:
+        return Answer(
+            question, text, symbols, list(found), queries=list(queries), interpreted_question=interpreted, refused=True
+        )
 
-    queries = [search_question]
-    if expand and (extra := expand_queries(llm, search_question)):
-        queries += extra
-        passages, _ = retrieve(conn, embedder, queries, symbols, limit, forms)
+    if intent.market and not symbols:
+        return refuse(NO_COMPANY)
+    market: list[MarketEvidence] = []
+    if intent.market:
+        market = gather_market_evidence(conn, symbols, intent, parse_window(search_question), getattr(llm, "name", ""))
 
-    text, cited, bad = _generate_checked(llm, search_question, passages)
+    passages: list[SearchResult] = []
+    queries: list[str] = []
+    if intent.filings:
+        forms = detect_forms(search_question)
+        found, best = retrieve(conn, embedder, [search_question], symbols, limit, forms)
+        queries = [search_question]
+        if found and best >= MIN_SCORE:
+            passages = found
+            if expand and (extra := expand_queries(llm, search_question)):
+                queries += extra
+                passages, _ = retrieve(conn, embedder, queries, symbols, limit, forms)
+        elif not market:
+            return refuse(NO_EVIDENCE, found, queries)
+    if not market and not passages:
+        return refuse(NO_EVIDENCE)
+
+    evidence = market + passages  # prices and headlines first: they are short, and the passages are numbered after them
+    text, cited, bad, causes = _generate_checked_full(llm, search_question, evidence)
+    cautions = [CAUSE_CAUTION] if causes else []
     return Answer(
-        question, text, symbols, passages, cited, grounded=bool(cited), unverified_numbers=bad,
-        queries=queries, interpreted_question=interpreted,
+        question, text, symbols, evidence, cited, grounded=bool(cited), unverified_numbers=bad,
+        queries=queries, interpreted_question=interpreted, cautions=cautions,
     )
 
 
@@ -339,16 +456,21 @@ def main(argv: list[str] | None = None) -> int:
             print(build_prompt(args.question, ans.retrieved), "\n")
 
     print(f"[{llm.name}] companies: {', '.join(ans.symbols) or 'none detected'}")
-    print(f"searches: {' | '.join(ans.queries)}\n")
+    print(f"searches: {' | '.join(ans.queries) or 'none (no filing search was needed)'}\n")
     print(ans.text)
-    if ans.retrieved and not ans.grounded and ans.text != NO_EVIDENCE:
+    if ans.retrieved and not ans.grounded and not ans.refused:
         print("\nWARNING: this answer cites no passages, so treat it as unverified.")
     if ans.unverified_numbers:
         print(f"\nWARNING: these figures are not in the cited passages: {', '.join(ans.unverified_numbers)}")
+    for caution in ans.cautions:
+        print(f"\nWARNING: {caution}")
     if ans.sources:
         print("\nSources:")
         for n, r in ans.sources:
-            print(f"  [{n}] {r.symbol} {r.form} filed {r.filed_at}, {r.section or '-'}\n      {r.url}")
+            if isinstance(r, MarketEvidence):
+                print(f"  [{n}] {r.header}" + (f"\n      {r.url}" if r.url else ""))
+            else:
+                print(f"  [{n}] {r.symbol} {r.form} filed {r.filed_at}, {r.section or '-'}\n      {r.url}")
     print(f"\n{ans.disclaimer}")
     return 0
 

@@ -47,9 +47,11 @@ filings text -> chunking.py -> embeddings.py -> filing_chunks (pgvector)
                                                       |
 question (+ earlier turns, optional) -> copilot.py: resolve_question: rewrite a follow-up into a standalone question (LLM)
          -> find companies -> rewrite into extra searches (LLM)
-         -> search.py (vector search, merged by reciprocal rank, near-duplicates dropped)
-         -> relevance gate -> LLM answers from the passages with [n] citations
-         -> citations and numbers check (one retry on failure) -> answer
+         -> market.py: detect_intent (keyword rules): which of filings / prices / headlines / sentiment does it need?
+         -> search.py (vector search, merged by reciprocal rank, near-duplicates dropped)   [filings]
+         -> market.py: price facts, headlines, sentiment summary worked out in Python from the database
+         -> relevance gate (filings) -> LLM answers from the numbered sources with [n] citations
+         -> citations, numbers, direction, and cause checks (one retry on failure) -> answer
 headlines -> sentiment.py -> LLM labels in batches (strict JSON) -> news_sentiment
 ```
 
@@ -61,6 +63,7 @@ headlines -> sentiment.py -> LLM labels in batches (strict JSON) -> news_sentime
 | Search | `ai/search.py` | Cosine similarity with an HNSW index. Filters by ticker and form. `latest_only` keeps the newest filing of each form |
 | LLM interface | `ai/llm.py` | `generate(system, user, json_schema=None)`. Only `OllamaLLM` (Qwen3) exists. Pick with `LLM_PROVIDER` |
 | Copilot | `ai/copilot.py` | See the safety behaviors below |
+| Market evidence | `ai/market.py` | Turns stored prices, headlines, and sentiment labels into numbered sources. See "Prices, headlines, and sentiment in answers" |
 | Sentiment | `ai/sentiment.py` | Labels each headline from an investor's view of one company |
 
 ### Follow-up questions
@@ -78,15 +81,44 @@ test checks this). Around the rewrite:
 - a rewrite that is empty, too short, over 300 characters, or fails falls back to the original question;
 - the reply carries `interpreted_question` (null when the question was used as written) so the screen can show it.
 
-`ai/eval_followups.py` measures this against 27 conversations (see DECISIONS for results).
+`ai/eval_followups.py` measures this against 27 conversations (see DECISIONS for results). `ai/eval_market.py` does
+the same for price, news, and sentiment questions.
+
+### Prices, headlines, and sentiment in answers
+
+The copilot's rule is that the model sees only numbered sources and every figure it writes is checked against them.
+That rule now covers four kinds of source: a filing passage, **price facts**, a **headline**, and a **sentiment
+summary** (`MarketEvidence` in `ai/market.py`; filing passages are still `SearchResult`).
+
+- **Which sources a question gets** is decided by `detect_intent`, plain keyword rules (no model call), so it is
+  predictable and tested. No market wording means filings only, exactly as before. Price wording ("stock", "closed",
+  "fell", a named period) adds price facts; "news" or "why did it move" adds headlines; "sentiment" adds the summary.
+  Market wording without filing wording skips the filing search. The period ("this month", "year to date", "past 6
+  months"; default one month) comes from `parse_window`.
+- **The model never calculates.** Python computes the latest close, the change over the window (with the direction
+  in words, "a rise" or "a fall"), the highest and lowest close, and the 52-week range from `prices_daily`, and
+  writes them into the source text. Year to date is measured from the last close of the previous year. The text
+  also says when stored prices are stale, only start partway through the window, or include a partial trading day.
+- **Headlines** are titles only, newest first, de-duplicated, with the automatic label. Quote pages ("Stock Price
+  Today: $226.19") and "X vs Y" pages are left out, because their intraday figures read like closing prices.
+- **No company named, or an index (S&P 500, Dow, Nasdaq):** refused with a plain message. No index data is stored,
+  and a model will happily read a filing's total-return chart as an index level.
+- **Sources numbering:** prices, sentiment, and headlines first, then filing passages.
 
 ### Copilot safety behaviors
 
-- Answers only from retrieved passages, with `[n]` citations. Citations to passages that don't exist are removed.
-- **Relevance gate:** if the best passage scores below `MIN_SCORE` (0.62), it answers "I couldn't find..." without
-  calling the model.
-- **Numbers check:** every figure in an answer must appear in the cited passages (or their headers). If not, it asks
-  the model once to rewrite using only quoted figures, and if that fails it prints a warning.
+- Answers only from retrieved sources, with `[n]` citations. Citations to sources that don't exist are removed.
+- **Relevance gate:** if the best filing passage scores below `MIN_SCORE` (0.62), no filings are used. With no market
+  evidence either, it answers "I couldn't find..." without calling the model.
+- **Numbers check:** every figure in an answer must appear in the cited sources (or their headers). A minus sign the
+  sources don't have is flagged too. If not, it asks the model once to rewrite using only quoted figures, and if that
+  fails it shows a warning.
+- **Direction check:** a sentence that gives a stored price change but says it fell when the data shows a rise (or
+  the reverse) is flagged the same way. The digits alone passed the numbers check ("fell by 3.68%" when the stock
+  rose 3.68%).
+- **Cause check:** when the answer was given both price data and headlines, wording that puts a price move down to
+  something ("due to", "may have contributed") triggers one retry, and if it persists the reply carries a
+  `cautions` entry that the screen shows. Headlines are titles only and cannot show why a price moved.
 - It refuses buy/sell/hold advice and price predictions. It adds a "not financial advice" note.
 - "Annual report" or "10-K" restricts the search to 10-Ks, and "quarter" or "10-Q" restricts it to 10-Qs.
 

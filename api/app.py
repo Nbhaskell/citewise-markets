@@ -11,10 +11,11 @@ import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from ai.copilot import NO_EVIDENCE, Turn, answer_question
+from ai.copilot import Turn, answer_question
 from ai.embeddings import DEFAULT_MODEL, Embedder
 from ai.llm import LLM
-from ai.search import search_filings
+from ai.market import MarketEvidence
+from ai.search import SearchResult, search_filings
 from jobs.status import freshness, recent_runs
 
 from . import queries, schemas
@@ -30,7 +31,7 @@ app = FastAPI(
     version="0.1.0",
     description=(
         "Read-only access to prices, news, sentiment, SEC filings, and the filing-grounded copilot. "
-        "Summaries of public filings, not financial advice."
+        "Summaries of public filings, prices, and headlines. Not financial advice."
     ),
 )
 app.add_middleware(
@@ -151,7 +152,7 @@ def copilot(
     req: schemas.CopilotRequest, conn: Conn,
     embedder: Annotated[Embedder, Depends(get_embedder)], llm: Annotated[LLM, Depends(get_chat_model)],
 ):
-    """Answer a question from the stored filings, with numbered citations. Can take several seconds."""
+    """Answer a question from stored filings, prices, and headlines, with numbered citations. Can take several seconds."""
     if req.symbols:
         if not all(SYMBOL_RE.match(s) for s in req.symbols):
             raise HTTPException(422, "symbols must be tickers like AAPL")
@@ -169,17 +170,31 @@ def copilot(
     return {
         "question": ans.question,
         "answer": ans.text,
-        "refused": ans.text == NO_EVIDENCE,
+        "refused": ans.refused,
         "grounded": ans.grounded,
         "companies": ans.symbols,
+        "evidence_kinds": sorted({kind_of(r) for r in ans.retrieved}, key=KIND_ORDER.index),
         "unverified_numbers": ans.unverified_numbers,
+        "cautions": ans.cautions,
         "searches": ans.queries,
         "interpreted_question": ans.interpreted_question,
         "disclaimer": ans.disclaimer,
-        "sources": [
-            {"number": n, "symbol": r.symbol, "form": r.form, "filed_at": r.filed_at,
-             "period_of_report": r.period_of_report, "section": r.section, "url": r.url,
-             "score": round(r.score, 4), "excerpt": r.text}
-            for n, r in ans.sources
-        ],
+        "sources": [source_out(n, r) for n, r in ans.sources],
     }
+
+
+KIND_ORDER = ["price", "sentiment", "headline", "filing"]
+
+
+def kind_of(item: SearchResult | MarketEvidence) -> str:
+    return item.kind if isinstance(item, MarketEvidence) else "filing"
+
+
+def source_out(number: int, item: SearchResult | MarketEvidence) -> dict:
+    """One cited source in the API's shape. Filing passages keep their original fields; the rest fill only what applies."""
+    if isinstance(item, MarketEvidence):
+        return {"number": number, "kind": item.kind, "symbol": item.symbol, "title": item.header, "as_of": item.as_of,
+                "url": item.url, "excerpt": item.text}
+    return {"number": number, "kind": "filing", "symbol": item.symbol, "title": f"{item.symbol} {item.form} filed {item.filed_at}",
+            "as_of": item.filed_at, "form": item.form, "filed_at": item.filed_at, "period_of_report": item.period_of_report,
+            "section": item.section, "url": item.url, "score": round(item.score, 4), "excerpt": item.text}

@@ -1,7 +1,41 @@
 import { useId, useState } from "react";
-import type { CopilotResponse } from "../api/types";
+import type { CopilotResponse, CopilotSource } from "../api/types";
 import { safeHttpUrl } from "../lib/format";
 import { AnswerText } from "./AnswerText";
+
+type Kind = CopilotSource["kind"];
+
+/** Words, not colours, say what kind of source each one is. */
+const KIND_LABEL: Record<Kind, string> = {
+  filing: "Filing",
+  price: "Price data",
+  headline: "Headline",
+  sentiment: "Sentiment",
+};
+const LOOKED_AT: Record<Kind, string> = {
+  filing: "filings",
+  price: "prices",
+  headline: "headlines",
+  sentiment: "headline sentiment",
+};
+const LINK_LABEL: Partial<Record<Kind, string>> = { filing: "View filing", headline: "Read headline" };
+
+function joinWords(words: string[]): string {
+  if (words.length <= 1) return words.join("");
+  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+/** What the model was shown, in a sentence. Filings only keeps the wording the app has always used. */
+function lookedAt(result: CopilotResponse): string {
+  if (result.refused) return "No matching data found";
+  const where = result.companies.length > 0 ? result.companies.join(", ") : null;
+  const kinds = result.evidence_kinds;
+  if (kinds.length === 1 && kinds[0] === "filing") {
+    return where ? `Searched filings for ${where}` : "Searched all stored filings";
+  }
+  const what = joinWords(kinds.map((k) => LOOKED_AT[k]));
+  return where ? `Looked at ${what} for ${where}` : `Looked at ${what}`;
+}
 
 /**
  * One copilot answer: the text with clickable citations, warnings, and the numbered sources.
@@ -22,22 +56,21 @@ export function AnswerView({ result }: { result: CopilotResponse }) {
 
   return (
     <div className="result">
-      <p className="muted small">
-        {result.refused
-          ? "No matching passages found"
-          : result.companies.length > 0
-            ? `Searched filings for ${result.companies.join(", ")}`
-            : "Searched all stored filings"}
-      </p>
+      <p className="muted small">{lookedAt(result)}</p>
 
       <AnswerText text={result.answer} onCite={showSource} />
 
       {result.unverified_numbers.length > 0 && (
         <p role="alert" className="flag warn">
-          Some figures in this answer weren't found in the cited passages ({result.unverified_numbers.join(", ")}).
-          Check the source before relying on them.
+          Some figures in this answer weren't found in the cited sources, or describe a price move the wrong way (
+          {result.unverified_numbers.join(", ")}). Check the source before relying on them.
         </p>
       )}
+      {result.cautions.map((caution) => (
+        <p key={caution} role="alert" className="flag warn">
+          {caution}
+        </p>
+      ))}
       {unnamed && (
         <p className="flag warn">
           No company was named, so this searched every company's filings and drew on {drewOn.join(", ")}. If you meant a
@@ -46,38 +79,39 @@ export function AnswerView({ result }: { result: CopilotResponse }) {
       )}
       {uncited && (
         <p role="alert" className="flag warn">
-          This answer doesn't cite any filing passages. Treat it as unverified.
+          This answer doesn't cite any source. Treat it as unverified.
         </p>
       )}
 
       {result.sources.length > 0 && (
         <ol className="sources" aria-label="Sources">
-          {result.sources.map((s) => (
-            <li
-              key={s.number}
-              id={`${uid}-source-${s.number}`}
-              className={highlight === s.number ? "highlight" : undefined}
-              value={s.number}
-            >
-              <strong>
-                {s.symbol} {s.form}
-              </strong>{" "}
-              filed {s.filed_at}
-              {s.section ? ` · ${s.section}` : ""}
-              {safeHttpUrl(s.url) && (
-                <>
-                  {" · "}
-                  <a href={safeHttpUrl(s.url)} target="_blank" rel="noopener noreferrer">
-                    View filing
-                  </a>
-                </>
-              )}
-              <details>
-                <summary>Excerpt</summary>
-                <p className="excerpt">{s.excerpt}</p>
-              </details>
-            </li>
-          ))}
+          {result.sources.map((s) => {
+            const href = safeHttpUrl(s.url);
+            const linkLabel = LINK_LABEL[s.kind];
+            return (
+              <li
+                key={s.number}
+                id={`${uid}-source-${s.number}`}
+                className={highlight === s.number ? "highlight" : undefined}
+                value={s.number}
+              >
+                <strong>{KIND_LABEL[s.kind]}</strong> {s.title}
+                {s.section ? ` · ${s.section}` : ""}
+                {href && linkLabel && (
+                  <>
+                    {" · "}
+                    <a href={href} target="_blank" rel="noopener noreferrer">
+                      {linkLabel}
+                    </a>
+                  </>
+                )}
+                <details>
+                  <summary>Excerpt</summary>
+                  <p className="excerpt">{s.excerpt}</p>
+                </details>
+              </li>
+            );
+          })}
         </ol>
       )}
       <p className="muted small">{result.disclaimer}</p>

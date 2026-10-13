@@ -1,7 +1,7 @@
 """Response and request shapes. These are the API's contract with the screens."""
 import re
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -119,25 +119,33 @@ class CopilotRequest(BaseModel):
     )
 
 
+SourceKind = Literal["filing", "price", "headline", "sentiment"]
+
+
 class Source(BaseModel):
     number: int = Field(description="Matches the [n] citation in the answer")
+    kind: SourceKind = Field(description="filing = a passage from an SEC filing; price = figures worked out from stored daily closes; headline = a news title; sentiment = a summary of headline labels")
     symbol: str
-    form: str
-    filed_at: date
-    period_of_report: Optional[date]
-    section: Optional[str]
-    url: str
-    score: float
+    title: str = Field(description="One line saying what this source is, e.g. 'NVDA 10-K filed 2026-02-25' or 'NVDA price data (stored daily closes), as of 2026-10-12'")
+    as_of: date = Field(description="The filing date for a filing, otherwise the date of the data")
+    form: Optional[str] = Field(None, description="Filings only: 10-K or 10-Q")
+    filed_at: Optional[date] = Field(None, description="Filings only")
+    period_of_report: Optional[date] = Field(None, description="Filings only")
+    section: Optional[str] = Field(None, description="Filings only")
+    url: Optional[str] = Field(None, description="Where to read it: the filing or the headline's article. Null for price and sentiment sources")
+    score: Optional[float] = Field(None, description="Filings only: how closely the passage matched the question")
     excerpt: str
 
 
 class CopilotResponse(BaseModel):
     question: str
     answer: str
-    refused: bool = Field(description="True when nothing relevant was found, so the model wasn't asked")
-    grounded: bool = Field(description="True when the answer cites at least one real passage")
+    refused: bool = Field(description="True when nothing relevant was found or no company was named, so the model wasn't asked")
+    grounded: bool = Field(description="True when the answer cites at least one real source")
     companies: list[str]
-    unverified_numbers: list[str] = Field(description="Figures in the answer that are not in the cited passages. Show a warning if non-empty")
+    evidence_kinds: list[SourceKind] = Field(description="The kinds of source the model was shown (not only the ones it cited), so the screen can say what was looked at")
+    unverified_numbers: list[str] = Field(description="Figures in the answer that are not in the cited sources, a minus sign the sources don't have, or a price move described in the wrong direction. Show a warning if non-empty")
+    cautions: list[str] = Field(description="Plain-language warnings to show with the answer, for example when it may suggest a reason for a price move that the data cannot show")
     sources: list[Source]
     searches: list[str]
     interpreted_question: Optional[str] = Field(
