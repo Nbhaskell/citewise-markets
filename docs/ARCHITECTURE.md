@@ -64,7 +64,7 @@ headlines -> sentiment.py -> LLM labels in batches (strict JSON) -> news_sentime
 | LLM interface | `ai/llm.py` | `generate(system, user, json_schema=None)`. Only `OllamaLLM` (Qwen3) exists. Pick with `LLM_PROVIDER` |
 | Copilot | `ai/copilot.py` | See the safety behaviors below |
 | Market evidence | `ai/market.py` | Turns stored prices, headlines, and sentiment labels into numbered sources. See "Prices, headlines, and sentiment in answers" |
-| Sentiment | `ai/sentiment.py` | Labels each headline from an investor's view of one company |
+| Sentiment | `ai/sentiment.py` | Labels each headline from an investor's view of one company. `label_counts` turns labels into the totals and score: each story once per company, quote and "X vs Y" pages left out (shared rules in `data/headlines.py`) |
 
 ### Follow-up questions
 

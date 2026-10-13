@@ -115,8 +115,9 @@ def test_stock_list_has_price_change_and_sentiment(client):
     z = stocks[SYM]
     assert z["name"] == "Zeta API Co" and z["last_price"] == 499 and z["as_of"] == str(LATEST)
     assert z["change"] == 1 and z["change_pct"] == pytest.approx(1 / 498 * 100, abs=1e-3)
-    # last 7 days: positive, negative, neutral, irrelevant; the 60-day-old story and unscored one don't count
-    assert z["sentiment"] == {"days": 7, "positive": 1, "neutral": 1, "negative": 1, "irrelevant": 1, "score": 0.0}
+    # last 7 days: positive, negative, irrelevant; the 60-day-old story and unscored one don't count, and the neutral
+    # "Zeta quote page" is shown in the news list but left out of the totals
+    assert z["sentiment"] == {"days": 7, "positive": 1, "neutral": 0, "negative": 1, "irrelevant": 1, "score": 0.0}
 
 
 def test_stock_detail_adds_52_week_range(client):

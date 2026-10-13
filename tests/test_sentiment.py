@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from ai.sentiment import SentimentSummary, score_batch, score_symbol, summarize
+from ai.sentiment import SentimentSummary, label_counts, score_batch, score_symbol, summarize
 from data.db import connect
 
 SYMBOL = "ZZSEN"
@@ -111,6 +111,55 @@ def test_summary_counts_window_and_score(conn):
     assert s.score == 0.0
     assert summarize(conn, SYMBOL, "fake-a", days=60).score == pytest.approx(1 / 4)
     assert summarize(conn, SYMBOL, "other-model").score is None
+
+
+def add_story(c, key, title, publisher, hours_ago, labels, symbols=(SYMBOL,)):
+    """Insert one article for each symbol and give it the label `labels[symbol]` (None leaves it unlabeled)."""
+    c.execute("INSERT INTO news_articles (id, source, title, publisher, url, published_at) "
+              "VALUES (%s, 'fake', %s, %s, 'https://x', now() - make_interval(hours => %s))",
+              (f"fake:{key}", title, publisher, hours_ago))
+    for sym in symbols:
+        c.execute("INSERT INTO news_article_symbols (article_id, symbol) VALUES (%s, %s)", (f"fake:{key}", sym))
+        if labels.get(sym):
+            c.execute("INSERT INTO news_sentiment (article_id, symbol, label, model) VALUES (%s, %s, %s, 'fake-a')",
+                      (f"fake:{key}", sym, labels[sym]))
+
+
+def test_totals_count_each_story_once_and_skip_quote_pages(conn):
+    score_symbol(conn, KeywordLLM(), SYMBOL)  # beats = positive, probe = negative, the rest neutral
+    # a repeat of "Co beats earnings" from another outlet, carrying the outlet in the title like Google News does
+    add_story(conn, "zzs5", "Co beats earnings - Other Wire", "Other Wire", 1, {SYMBOL: "positive"})
+    # one story carried twice and labeled differently each time: the newest copy's label is the one that counts
+    add_story(conn, "zzs6", "Co settles lawsuit", "Wire", 3, {SYMBOL: "negative"})
+    add_story(conn, "zzs7", "CO SETTLES  LAWSUIT", "Wire 2", 20, {SYMBOL: "neutral"})
+    for i, title in enumerate(["Co (ZZSEN) Stock Price Today: $12.30", "Co Stock Price, News, Quote & History",
+                               "Co vs. Rival: Which Is a Better Buy?"]):
+        add_story(conn, f"zzs8{i}", title, "Quotes", 2, {SYMBOL: "positive"})  # even a "positive" quote page is left out
+    conn.commit()
+    s = summarize(conn, SYMBOL, "fake-a", days=7)
+    # positive: beats (once). negative: probe + the newest copy of the lawsuit story. neutral: annual meeting only.
+    assert (s.positive, s.neutral, s.negative, s.irrelevant) == (1, 1, 2, 0)
+    assert s.score == pytest.approx(-1 / 4)
+
+
+def test_a_story_about_two_companies_counts_for_each(conn):
+    other = "ZZSE2"
+    conn.execute("INSERT INTO instruments (symbol, name) VALUES (%s, 'Second Co')", (other,))
+    try:
+        add_story(conn, "zzs9", "Co and Second Co announce a merger", "Wire", 1, {SYMBOL: "positive", other: "irrelevant"},
+                  symbols=(SYMBOL, other))
+        add_story(conn, "zzs90", "Co and Second Co announce a merger", "Other", 2, {SYMBOL: "positive", other: "irrelevant"},
+                  symbols=(SYMBOL, other))
+        conn.commit()
+        everyone = label_counts(conn, "fake-a", days=7)
+        assert everyone == {SYMBOL: {"positive": 1}, other: {"irrelevant": 1}}
+        assert label_counts(conn, "fake-a", days=7, symbol=other) == {other: {"irrelevant": 1}}
+        assert label_counts(conn, "other-model", days=7) == {}
+    finally:
+        conn.rollback()
+        conn.execute("DELETE FROM news_articles WHERE id LIKE 'fake:zzs%'")
+        conn.execute("DELETE FROM instruments WHERE symbol = %s", (other,))
+        conn.commit()
 
 
 def test_score_formula_ignores_irrelevant():

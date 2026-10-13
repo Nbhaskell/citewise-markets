@@ -16,7 +16,7 @@ from typing import Optional
 import psycopg
 
 from data.db import connect
-from data.headlines import title_key
+from data.headlines import is_quote_page, title_key
 
 from .sentiment import summarize
 
@@ -202,13 +202,6 @@ def price_evidence(conn: psycopg.Connection, symbol: str, window: Window, today:
     return MarketEvidence("price", symbol, header, "\n".join(lines), None, last_ts, change=change, change_pct=pct)
 
 
-# Quote pages and "X vs Y" comparison pages are the bulk of the neutral labels. They say nothing new, and a quoted
-# price in a title (an intraday figure) could be mistaken for the stored close, so the copilot leaves them out.
-QUOTE_PAGE_RE = re.compile(
-    r"\bstock\s+price\b|\bshare\s+price\b|\bprice\s+today\b|\bquote\b|\bprice\s*,|\bvs\.?\s", re.IGNORECASE
-)
-
-
 def headline_evidence(conn: psycopg.Connection, symbol: str, model: str, days: int, limit: int = NEWS_PER_COMPANY) -> list[MarketEvidence]:
     rows = conn.execute(
         "SELECT a.title, a.publisher, a.url, a.published_at, n.label "
@@ -221,7 +214,7 @@ def headline_evidence(conn: psycopg.Connection, symbol: str, model: str, days: i
     seen, out = set(), []
     for title, publisher, url, published, label in rows:  # the same story often arrives from several sources
         key = title_key(title, publisher)
-        if key in seen or QUOTE_PAGE_RE.search(title):
+        if key in seen or is_quote_page(title):  # the copilot leaves quote pages out of its sources
             continue
         seen.add(key)
         day = published.astimezone(timezone.utc).date() if isinstance(published, datetime) else published
@@ -238,7 +231,8 @@ def sentiment_evidence(conn: psycopg.Connection, symbol: str, model: str, days: 
         return None
     score = "no score" if s.score is None else f"{s.score:+.2f}"
     text = (
-        f"Headlines from the last {days} days, labeled automatically by an AI model ({model}): "
+        f"Headlines from the last {days} days, labeled automatically by an AI model ({model}), counting each story once "
+        "and leaving out stock-quote and comparison pages: "
         f"{s.positive} positive, {s.neutral} neutral, {s.negative} negative, {s.irrelevant} not actually about the company.\n"
         f"Score: {score} (positives minus negatives, divided by the relevant headlines). Most headlines are labeled "
         "neutral, so scores stay close to zero. The labels are imperfect."
