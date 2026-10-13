@@ -15,7 +15,7 @@ export interface paths {
         put?: never;
         /**
          * Copilot
-         * @description Answer a question from the stored filings, with numbered citations. Can take several seconds.
+         * @description Answer a question from stored filings, prices, and headlines, with numbered citations. Can take several seconds.
          */
         post: operations["copilot_api_copilot_post"];
         delete?: never;
@@ -218,13 +218,23 @@ export interface components {
         CopilotResponse: {
             /** Answer */
             answer: string;
+            /**
+             * Cautions
+             * @description Plain-language warnings to show with the answer, for example when it may suggest a reason for a price move that the data cannot show
+             */
+            cautions: string[];
             /** Companies */
             companies: string[];
             /** Disclaimer */
             disclaimer: string;
             /**
+             * Evidence Kinds
+             * @description The kinds of source the model was shown (not only the ones it cited), so the screen can say what was looked at
+             */
+            evidence_kinds: ("filing" | "price" | "headline" | "sentiment")[];
+            /**
              * Grounded
-             * @description True when the answer cites at least one real passage
+             * @description True when the answer cites at least one real source
              */
             grounded: boolean;
             /**
@@ -236,7 +246,7 @@ export interface components {
             question: string;
             /**
              * Refused
-             * @description True when nothing relevant was found, so the model wasn't asked
+             * @description True when nothing relevant was found or no company was named, so the model wasn't asked
              */
             refused: boolean;
             /** Searches */
@@ -245,7 +255,7 @@ export interface components {
             sources: components["schemas"]["Source"][];
             /**
              * Unverified Numbers
-             * @description Figures in the answer that are not in the cited passages. Show a warning if non-empty
+             * @description Figures in the answer that are not in the cited sources, a minus sign the sources don't have, or a price move described in the wrong direction. Show a warning if non-empty
              */
             unverified_numbers: string[];
         };
@@ -450,30 +460,62 @@ export interface components {
         };
         /** Source */
         Source: {
+            /**
+             * As Of
+             * Format: date
+             * @description The filing date for a filing, otherwise the date of the data
+             */
+            as_of: string;
             /** Excerpt */
             excerpt: string;
             /**
              * Filed At
-             * Format: date
+             * @description Filings only
              */
-            filed_at: string;
-            /** Form */
-            form: string;
+            filed_at?: string | null;
+            /**
+             * Form
+             * @description Filings only: 10-K or 10-Q
+             */
+            form?: string | null;
+            /**
+             * Kind
+             * @description filing = a passage from an SEC filing; price = figures worked out from stored daily closes; headline = a news title; sentiment = a summary of headline labels
+             * @enum {string}
+             */
+            kind: "filing" | "price" | "headline" | "sentiment";
             /**
              * Number
              * @description Matches the [n] citation in the answer
              */
             number: number;
-            /** Period Of Report */
-            period_of_report: string | null;
-            /** Score */
-            score: number;
-            /** Section */
-            section: string | null;
+            /**
+             * Period Of Report
+             * @description Filings only
+             */
+            period_of_report?: string | null;
+            /**
+             * Score
+             * @description Filings only: how closely the passage matched the question
+             */
+            score?: number | null;
+            /**
+             * Section
+             * @description Filings only
+             */
+            section?: string | null;
             /** Symbol */
             symbol: string;
-            /** Url */
-            url: string;
+            /**
+             * Title
+             * @description One line saying what this source is, e.g. 'NVDA 10-K filed 2026-02-25' or 'NVDA price data (stored daily closes), as of 2026-10-12'
+             */
+            title: string;
+            /**
+             * Url
+             * @description Where to read it: the filing or the headline's article. Null for price and sentiment sources
+             */
+            url?: string | null;
         };
         /** StatusOut */
         StatusOut: {

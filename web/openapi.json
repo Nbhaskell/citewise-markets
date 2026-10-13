@@ -55,6 +55,14 @@
             "title": "Answer",
             "type": "string"
           },
+          "cautions": {
+            "description": "Plain-language warnings to show with the answer, for example when it may suggest a reason for a price move that the data cannot show",
+            "items": {
+              "type": "string"
+            },
+            "title": "Cautions",
+            "type": "array"
+          },
           "companies": {
             "items": {
               "type": "string"
@@ -66,8 +74,22 @@
             "title": "Disclaimer",
             "type": "string"
           },
+          "evidence_kinds": {
+            "description": "The kinds of source the model was shown (not only the ones it cited), so the screen can say what was looked at",
+            "items": {
+              "enum": [
+                "filing",
+                "price",
+                "headline",
+                "sentiment"
+              ],
+              "type": "string"
+            },
+            "title": "Evidence Kinds",
+            "type": "array"
+          },
           "grounded": {
-            "description": "True when the answer cites at least one real passage",
+            "description": "True when the answer cites at least one real source",
             "title": "Grounded",
             "type": "boolean"
           },
@@ -88,7 +110,7 @@
             "type": "string"
           },
           "refused": {
-            "description": "True when nothing relevant was found, so the model wasn't asked",
+            "description": "True when nothing relevant was found or no company was named, so the model wasn't asked",
             "title": "Refused",
             "type": "boolean"
           },
@@ -107,7 +129,7 @@
             "type": "array"
           },
           "unverified_numbers": {
-            "description": "Figures in the answer that are not in the cited passages. Show a warning if non-empty",
+            "description": "Figures in the answer that are not in the cited sources, a minus sign the sources don't have, or a price move described in the wrong direction. Show a warning if non-empty",
             "items": {
               "type": "string"
             },
@@ -121,7 +143,9 @@
           "refused",
           "grounded",
           "companies",
+          "evidence_kinds",
           "unverified_numbers",
+          "cautions",
           "sources",
           "searches",
           "disclaimer"
@@ -674,17 +698,50 @@
       },
       "Source": {
         "properties": {
+          "as_of": {
+            "description": "The filing date for a filing, otherwise the date of the data",
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
           "excerpt": {
             "title": "Excerpt",
             "type": "string"
           },
           "filed_at": {
-            "format": "date",
-            "title": "Filed At",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Filings only",
+            "title": "Filed At"
           },
           "form": {
-            "title": "Form",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Filings only: 10-K or 10-Q",
+            "title": "Form"
+          },
+          "kind": {
+            "description": "filing = a passage from an SEC filing; price = figures worked out from stored daily closes; headline = a news title; sentiment = a summary of headline labels",
+            "enum": [
+              "filing",
+              "price",
+              "headline",
+              "sentiment"
+            ],
+            "title": "Kind",
             "type": "string"
           },
           "number": {
@@ -702,11 +759,20 @@
                 "type": "null"
               }
             ],
+            "description": "Filings only",
             "title": "Period Of Report"
           },
           "score": {
-            "title": "Score",
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Filings only: how closely the passage matched the question",
+            "title": "Score"
           },
           "section": {
             "anyOf": [
@@ -717,26 +783,37 @@
                 "type": "null"
               }
             ],
+            "description": "Filings only",
             "title": "Section"
           },
           "symbol": {
             "title": "Symbol",
             "type": "string"
           },
-          "url": {
-            "title": "Url",
+          "title": {
+            "description": "One line saying what this source is, e.g. 'NVDA 10-K filed 2026-02-25' or 'NVDA price data (stored daily closes), as of 2026-10-12'",
+            "title": "Title",
             "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where to read it: the filing or the headline's article. Null for price and sentiment sources",
+            "title": "Url"
           }
         },
         "required": [
           "number",
+          "kind",
           "symbol",
-          "form",
-          "filed_at",
-          "period_of_report",
-          "section",
-          "url",
-          "score",
+          "title",
+          "as_of",
           "excerpt"
         ],
         "title": "Source",
@@ -1066,7 +1143,7 @@
     }
   },
   "info": {
-    "description": "Read-only access to prices, news, sentiment, SEC filings, and the filing-grounded copilot. Summaries of public filings, not financial advice.",
+    "description": "Read-only access to prices, news, sentiment, SEC filings, and the filing-grounded copilot. Summaries of public filings, prices, and headlines. Not financial advice.",
     "title": "stockMarket API",
     "version": "0.1.0"
   },
@@ -1074,7 +1151,7 @@
   "paths": {
     "/api/copilot": {
       "post": {
-        "description": "Answer a question from the stored filings, with numbered citations. Can take several seconds.",
+        "description": "Answer a question from stored filings, prices, and headlines, with numbered citations. Can take several seconds.",
         "operationId": "copilot_api_copilot_post",
         "requestBody": {
           "content": {
