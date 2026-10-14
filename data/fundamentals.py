@@ -79,6 +79,17 @@ class Fundamentals:
     pe: Optional[float] = None
     pe_note: str = ""
     cautions: list[str] = field(default_factory=list)
+    # Which figures each caution concerns (pe, eps, net_income, net_margin, market_value, shares), or "all". The copilot
+    # shows a caution only with an answer about those figures, so a warning about investment gains doesn't ride along
+    # with a revenue answer.
+    caution_scopes: dict[str, tuple[str, ...]] = field(default_factory=dict)
+
+    def add_caution(self, text: str, *scopes: str) -> None:
+        self.cautions.append(text)
+        self.caution_scopes[text] = scopes or ("all",)
+
+
+EARNINGS = ("pe", "eps", "net_income")  # figures that move together when profit is inflated or the share count is off
 
 
 def load_facts(conn: psycopg.Connection, symbol: str) -> list[Fact]:
@@ -214,10 +225,10 @@ def compute(symbol: str, facts: list[Fact], close: Optional[float], close_date: 
              "operating income": out.operating_income, "gross profit": out.gross_profit}
     for name, f in named.items():
         if f is not None and abs((f.period_end - anchor.period_end).days) > 30:
-            out.cautions.append(f"{name} is for the period ending {f.period_end}, not {anchor.period_end} like the rest")
+            out.add_caution(f"{name} is for the period ending {f.period_end}, not {anchor.period_end} like the rest")
     for name in ("revenue", "net income", "diluted EPS", "operating income"):
         if named[name] is None:
-            out.cautions.append(f"{name} isn't available: {reasons.get(name)}")
+            out.add_caution(f"{name} isn't available: {reasons.get(name)}")
     # gross profit is simply absent for some companies (Alphabet reports none), so that is not a caution
 
     if out.revenue and out.revenue.value > 0:
@@ -238,38 +249,43 @@ def compute(symbol: str, facts: list[Fact], close: Optional[float], close_date: 
 
     # ---- cautions: places where a correct number could still mislead ----
     if (today - anchor.period_end).days > OLD_FIGURES_DAYS:
-        out.cautions.append(f"the latest reported period ended {anchor.period_end}, which is old; a filing may be missing")
+        out.add_caution(f"the latest reported period ended {anchor.period_end}, which is old; a filing may be missing")
     if close_date is not None and (today - close_date).days > OLD_PRICE_DAYS:
-        out.cautions.append(f"the stored price is from {close_date}, so market value and P/E use an old price")
+        out.add_caution(f"the stored price is from {close_date}, so market value and P/E use an old price", "pe", "market_value")
     if close is None:
-        out.cautions.append("no stored price, so market value and P/E can't be computed")
+        out.add_caution("no stored price, so market value and P/E can't be computed", "pe", "market_value")
     ni, op = out.net_income, out.operating_income
     if ni and op and ni.value > 0 and ni.value > PROFIT_VS_OPERATING * max(op.value, 0):
         ratio = f"{ni.value / op.value:.1f} times" if op.value > 0 else "positive despite an operating loss, and"
-        out.cautions.append(
+        out.add_caution(
             f"net income is {ratio} operating income, which usually means gains outside the core business "
-            "(such as investments), so earnings per share and P/E may flatter the company")
+            "(such as investments), so earnings per share and P/E may flatter the company", *EARNINGS, "net_margin")
     weighted = _choose(facts, WEIGHTED_SHARES)
     wavg = weighted[max(weighted, key=lambda k: (k[1], _dur(k) if k[0] else 0))].value if weighted else None
     if out.shares and wavg and abs(out.shares.value / wavg - 1) > SHARE_COUNT_GAP:
-        out.cautions.append(
+        out.add_caution(
             f"the share count ({out.shares.value / 1e9:.2f} billion, from {out.shares.source}) differs from the latest "
             f"average used for earnings per share ({wavg / 1e9:.2f} billion) by {abs(out.shares.value / wavg - 1):.0%}, "
-            "so market value depends on which one is used (new shares may have been issued)")
+            "so market value depends on which one is used (new shares may have been issued)", "market_value", "shares")
     if out.shares and out.shares.source.startswith("the balance sheet"):
-        out.cautions.append(f"the share count is from the balance sheet date ({out.shares.as_of}), not the filing's cover page")
+        out.add_caution(f"the share count is from the balance sheet date ({out.shares.as_of}), not the filing's cover page",
+                        "market_value", "shares")
     if ni and out.diluted_eps and wavg and ni.value > 0 and out.diluted_eps.value > 0:
         implied = ni.value / out.diluted_eps.value
         if abs(implied / wavg - 1) > EPS_SHARE_GAP:
-            out.cautions.append("net income and earnings per share imply a share count that differs from the reported "
-                                f"average by {abs(implied / wavg - 1):.0%}; one of the figures may cover a different period")
+            out.add_caution("net income and earnings per share imply a share count that differs from the reported "
+                            f"average by {abs(implied / wavg - 1):.0%}; one of the figures may cover a different period",
+                            *EARNINGS)
     return out
 
 
 # ---- display ----
 
-def _money(v: float) -> str:
+def format_money(v: float) -> str:
     return f"${v / 1e12:,.2f} trillion" if abs(v) >= 1e12 else f"${v / 1e9:,.1f} billion"
+
+
+_money = format_money
 
 
 def format_report(f: Fundamentals) -> str:

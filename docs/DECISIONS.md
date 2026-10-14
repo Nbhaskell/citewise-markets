@@ -57,6 +57,11 @@ benchmarks.
 | US-GAAP filers only; foreign filers show "not available" | TSMC and ASML report under IFRS, in another currency, with different concept names and (for TSMC) no earnings per share. Supporting them would be real work, and it matches the 20-F filings gap. Decided by the owner on 2026-10-13 |
 | A company with no fundamentals gets `200` with `available: false` and a reason, not a 404 | The company exists; only its figures don't (not downloaded yet, or a foreign filer). The page can then say why and how to fetch them instead of showing a generic error |
 | On the stock page, cautions come before the numbers, labeled "Caution:", and each calculation is one click away | A correct number can mislead (Alphabet's P/E looks cheap because of investment gains), so the warning must be read first and never rely on color. The recipe and source filings stay available without crowding the card |
+| The copilot gets the figures as one numbered source of kind `fundamentals`, worked out by `data/fundamentals.py` | Same mechanism as prices: Python computes, the model copies, and the numbers check applies unchanged. A company with no figures still gets a source that says "not available" and why, so the answer can say so instead of falling into the generic "couldn't find anything" |
+| Cautions are attached to the answer in code, scoped to the figures asked about | In the first real test the model's own sentence left out Alphabet's "investment gains" caution, so relying on the prompt would have shown a flattered P/E with no warning. Each caution carries the figures it concerns (`caution_scopes`), so a revenue answer doesn't get an earnings warning. The scope comes from the question and from what the answer actually mentions, so an answer that wanders from revenue into P/E still carries it |
+| P/E, market value, EPS, and share count always go to the figures; "revenue", "profit", and "margin" go to the filings when the question names a filing, a quarter, a segment, or asks why | The figures are twelve-month totals and can't explain anything. "What does the 10-K say about revenue?" and "Why is revenue growing?" keep their old (filings) route; "What was revenue last quarter?" goes to the 10-Q, which has the quarter |
+| The rules for using the figures are a separate prompt block, added only when a figures source is present | Adding them to the shared prompt moved other questions (see the gotchas): "news and stock" went from 10 of 10 to 0 of 10 and "should I sell" from 16 of 20 to 4 of 20. Questions that don't use the figures now get byte-for-byte the prompt they were evaluated with |
+| Growth is written as "measured on the 6 months to X vs the same 6 months a year earlier only (not the growth of the 12-month total)" | The model wrote "revenue for the last 12 months was $303.0 billion, an increase of 95.8%" when 95.8% compared only the latest six months. With the plain wording that happened in 6 of 6 runs of the premise question; with this wording, 0 of 18 |
 
 ## Gotchas we hit
 
@@ -83,6 +88,9 @@ benchmarks.
 | The browser kept showing old page text after I edited a file | Vite's file watcher missed the change. Restarting `npm run dev` fixed it. Check what the server really serves before blaming the code || With the API stopped, the page said "The API returned an error (502)" | In development the Vite proxy answers 502 or 504 when the API is down, so the browser never sees a network failure. The client now maps a 502 or 504 with no API message to "Can't reach the API. Is it running? python -m api" |
 | `node` was "not found" right after installing Node.js | Terminals and tools opened before the install don't see the new PATH. Open a new terminal (tools started earlier need `PATH` extended with `C:\Program Files\nodejs`) |
 | Python patch scripts wrote broken strings and regexes into files | Escapes like `\n` and `\b` were mangled by shell heredocs. Edit files directly, or build such characters explicitly |
+| Three new sentences in the shared prompt made unrelated questions worse | Found by A/B against `main`'s code on the same cases, 10 to 20 runs each. Adding a rule about the figures: "news and stock" 10/10 to 5/10 (0/10 with the full set of edits). Three small wording edits together (the intro sentence, one parenthesis in rule 3, and rule 7; not bisected, so which one matters is unknown): "should I sell" 16/20 to 4/20. In the answers I read, the model still declined but in wording the check didn't match, and then listed "factors that could impact the stock". Shared prompt restored exactly; everything about the figures lives in `FIGURES_RULES`. A single 5-run comparison is not enough here: the same code scored 1/5 and 7/10 on one case |
+| A drop in the evaluation total was mostly live data | Fresh headlines ("Apple Stock Hits All-Time Highs") changed "crashing premise", "how is X doing", and "news and stock" answers. `main`'s own code scored 0/10 on "crashing premise" the same day. Always A/B against the old code before explaining a drop, in either direction |
+| A strict check read a correct refusal as a failure | "Is Tesla overvalued?" was answered "the P/E ratio does not indicate whether a stock is overvalued... the sources do not offer information to determine", with no "can't" or "advice". The check was changed to look for a refusal to judge (noted in `ai/eval_market.py`). The held-out "buy on P/E" case failed the same way ("...advice, which I cannot") and was left as written |
 
 ## How the safety checks were calibrated
 
@@ -147,10 +155,10 @@ benchmarks.
   under Nvidia.
 - **Year-to-date and window figures use closing prices only,** from the free Yahoo feed. The latest day may be partial,
   and the 52-week range is of closes, not intraday highs and lows.
-- **Fundamentals exist in the database but nothing shows them yet.** Revenue, profit, EPS, margins, market value, and P/E
-  are stored and computed (see "Fundamentals" below), but the stock detail page and the copilot don't use them, so the
-  copilot still says they aren't available, and on a filings-route question the model sometimes answers uncited ("the
-  sources don't include that"). Analyst targets are not stored.
+- **Some things are still not stored,** so the copilot says they aren't available: analyst targets, dividends and dividend
+  yield, debt, cash, price-to-book, and any figure for a foreign filer. On a filings-route question the model sometimes
+  answers uncited ("the sources don't include that"). Revenue, profit, EPS, margins, market value, and P/E are stored and
+  answered (see "Fundamentals" below).
 - **The "If the question assumes a decline, it contradicts the data" sentence** showed up in a real answer, copied
   from the prompt rule. Harmless, but it is the model repeating its instructions.
 - **Checked in a real browser:** a price question with a false premise, a sentiment question, an index question
@@ -203,8 +211,8 @@ benchmarks.
 - **The copilot page was checked in a real browser:** a company-filtered question, a reload that restored history,
   an unnamed follow-up (which exposed the Amazon problem above), the clear flow, and a 375 px phone width. Stop
   and retry were checked by automated tests only. Dark mode only.
-- **The stock detail page has no AI signal or fundamentals.** Those need data and a model that don't exist. It shows what
-  the stored data supports: prices, news mood, filings, and the filings copilot.
+- **The stock detail page has no AI signal.** That needs a model that doesn't exist. It shows what the stored data
+  supports: prices, news mood, fundamentals, filings, and the copilot.
 - **Duplicate headlines are hidden in the news lists, not counted out of the totals.** The free news feed returns one
   story once per outlet that carried it. `/api/stocks/{symbol}/news` and `/api/news` now show a story once per company
   (newest copy kept), using the same rule as the copilot (`data/headlines.py`: case, spacing, and a trailing
@@ -318,7 +326,7 @@ benchmarks.
   whether restatements are common. One price (the latest close) is used; a partial trading day would shift market value.
   Share counts for multi-class companies are totals from the balance sheet. Debt, cash, and ratios like price-to-book
   were left out on purpose. The caution thresholds (1.2x, 5%, 10%) were picked from these six companies and are not
-  tuned on anything else. Steps 2 and 3 (the page and the copilot) are not built.
+  tuned on anything else. Steps 2 and 3 (the page and the copilot) followed; see below.
 - **Fundamentals (step 2 of 3: the endpoint and the stock page; 2026-10-13).** `GET /api/stocks/{symbol}/fundamentals`
   returns the computed figures with their recipes, source filings, and cautions; the stock detail page shows them in a
   "Fundamentals" card under Key stats. Checked: 4 new API tests (figures, cautions, `available: false`, 404/422), 11
@@ -333,7 +341,42 @@ benchmarks.
   wordy; EPS growth of 0.00% (Tesla) reads oddly but is correct; net income growth can be huge when the base is small
   (Alphabet +178%, partly the same investment gains the caution describes). The card doesn't say which share-count
   figure the market value would take under the other choice (Tesla's caution gives both counts but not both values).
-  The copilot still refuses these questions (step 3).
+  At the time the copilot still refused these questions; step 3 changed that (next entry).
+- **Fundamentals (step 3 of 3: the copilot; 2026-10-14).** The copilot answers P/E, market value, EPS, share count,
+  revenue, profit, and margin questions from the stored figures, as one numbered `fundamentals` source with the growth
+  direction in words, and attaches the cautions that concern the figures asked about to the answer in code (see the
+  decisions table). **Tests:** 48 new unit tests (routing, the source text, cautions, the whole copilot with a fake
+  model), 2 API tests, 2 web tests; 410 Python and 207 web tests pass. Fourteen deliberate breakages were each caught: cautions never attached, scoping removed, growth direction
+  unchecked, "grew" not read as upward, the why/filing exception removed, matched words not cut out, revenue words
+  searching the filings, an unavailable company refused, a caution missing from the source, and a wrong scope; then,
+  after the figures rules were split into their own prompt block, the rules sent with every question, never sent, the
+  caution rule dropped from them, and the shared prompt edited to mention the figures. **Evaluation** (`ai.eval_market --repeat 3 --show`, 55 cases, the 43 old ones plus 12 written for
+  this step before the code; the old "figure that isn't stored" case asked for P/E and now asks for price-to-book):
+  the last full run scored 153 of 165 (an earlier one 155), against 121 to 123 of 129 documented before. All 12 new
+  cases passed 3 of 3 in every run after the prompt fix, quoting the figure Python computes today (the same `compute` the source
+  uses, so this shows the model copied it, not that it is right; step 1 checked the figures against filings), showing the right caution, and showing none where none applies. The
+  misses are not new: "follow-up other company" and "price target" (0 of 3, known), "crashing premise" (0 of 3, and
+  0 of 10 on `main`'s code the same day), "how is X doing" (0 of 3 in that run; 1 of 5 and 7 of 10 on `main`'s code),
+  and a one-off "investor mood". **Held-out:** 14 cases written in different wording before the routing or prompt
+  existed, run once: 13 of 14 (39 of 42 over three runs). The miss, "buy on P/E", reads as a correct refusal ("...investment
+  advice, which I cannot", no verdict, the P/E, and the caution) that the pre-written check didn't recognize, so it was
+  left as written. Reading the passes: "dividend yield" explained the formula from outside knowledge before saying it
+  can't be determined, "two margins" said "better" (a mild judgment), and "TSMC's P/E" got the generic "tell me which
+  company" refusal (TSMC isn't tracked). Those held-out cases are tuning material now (`ROUND_FIVE`; `HELD_OUT` is empty again, and the 69-case set has not been scored as a whole yet). **In a real browser** (live data,
+  servers stopped afterwards): Alphabet's P/E showed the amber "Caution for GOOGL" box under an answer whose own
+  sentence never mentioned it, and Alphabet's revenue showed no caution. Dark mode, 800 px. **Not checked in a
+  browser:** a phone width, light mode, and a foreign filer through the copilot (that is covered by tests with fake data).
+  **Weak spots:** (1) The model itself restated Alphabet's caution in 0 of 3 tuning runs (it sometimes copies the
+  source's "CAUTION" line, even writing "the CAUTION line notes"); the guarantee is the code, and the answer text alone
+  can omit it. The caution box is the only place a reader is certain to see it. (2) Routing is keyword rules and the
+  new vocabulary is untested beyond the 26 cases: "how expensive is X relative to its earnings", "sales", and "how much
+  is X worth" use words the rules don't cover, and "market value" in a question about marketable securities would go
+  to the figures. (3) The figures are twelve-month totals, so a question about one quarter or a calendar year is
+  answered with the twelve-month figure and a request to say so (not evaluated), or goes to the 10-Q if it says
+  "quarter". (4) The growth direction check leaves a sentence alone if it mixes up and down words. (5) A single
+  five-run comparison is not enough to judge a prompt change here: the same case scored 1 of 5 and 7 of 10 with identical
+  code. (6) The model sometimes explains a P/E with a share-count caution that concerns market value, because the
+  answer mentions both. (7) No test covers a rate that is exactly flat.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

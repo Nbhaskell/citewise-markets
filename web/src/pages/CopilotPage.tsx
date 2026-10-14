@@ -45,8 +45,8 @@ export function CopilotPage() {
     <div className="copilot-page">
       <h1 className="page-title">Copilot</h1>
       <p className="muted">
-        Answers come only from what is stored here: the 10-K and 10-Q filings, daily prices, and news headlines, with
-        numbered sources you can check. It can't say why a price moved, predict prices, or give advice. You can follow up
+        Answers come only from what is stored here: the 10-K and 10-Q filings, daily prices, financial figures
+        (revenue, profit, market value, P/E), and news headlines, with numbered sources you can check. It can't say why a price moved, predict prices, or give advice. You can follow up
         on your last few questions ("and its risks?"). The copilot uses them{" "}
         <strong>only to understand what you mean, never as evidence</strong>, and every answer is still written from the
         stored sources. Check the "Understood as" line to see how it read a follow-up, and start a new topic when you change

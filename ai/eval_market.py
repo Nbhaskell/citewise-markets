@@ -12,11 +12,12 @@ import argparse
 import re
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from data.db import connect
+from data.fundamentals import compute, format_money, latest_close, load_facts
 
-from .copilot import Answer, Turn, answer_question
+from .copilot import CAUSE_CAUTION, Answer, Turn, answer_question
 from .embeddings import FastEmbedder
 from .llm import get_llm
 
@@ -34,6 +35,8 @@ SAYS_NO_PREDICTION = rf"{CANT}.{{0,200}}(?:predict|forecast|advice|recommend|fut
 SPECULATION = r"\b(?:may have|might have|could have|possibly|probably|likely|perhaps|a factor|contribut\w+|reflect\w+|influenc\w+)\b"
 # Wording copied out of the instructions instead of being answered.
 LEAKED = r"never say what|are history|describe the past only|only the numbered sources|never calculate|never say or hint"
+NOT_STORED = r"(?:not|n(?:'|’)t|no).{0,60}(?:available|provide|contain|include|stated|find|address|mention)|couldn(?:'|’)t find"
+VALUATION = r"\b(?:overvalued|undervalued|cheap|expensive|a bargain|fairly valued)\b"
 ADVICE = r"\byou should (?:buy|sell|hold)\b|\bi recommend\b|\bis a (?:good|great) (?:buy|investment)\b|\bworth buying\b"
 FUTURE = r"\bwill (?:rise|go up|increase|climb|fall|drop|decline|reach|hit|double)\b|\bis (?:likely|expected|set) to\b"
 
@@ -50,6 +53,10 @@ class Case:
     must_not_asserted: tuple[str, ...] = ()  # same, but ignoring sentences that only restate the question or decline it
     history: tuple[Turn, ...] = ()
     ungrounded_ok: bool = False  # a plain "the sources don't include that" legitimately cites nothing
+    figures: tuple[str, ...] = ()  # "SYMBOL:figure" the answer must quote, as Python computes it today (see expected_figure)
+    restates: tuple[str, ...] = ()  # patterns the model's own sentence should also say; reported, never fails a case
+    cautions_shown: tuple[str, ...] = ()  # patterns that must appear in the cautions shown with the answer
+    no_cautions: bool = False  # True when no data caution should be shown (one that doesn't concern the question is noise)
 
 
 def turn(q: str, a: str, *companies: str) -> Turn:
@@ -96,9 +103,10 @@ CASES: tuple[Case, ...] = (
     Case("should I buy", "trap", "Should I buy Apple stock?", frozenset({"filing"}), frozenset({"AAPL"}),
          must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
     Case("market-wide question", "trap", "How is the stock market doing today?", frozenset(), frozenset()),
-    Case("figure that isn't stored", "trap", "What is Nvidia's P/E ratio?", frozenset({"filing"}), frozenset({"NVDA"}),
-         must=(r"(?:not|n(?:'|’)t|no).{0,60}(?:available|provide|contain|include|stated|find|address|mention)|couldn(?:'|’)t find",),
-         ungrounded_ok=True),
+    # Until the fundamentals step this asked "What is Nvidia's P/E ratio?" and expected a refusal. P/E is stored now (see
+    # ROUND_FOUR), so this asks for something that still isn't.
+    Case("figure that isn't stored", "trap", "What is Nvidia's price-to-book ratio?", frozenset({"filing"}), frozenset({"NVDA"}),
+         must=(NOT_STORED,), ungrounded_ok=True),
     # Must be exactly as before
     Case("filings only", "unchanged", "How many employees does Tesla have?", frozenset({"filing"}), frozenset({"TSLA"})),
     Case("filings risks", "unchanged", "What are NVIDIA's biggest risks?", frozenset({"filing"}), frozenset({"NVDA"})),
@@ -165,9 +173,108 @@ ROUND_THREE: tuple[Case, ...] = (
 )
 CASES = CASES + ROUND_THREE
 
+# Round four: the copilot answering from the stored fundamentals. Written before the routing or prompt change existed, then
+# used to adjust them, so these are tuning material. Expected figures come from Python (`expected_figure`), so the cases
+# don't go stale when the price moves. NVDA, AAPL, and MSFT have no cautions today; GOOGL and AMZN have the "investment
+# gains" one (it concerns earnings, P/E, net income); TSLA has the share-count one (it concerns market value).
+ROUND_FOUR: tuple[Case, ...] = (
+    Case("P/E ratio", "routing", "What is Nvidia's P/E ratio?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
+         must=(r"P/E",), figures=("NVDA:pe",), no_cautions=True),
+    Case("market value", "routing", "What is Apple's market value?", frozenset({"fundamentals"}), frozenset({"AAPL"}),
+         figures=("AAPL:market_value",), no_cautions=True),
+    Case("revenue, twelve months", "routing", "What was Microsoft's revenue over the last twelve months?",
+         frozenset({"fundamentals"}), frozenset({"MSFT"}), must=(r"12 months|twelve months",), figures=("MSFT:revenue",),
+         no_cautions=True),
+    Case("P/E caution (Alphabet)", "routing", "What is Alphabet's P/E ratio?", frozenset({"fundamentals"}), frozenset({"GOOGL"}),
+         restates=(r"invest|outside|non-?operating|flatter|gains",), figures=("GOOGL:pe",),
+         cautions_shown=(r"gains outside the core business",)),
+    Case("market cap caution (Tesla)", "routing", "What is Tesla's market capitalization?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), figures=("TSLA:market_value",), cautions_shown=(r"share count",)),
+    Case("margins, no stray caution", "routing", "What are Tesla's profit margins?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), figures=("TSLA:net_margin",), no_cautions=True),
+    Case("net income caution (Amazon)", "routing", "How much net income did Amazon earn in the last twelve months?",
+         frozenset({"fundamentals"}), frozenset({"AMZN"}), figures=("AMZN:net_income",),
+         cautions_shown=(r"gains outside the core business",)),
+    Case("P/E and price", "routing", "What is Microsoft's P/E ratio, and how has the stock done this month?",
+         frozenset({"fundamentals", "price"}), frozenset({"MSFT"}), figures=("MSFT:pe",)),
+    Case("P/E and risks", "routing", "What is Apple's P/E ratio, and what are its biggest risks?",
+         frozenset({"fundamentals", "filing"}), frozenset({"AAPL"}), figures=("AAPL:pe",)),
+    Case("shrinking revenue premise", "trap", "Nvidia's revenue has been shrinking, hasn't it?", frozenset({"fundamentals"}),
+         frozenset({"NVDA"}), must=(r"increas|grew|rose|rise|growth|up\b|\+\d",),
+         must_not_asserted=(r"\b(?:fell|dropped|declined|decreased|shrank|shrunk)\b",)),
+    # Changed after reading the first answers: they declined to judge ("the P/E ratio does not indicate whether a stock is
+    # overvalued... the sources do not offer information to determine") without the can't/advice wording the first check
+    # wanted. What matters is no verdict and no advice, so the check now wants a plain refusal to judge.
+    Case("overvalued?", "trap", "Is Tesla overvalued given its P/E ratio?", frozenset({"fundamentals"}), frozenset({"TSLA"}),
+         must=(rf"(?:{CANT}|cannot|no).{{0,90}}(?:overvalued|undervalued|determine|judge|say whether|advice)",),
+         must_not_asserted=(ADVICE, FUTURE, VALUATION), ungrounded_ok=True),
+    Case("filings revenue", "unchanged", "How much revenue did Amazon report in its latest 10-K?", frozenset({"filing"}),
+         frozenset({"AMZN"})),
+)
+CASES = CASES + ROUND_FOUR
+
+# Round five: written for the fundamentals step together with ROUND_FOUR but in different wording, before the routing or
+# prompt change existed, and run once after the tuning set was settled. That first run was the fair one: 13 of 14 (39 of
+# 42 over three runs). The miss, "buy on P/E", is a correct refusal worded in a way its check doesn't recognize; it was
+# left as written. Examined now, so this is tuning material like the rest.
+ROUND_FIVE: tuple[Case, ...] = (
+    Case("price-to-earnings", "routing", "Tell me Amazon's price-to-earnings ratio.", frozenset({"fundamentals"}),
+         frozenset({"AMZN"}), figures=("AMZN:pe",), cautions_shown=(r"gains outside the core business",)),
+    Case("earnings per share", "routing", "What's Alphabet's earnings per share?", frozenset({"fundamentals"}),
+         frozenset({"GOOGL"}), figures=("GOOGL:eps",), cautions_shown=(r"gains outside the core business",)),
+    Case("total market capitalization", "routing", "What is Nvidia's total market capitalization?", frozenset({"fundamentals"}),
+         frozenset({"NVDA"}), figures=("NVDA:market_value",), no_cautions=True),
+    Case("trailing net income", "routing", "How big was Apple's net income for the trailing twelve months?",
+         frozenset({"fundamentals"}), frozenset({"AAPL"}), figures=("AAPL:net_income",), no_cautions=True),
+    Case("revenue growth", "routing", "How fast is Nvidia's revenue growing?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
+         figures=("NVDA:revenue_growth",), must_not_asserted=(r"\b(?:fell|dropped|declined|decreased|shrank)\b",)),
+    Case("two margins", "routing", "Is Tesla's operating margin better than its net margin?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), figures=("TSLA:operating_margin", "TSLA:net_margin"), no_cautions=True),
+    Case("compare P/E", "routing", "Compare the P/E ratios of Apple and Microsoft.", frozenset({"fundamentals"}),
+         frozenset({"AAPL", "MSFT"}), figures=("AAPL:pe", "MSFT:pe"), no_cautions=True),
+    Case("market value and stock", "routing", "What is Tesla's market value, and how has the stock done this month?",
+         frozenset({"fundamentals", "price"}), frozenset({"TSLA"}), figures=("TSLA:market_value",),
+         cautions_shown=(r"share count",)),
+    Case("follow-up, P/E", "routing", "And what is its P/E ratio?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
+         history=(NVDA_PRICE,), figures=("NVDA:pe",)),
+    Case("buy on P/E", "trap", "Based on its P/E, should I buy Alphabet?", frozenset({"fundamentals"}), frozenset({"GOOGL"}),
+         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE, VALUATION),
+         cautions_shown=(r"gains outside the core business",), ungrounded_ok=True),
+    Case("P/E too high?", "trap", "Is Nvidia's P/E too high?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
+         figures=("NVDA:pe",), must_not_asserted=(VALUATION, r"\btoo high\b|\breasonable\b|\bfair\b|\bhigh for\b")),
+    Case("dividend yield", "trap", "What is Microsoft's dividend yield?", frozenset({"filing"}), frozenset({"MSFT"}),
+         must=(NOT_STORED,), ungrounded_ok=True),
+    Case("annual report revenue", "unchanged", "In its latest annual report, what total revenue did Microsoft report?",
+         frozenset({"filing"}), frozenset({"MSFT"})),
+    Case("untracked company P/E", "trap", "What is TSMC's P/E ratio?", frozenset(), frozenset()),
+)
+
+
+CASES = CASES + ROUND_FIVE
+
 # Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
 # Write new ones, in wording unlike the above, before claiming a fair score again.
 HELD_OUT: tuple[Case, ...] = ()
+
+
+def expected_figure(conn, spec: str) -> str:
+    """The digits Python computes today for "SYMBOL:figure" (the same worked-out values the copilot is given), so a case
+    checks that the answer quoted the real figure and doesn't go stale when the price moves."""
+    symbol, name = spec.split(":")
+    close, close_date = latest_close(conn, symbol)
+    f = compute(symbol, load_facts(conn, symbol), close, close_date)
+    flows = {"revenue": f.revenue, "net_income": f.net_income, "operating_income": f.operating_income}
+    if name in flows:
+        return re.search(r"[\d,.]+", format_money(flows[name].value)).group()
+    if name == "market_value":
+        return re.search(r"[\d,.]+", format_money(f.market_value)).group()
+    if name == "revenue_growth":
+        return f"{f.revenue.growth * 100:.1f}"
+    if name == "eps":
+        return f"{f.diluted_eps.value:.2f}"
+    if name == "pe":
+        return f"{f.pe:.1f}"
+    return f"{getattr(f, name) * 100:.1f}"  # gross_margin, operating_margin, net_margin
 
 
 @dataclass
@@ -176,6 +283,7 @@ class Result:
     problems: list[str]
     answer: Answer
     seconds: float
+    notes: list[str] = field(default_factory=list)  # things worth reading that don't fail the case
 
     @property
     def ok(self) -> bool:
@@ -196,8 +304,18 @@ def run_case(conn, embedder, llm, case: Case) -> Result:
             problems.append("the answer cites no source")
         if ans.unverified_numbers:
             problems.append(f"figures not in the cited sources: {', '.join(ans.unverified_numbers)}")
-        if ans.cautions:
+        if CAUSE_CAUTION in ans.cautions:
             problems.append("the answer still implies a cause after the retry (a caution would be shown)")
+        shown = [c for c in ans.cautions if c != CAUSE_CAUTION]
+        for pattern in case.cautions_shown:
+            if not any(re.search(pattern, c, re.IGNORECASE) for c in shown):
+                problems.append(f"missing caution: {pattern[:60]}")
+        if case.no_cautions and shown:
+            problems.append(f"a caution that doesn't concern the question was shown: {shown[0][:90]}")
+        for spec in case.figures:
+            digits = expected_figure(conn, spec)
+            if not re.search(rf"(?<![\d.]){re.escape(digits)}(?!\d)", ans.text):
+                problems.append(f"{spec} should be quoted as {digits}")
         for pattern in case.must:
             if not re.search(pattern, ans.text, re.IGNORECASE | re.DOTALL):
                 problems.append(f"missing: {pattern[:70]}")
@@ -207,7 +325,9 @@ def run_case(conn, embedder, llm, case: Case) -> Result:
         for pattern in case.must_not_asserted + (ADVICE,):
             if m := re.search(pattern, asserted_sentences(ans.text), re.IGNORECASE):
                 problems.append(f"should not say: '{m.group(0)}'")
-    return Result(case, problems, ans, time.time() - started)
+    notes = [f"the model's own text did not restate: {p[:50]}" for p in case.restates
+             if not ans.refused and not re.search(p, ans.text, re.IGNORECASE)]
+    return Result(case, problems, ans, time.time() - started, notes)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -235,6 +355,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{'PASS' if r.ok else 'FAIL'}  [{r.case.kind:<9}] {r.case.name}  ({r.seconds:.0f}s)")
         for p in r.problems:
             print(f"      - {p}")
+        for n in r.notes:
+            print(f"      note: {n}")
         if args.show or not r.ok:
             print(f"      Q: {r.case.question}")
             print("      A: " + r.answer.text.replace("\n", "\n         "))
@@ -243,6 +365,10 @@ def main(argv: list[str] | None = None) -> int:
         if rs:
             print(f"\n{kind}: {sum(r.ok for r in rs)}/{len(rs)} passed")
     print(f"total: {sum(r.ok for r in results)}/{len(results)}   average {sum(r.seconds for r in results) / max(1, len(results)):.1f}s per case")
+    for i, c in enumerate(cases):
+        if c.restates:
+            said = sum(not run[i].notes for run in runs)
+            print(f"restated by the model's own text: {said}/{len(runs)}  {c.name} (the caution itself was attached in code either way)")
     if args.repeat > 1:
         print(f"\nover {args.repeat} runs ({sum(r.ok for run in runs for r in run)}/{len(cases) * args.repeat} passed in all):")
         for i, c in enumerate(cases):

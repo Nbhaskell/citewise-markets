@@ -9,7 +9,7 @@ An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, 
 refresh job (`jobs/`, scheduled in Windows Task Scheduler for 5pm Pacific), a read-only FastAPI backend (`api/`), and a
 React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot that understands follow-ups
 and answers from filings, daily prices, and news headlines. Not built: accounts and
-login, portfolios, a screener, fundamentals data (P/E, market value, revenue), adding a company from the app, backups
+login, portfolios, a screener, fundamentals for foreign (20-F) filers, adding a company from the app, backups
 kept anywhere but this PC's disk, email or phone alerts, a Claude (Anthropic API) provider, and anything that puts it online. See the
 README's "What is not built yet" for the current list.
 
@@ -32,8 +32,9 @@ them (the owner hasn't confirmed the order):
 3. **Fundamentals** (P/E, market value, revenue, margins), in three steps the owner approved on 2026-10-13: (1) data
    and calculations, built: SEC "company facts" stored in `financial_facts`, ratios computed in `data/fundamentals.py`,
    a nightly `fundamentals` step; (2) built: `GET /api/stocks/{symbol}/fundamentals` and a "Fundamentals" card on the
-   stock detail page (`web/src/components/Fundamentals.tsx`); (3) the copilot answering from them, not started (it
-   still refuses). US-GAAP filers only; foreign filers show "not available".
+   stock detail page (`web/src/components/Fundamentals.tsx`); (3) built: the copilot answers P/E, market value,
+   EPS, revenue, profit, and margin questions from the figures as a numbered source of kind `fundamentals`
+   (`ai/market.py`), and attaches the relevant cautions to the answer in code. US-GAAP filers only; foreign filers show "not available".
    Python computes every ratio and the model only quotes it as a numbered source. A screener can't exist without these.
 4. **A daily "what changed" view** (new filings, big moves, notable headlines) from data already stored.
 5. **Copilot trust.** "Follow-up to another company" and "price target" fail in `ai.eval_market` every time, and the
@@ -126,8 +127,13 @@ The owner is building this step by step and is not a professional developer, so 
   explain a price move. Before changing the prompt, `detect_intent`, or `parse_window`, run `python -m ai.eval_market
   --repeat 3 --show` (needs Ollama) and read the answers, not just the totals; checks that are too loose give false
   passes. `HELD_OUT` in that file is empty on purpose: write fresh cases in different wording before claiming a fair
-  score, and don't tune against them once run. Over three runs it scores about 121 to 123 of 129; a swing of two is
-  normal model variation, and a case that drops to 0 of 3 is not (A/B it with the old code before explaining it away).
+  score, and don't tune against them once run. Before the fundamentals step, three runs scored about 121 to 123 of 129;
+  after it, 153 to 155 of 165 on the same 43 cases plus 12 new ones (the 14 held-out cases that were then run, 13 passing,
+  are now in `CASES` too, so the set is 69 and a full run hasn't been scored yet). A swing of two is normal model
+  variation, and a case that drops to 0 of 3 is not: A/B it against the old code (a `git worktree` of `main`, 10 to 20
+  runs, since 5 is not enough) before explaining it away. Headlines change daily, so some cases drift on their own.
+  **Never edit `SYSTEM_PROMPT` for a new feature**: even three small wording edits moved unrelated cases ("should I
+  sell" 16/20 to 4/20); add a conditional block like `FIGURES_RULES` instead.
   Don't change the follow-up rewrite prompt without running
   `ai.eval_followups` and `--held-out` (a change for "What about X?" once made it worse and was reverted).
 - **Headline rules and sentiment totals (`data/headlines.py`, `ai/sentiment.py`):** "the same headline" (`title_key`) and
@@ -155,6 +161,14 @@ The owner is building this step by step and is not a professional developer, so 
   mismatched periods); a correct number can still mislead. Keep rejecting a leftover concept (Amazon's 2009 gross
   profit). Figures are checked against the filing text, not just for self-consistency. Tests use fake SEC data and
   `ZZFUN`.
+- **Copilot fundamentals (`ai/market.py`, `ai/copilot.py`):** the figures reach the model only as one numbered source
+  (kind `fundamentals`), every number from `data/fundamentals.py`, growth direction in words and checked like a price
+  move. **Cautions are attached to the answer in code** (`relevant_cautions` into `Answer.cautions`), scoped to the
+  figures the question or the answer is about; never leave them to the model, which dropped Alphabet's "investment
+  gains" caution in its own sentence. A new caution in `data/fundamentals.py` needs its scope tags (`add_caution`).
+  "Revenue" and "profit" words go to the filings instead when the question names a filing, a quarter, a segment, or asks
+  why; P/E, market value, and EPS always go to the figures. Same eval rules as the market data above: new cases in
+  different wording before changing routing or the prompt, and read the answers.
 - **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` or `scripts/register_backup_task.ps1`
   (they change Windows Task Scheduler) without being asked.
 

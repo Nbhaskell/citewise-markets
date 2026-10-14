@@ -119,12 +119,12 @@ class CopilotRequest(BaseModel):
     )
 
 
-SourceKind = Literal["filing", "price", "headline", "sentiment"]
+SourceKind = Literal["filing", "price", "headline", "sentiment", "fundamentals"]
 
 
 class Source(BaseModel):
     number: int = Field(description="Matches the [n] citation in the answer")
-    kind: SourceKind = Field(description="filing = a passage from an SEC filing; price = figures worked out from stored daily closes; headline = a news title; sentiment = a summary of headline labels")
+    kind: SourceKind = Field(description="filing = a passage from an SEC filing; price = figures worked out from stored daily closes; headline = a news title; sentiment = a summary of headline labels; fundamentals = revenue, profit, margins, market value and P/E worked out from SEC filings and the latest price")
     symbol: str
     title: str = Field(description="One line saying what this source is, e.g. 'NVDA 10-K filed 2026-02-25' or 'NVDA price data (stored daily closes), as of 2026-10-12'")
     as_of: date = Field(description="The filing date for a filing, otherwise the date of the data")
@@ -145,7 +145,7 @@ class CopilotResponse(BaseModel):
     companies: list[str]
     evidence_kinds: list[SourceKind] = Field(description="The kinds of source the model was shown (not only the ones it cited), so the screen can say what was looked at")
     unverified_numbers: list[str] = Field(description="Figures in the answer that are not in the cited sources, a minus sign the sources don't have, or a price move described in the wrong direction. Show a warning if non-empty")
-    cautions: list[str] = Field(description="Plain-language warnings to show with the answer, for example when it may suggest a reason for a price move that the data cannot show")
+    cautions: list[str] = Field(description="Plain-language warnings to show with the answer, for example when it may suggest a reason for a price move that the data cannot show, or when a financial figure it quotes can mislead (a P/E flattered by investment gains)")
     sources: list[Source]
     searches: list[str]
     interpreted_question: Optional[str] = Field(

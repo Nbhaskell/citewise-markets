@@ -241,7 +241,7 @@ export interface components {
             answer: string;
             /**
              * Cautions
-             * @description Plain-language warnings to show with the answer, for example when it may suggest a reason for a price move that the data cannot show
+             * @description Plain-language warnings to show with the answer, for example when it may suggest a reason for a price move that the data cannot show, or when a financial figure it quotes can mislead (a P/E flattered by investment gains)
              */
             cautions: string[];
             /** Companies */
@@ -252,7 +252,7 @@ export interface components {
              * Evidence Kinds
              * @description The kinds of source the model was shown (not only the ones it cited), so the screen can say what was looked at
              */
-            evidence_kinds: ("filing" | "price" | "headline" | "sentiment")[];
+            evidence_kinds: ("filing" | "price" | "headline" | "sentiment" | "fundamentals")[];
             /**
              * Grounded
              * @description True when the answer cites at least one real source
@@ -609,10 +609,10 @@ export interface components {
             form?: string | null;
             /**
              * Kind
-             * @description filing = a passage from an SEC filing; price = figures worked out from stored daily closes; headline = a news title; sentiment = a summary of headline labels
+             * @description filing = a passage from an SEC filing; price = figures worked out from stored daily closes; headline = a news title; sentiment = a summary of headline labels; fundamentals = revenue, profit, margins, market value and P/E worked out from SEC filings and the latest price
              * @enum {string}
              */
-            kind: "filing" | "price" | "headline" | "sentiment";
+            kind: "filing" | "price" | "headline" | "sentiment" | "fundamentals";
             /**
              * Number
              * @description Matches the [n] citation in the answer

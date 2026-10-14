@@ -11,12 +11,14 @@ const KIND_LABEL: Record<Kind, string> = {
   price: "Price data",
   headline: "Headline",
   sentiment: "Sentiment",
+  fundamentals: "Financial figures",
 };
 const LOOKED_AT: Record<Kind, string> = {
   filing: "filings",
   price: "prices",
   headline: "headlines",
   sentiment: "headline sentiment",
+  fundamentals: "financial figures",
 };
 const LINK_LABEL: Partial<Record<Kind, string>> = { filing: "View filing", headline: "Read headline" };
 
