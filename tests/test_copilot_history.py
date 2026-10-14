@@ -333,6 +333,27 @@ def test_a_rewrite_that_did_something_is_trusted(conn):
     assert ans.interpreted_question == "How many employees does Omegaware have?" and llm.calls.count("condense") == 1
 
 
+def test_a_rewrite_that_drops_the_stock_from_a_bare_stock_question_is_not_trusted(conn):
+    """"ok, and Omegaware stock?" was rewritten into the risks question that came before it, losing the one thing the
+    user asked for. The user's own words win when they name the stock and the rewrite no longer does."""
+    llm = RoutingLLM(rewrite="What are Omegaware's biggest risks?")
+    ans, emb = ask(conn, llm, "ok, and Omegaware stock?")
+    assert ans.symbols == ["ZZCB"] and ans.interpreted_question is None
+    assert all("risks" not in q for q in emb.queries)  # no filings search on the wrong topic
+
+
+def test_a_rewrite_that_keeps_the_stock_is_left_alone(conn):
+    llm = RoutingLLM(rewrite="How has Omegaware stock done this month?")
+    ans, _ = ask(conn, llm, "ok, and Omegaware stock?")
+    assert ans.interpreted_question == "How has Omegaware stock done this month?"
+
+
+def test_a_rewrite_is_still_trusted_when_the_question_is_not_a_bare_stock_one(conn):
+    llm = RoutingLLM(rewrite="What are Zetacorp's biggest risks?")
+    ans, _ = ask(conn, llm, "And what about its biggest risks?")
+    assert ans.interpreted_question == "What are Zetacorp's biggest risks?"
+
+
 def test_chosen_companies_are_never_second_guessed_by_the_switch_rule(conn):
     ans, _ = ask(conn, RoutingLLM(rewrite="What about Omegaware?"), "What about Omegaware?", symbols=["ZZCA"])
     assert ans.symbols == ["ZZCA"] and ans.interpreted_question is None

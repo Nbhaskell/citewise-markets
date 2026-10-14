@@ -14,7 +14,15 @@ from data.db import connect
 
 from .embeddings import Embedder, FastEmbedder
 from .llm import LLM, get_llm
-from .market import MarketEvidence, detect_intent, gather_market_evidence, join_names, parse_window, relevant_cautions
+from .market import (
+    BARE_STOCK_RE,
+    MarketEvidence,
+    detect_intent,
+    gather_market_evidence,
+    join_names,
+    parse_window,
+    relevant_cautions,
+)
 from .search import SearchResult, search_filings
 
 DISCLAIMER = (
@@ -458,6 +466,8 @@ def resolve_question(
     search_question = condense_question(llm, question, history) if history else question
     if history and not symbols and " ".join(search_question.lower().split()) == " ".join(question.lower().split()):
         search_question = carry_topic(conn, question, history) or search_question
+    elif history and not symbols and BARE_STOCK_RE.search(question) and not detect_intent(search_question).prices:
+        search_question = question  # "ok, and Alphabet stock?" was rewritten into the earlier risks question; the user's words win
     if (
         not symbols
         and history

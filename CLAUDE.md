@@ -41,9 +41,11 @@ them (the owner hasn't confirmed the order):
    Tesla?" fix (built, in code: `carry_topic` in `ai/copilot.py`). "Price target" and "crashing premise" still fail every
    time, but the answers are correct and the checks are the problem (see DECISIONS); the refusal checks for "buy on P/E",
    "good time to buy" and "should I sell" also miss real refusals. Ratios the app doesn't compute (dividend yield,
-   price-to-book, and seven more) are now declined in code (`unstored_figures` in `ai/market.py`); the set is 70 cases and
-   scored 197 of 210. Not done: "What about Tesla's stock?", the refusal checks, the one-day-old newest price (under
-   investigation), and fresh held-out cases.
+   price-to-book, and seven more) are now declined in code (`unstored_figures` in `ai/market.py`), and a company plus its
+   stock with nothing else ("What about Tesla's stock?") is a price question (`BARE_STOCK_RE`). The set is 75 cases and
+   scored 209 to 211 of 225 (two cases, "how is X doing" and "should I sell", are flaky on `main` too, so a total moves by
+   a few points with no change). Not done: the refusal checks, "How many shares does Apple have?" (goes to price data),
+   the one-day-old newest price (under investigation), and fresh held-out cases.
 
 ## Working with the owner
 

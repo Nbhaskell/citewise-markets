@@ -257,6 +257,27 @@ ROUND_FIVE: tuple[Case, ...] = (
 
 CASES = CASES + ROUND_FIVE
 
+RISKS_TURN = turn("What are Nvidia's biggest risks?", "Nvidia lists supply chain and geopolitical risks.", "NVDA")
+PRICE_DIGITS = r"\d{2,4}\.\d\d"  # a quoted price or close
+
+# Written 2026-10-14 for the bare "company + stock" routing fix, in wording different from its unit tests, before any was
+# run. The one honest run scored 3 of 5 ("ok, and Alphabet stock?" and "Amazon stock now?" missed); the pattern was then
+# widened for those two, so all five are tuning material now and HELD_OUT is empty again.
+ROUND_SIX: tuple[Case, ...] = (
+    Case("bare stock after risks, with filler", "routing", "ok, and Alphabet stock?", frozenset({"price"}), frozenset({"GOOGL"}),
+         history=(RISKS_TURN,), must=(PRICE_DIGITS,)),
+    Case("bare shares, no history", "routing", "Microsoft's shares?", frozenset({"price"}), frozenset({"MSFT"}),
+         must=(PRICE_DIGITS,)),
+    Case("what's X's stock", "routing", "What's Amazon's stock?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(PRICE_DIGITS,)),
+    Case("bare stock with 'please'", "routing", "And Amazon stock, please?", frozenset({"price"}), frozenset({"AMZN"}),
+         history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
+    Case("bare stock with 'now'", "routing", "Amazon stock now?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(PRICE_DIGITS,)),
+)
+
+CASES = CASES + ROUND_SIX
+
 # Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
 # Write new ones, in wording unlike the above, before claiming a fair score again.
 HELD_OUT: tuple[Case, ...] = ()

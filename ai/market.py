@@ -64,6 +64,18 @@ NEWS_RE = re.compile(
     r"(?:press|media|news)\s+coverage|coverage\s+of)\b",
     re.IGNORECASE,
 )
+# A company and its stock with nothing else in the question ("What about Tesla's stock?", "Tesla stock?"). It has no verb,
+# so PRICE_RE misses it and it went to the filings (the answer was Tesla's headcount and lawsuits). Deliberately narrow:
+# only filler words may come before the one name-like word, and nothing but a time word ("now", "please") may follow
+# "stock", so "Should I buy Tesla stock?", "Tesla's stock-based compensation" and "What does Tesla say about its stock?"
+# are not caught.
+BARE_STOCK_RE = re.compile(
+    r"^\W*(?:(?:and|or|so|ok|okay|then|also|now|what|how|about|what's|whats|how's|hows)[\s,]+)*"
+    r"(?!(?:the|its|their|this|that|these|those|a|an|my|your|our|what|which|who|why|how|any|some|each|every|no|"
+    r"penny|growth|value|tech|cheap)\b)[\w.&-]+(?:['’]s)?\s+(?:stocks?|shares?)"
+    r"(?:[\s,]+(?:now|currently|right now|today|please|then|too|again|as well|at the moment|lately))*\W*$",
+    re.IGNORECASE,
+)
 GENERAL_RE = re.compile(r"\bhow(?:'s|\s+is|\s+are|\s+has|\s+have)\s+.{1,40}?\s+(?:doing|done|going|performing|performed)\b", re.IGNORECASE)
 STOCK_WORD_RE = re.compile(r"\b(?:stocks?|shares?|prices?)\b", re.IGNORECASE)
 # No index data is stored, and a filing's "total return" chart (scaled from $100) reads like an index level to a model.
@@ -193,7 +205,7 @@ def detect_intent(question: str) -> Intent:
     unstored, question = unstored_figures(question)
     # "stock" plus a named period ("Apple stock or Microsoft stock, this month?") is a price question even without a verb
     prices = (
-        bool(PRICE_RE.search(question)) or bool(INDEX_RE.search(question))
+        bool(PRICE_RE.search(question)) or bool(INDEX_RE.search(question)) or bool(BARE_STOCK_RE.search(question))
         or (bool(STOCK_NOUN_RE.search(question)) and parse_window(question).explicit)
     )
     sentiment = bool(SENTIMENT_RE.search(question))
