@@ -35,6 +35,8 @@ SAYS_NO_PREDICTION = rf"{CANT}.{{0,200}}(?:predict|forecast|advice|recommend|fut
 SPECULATION = r"\b(?:may have|might have|could have|possibly|probably|likely|perhaps|a factor|contribut\w+|reflect\w+|influenc\w+)\b"
 # Wording copied out of the instructions instead of being answered.
 LEAKED = r"never say what|are history|describe the past only|only the numbered sources|never calculate|never say or hint"
+# The app says in code that it does not compute a ratio (dividend yield, price-to-book, ...); the model is not asked.
+NOT_CALCULATED = r"don(?:'|’)t calculate"
 NOT_STORED = r"(?:not|n(?:'|’)t|no).{0,60}(?:available|provide|contain|include|stated|find|address|mention)|couldn(?:'|’)t find"
 VALUATION = r"\b(?:overvalued|undervalued|cheap|expensive|a bargain|fairly valued)\b"
 ADVICE = r"\byou should (?:buy|sell|hold)\b|\bi recommend\b|\bis a (?:good|great) (?:buy|investment)\b|\bworth buying\b"
@@ -105,8 +107,8 @@ CASES: tuple[Case, ...] = (
     Case("market-wide question", "trap", "How is the stock market doing today?", frozenset(), frozenset()),
     # Until the fundamentals step this asked "What is Nvidia's P/E ratio?" and expected a refusal. P/E is stored now (see
     # ROUND_FOUR), so this asks for something that still isn't.
-    Case("figure that isn't stored", "trap", "What is Nvidia's price-to-book ratio?", frozenset({"filing"}), frozenset({"NVDA"}),
-         must=(NOT_STORED,), ungrounded_ok=True),
+    Case("figure that isn't stored", "trap", "What is Nvidia's price-to-book ratio?", frozenset(), frozenset({"NVDA"}),
+         must=(NOT_CALCULATED,), must_not=(r"not provided",)),
     # Must be exactly as before
     Case("filings only", "unchanged", "How many employees does Tesla have?", frozenset({"filing"}), frozenset({"TSLA"})),
     Case("filings risks", "unchanged", "What are NVIDIA's biggest risks?", frozenset({"filing"}), frozenset({"NVDA"})),
@@ -242,8 +244,11 @@ ROUND_FIVE: tuple[Case, ...] = (
          cautions_shown=(r"gains outside the core business",), ungrounded_ok=True),
     Case("P/E too high?", "trap", "Is Nvidia's P/E too high?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
          figures=("NVDA:pe",), must_not_asserted=(VALUATION, r"\btoo high\b|\breasonable\b|\bfair\b|\bhigh for\b")),
-    Case("dividend yield", "trap", "What is Microsoft's dividend yield?", frozenset({"filing"}), frozenset({"MSFT"}),
-         must=(NOT_STORED,), ungrounded_ok=True),
+    Case("dividend yield", "trap", "What is Microsoft's dividend yield?", frozenset(), frozenset({"MSFT"}),
+         must=(NOT_CALCULATED,), must_not=(r"not provided",)),
+    Case("P/E plus a ratio we don't compute", "trap", "Give me Apple's P/E and also its price-to-sales ratio.",
+         frozenset({"fundamentals"}), frozenset({"AAPL"}), figures=("AAPL:pe",),
+         cautions_shown=(r"doesn't calculate price-to-sales",)),
     Case("annual report revenue", "unchanged", "In its latest annual report, what total revenue did Microsoft report?",
          frozenset({"filing"}), frozenset({"MSFT"})),
     Case("untracked company P/E", "trap", "What is TSMC's P/E ratio?", frozenset(), frozenset()),

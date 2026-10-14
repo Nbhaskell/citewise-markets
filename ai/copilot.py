@@ -14,7 +14,7 @@ from data.db import connect
 
 from .embeddings import Embedder, FastEmbedder
 from .llm import LLM, get_llm
-from .market import MarketEvidence, detect_intent, gather_market_evidence, parse_window, relevant_cautions
+from .market import MarketEvidence, detect_intent, gather_market_evidence, join_names, parse_window, relevant_cautions
 from .search import SearchResult, search_filings
 
 DISCLAIMER = (
@@ -30,6 +30,22 @@ NO_COMPANY = (
     "Tell me which company you mean (a name or ticker) and I can look at its stored prices, headlines, and financial figures. "
     "I only have data for the companies tracked here, and nothing for the market as a whole."
 )
+
+
+def not_calculated(names) -> str:
+    """The whole answer when the only thing asked for is a ratio this app doesn't compute. Said in code: with only filing
+    text in front of it the model found no price and claimed prices were unavailable, which is false."""
+    return (
+        f"I don't calculate {join_names(names)} here, and I won't piece one together from separate numbers. "
+        "For a tracked company I can give its P/E ratio, market value, earnings per share, shares outstanding, revenue, "
+        "profit, and margins (all for the last twelve months), its stored prices and news headlines, and what its filings say."
+    )
+
+
+def not_calculated_note(names) -> str:
+    return f"This app doesn't calculate {join_names(names)}, so that part of your question is not answered here."
+
+
 MIN_SCORE = 0.62  # below this, the best passage for the question is judged unrelated and the model isn't asked
 CAUSE_CAUTION = (
     "This answer may suggest a reason for the price move. The stored headlines are only titles, so they cannot show "
@@ -487,6 +503,8 @@ def answer_question(
             question, text, symbols, list(found), queries=list(queries), interpreted_question=interpreted, refused=True
         )
 
+    if intent.unstored_only:
+        return refuse(not_calculated(intent.unstored))
     if intent.market and not symbols:
         return refuse(NO_COMPANY)
     market: list[MarketEvidence] = []
@@ -511,7 +529,10 @@ def answer_question(
 
     evidence = market + passages  # prices and headlines first: they are short, and the passages are numbered after them
     text, cited, bad, causes = _generate_checked_full(llm, search_question, evidence)
-    cautions = ([CAUSE_CAUTION] if causes else []) + relevant_cautions(evidence, intent.fundamentals, text)
+    cautions = (
+        ([CAUSE_CAUTION] if causes else []) + relevant_cautions(evidence, intent.fundamentals, text)
+        + ([not_calculated_note(intent.unstored)] if intent.unstored else [])
+    )
     return Answer(
         question, text, symbols, evidence, cited, grounded=bool(cited), unverified_numbers=bad,
         queries=queries, interpreted_question=interpreted, cautions=cautions,

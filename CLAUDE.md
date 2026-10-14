@@ -40,8 +40,10 @@ them (the owner hasn't confirmed the order):
 5. **Copilot trust.** In progress. The 69-case set scored 190 of 207 on `main` and 196 of 207 after the "What about
    Tesla?" fix (built, in code: `carry_topic` in `ai/copilot.py`). "Price target" and "crashing premise" still fail every
    time, but the answers are correct and the checks are the problem (see DECISIONS); the refusal checks for "buy on P/E",
-   "good time to buy" and "should I sell" also miss real refusals. Not done: dividend yield and price-to-book going to the
-   filings, "What about Tesla's stock?", and fresh held-out cases.
+   "good time to buy" and "should I sell" also miss real refusals. Ratios the app doesn't compute (dividend yield,
+   price-to-book, and seven more) are now declined in code (`unstored_figures` in `ai/market.py`); the set is 70 cases and
+   scored 197 of 210. Not done: "What about Tesla's stock?", the refusal checks, the one-day-old newest price (under
+   investigation), and fresh held-out cases.
 
 ## Working with the owner
 
