@@ -47,7 +47,8 @@ them (the owner hasn't confirmed the order):
    answer on purpose: it quotes one month's row, not the Total; the numbers check cannot see it). Scores from
    different steps are not the same bar, because some checks changed. A table passage that lost its unit sentence to the cut
    between passages gets it back at prompt time (`ai/table_units.py`), so "26,223" now comes back as "26,223 thousand".
-   Not done: which row of a table answers "last quarter" (it quotes the last month, not the Total), the one-day-old newest
+   Not done: which row of a table answers "last quarter" (it quotes the last month, not the Total; rebuilding rows was tried and
+   dropped, see DECISIONS, so don't retry it), the one-day-old newest
    price (under investigation), the content of advice-adjacent answers (a list of "factors to consider" still leans
    advice-like), and fresh held-out cases.
 

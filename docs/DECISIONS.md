@@ -558,6 +558,22 @@ benchmarks.
   its end can get a note. (3) 184 table passages still get nothing because no unit statement is within two passages.
   (4) The numbers check still only looks for digits, so it cannot see a wrong unit, row, or period. (5) The reader's
   excerpt now shows the extra line; not viewed in a browser.
+- **Rebuilding table rows for the model was tried and dropped (2026-10-14).** The remaining half of the table-reading
+  error: asked "last quarter", the model quotes the last month's row of Apple's buyback table (26,223) instead of the
+  quarter's Total (79,611). The idea was to show the model a table as readable rows ("Total: 79,611 | $138,004") instead
+  of one cell per line, at prompt time. **What a prototype showed (scratch code, nothing kept in the repo):** the re-layout
+  is safe as text, since across all 1,479 stored table passages it never changed, lost, or reordered a number; but it is
+  fragile, since 728 of the passages produce a row with no label, and prose with figures inside it ("was $ / 1.37 / billion
+  and $") turns into nonsense rows unless guarded. **With the real model, 5 runs each:** "last quarter" 0 of 5 Total rows
+  with and without the rebuilt rows; "in the most recent quarter" 0 of 5 and 0 of 5; "in total over the latest quarter"
+  0 of 5 without and 4 of 5 with (the question itself says "in total"). It also introduced a worse error: one answer said
+  "26,223 million shares" (the plain layout said "thousand" every time). **Why it can't work as a layout fix:** the model
+  can see the Total row; it reads "last quarter" as "the latest period listed", which is a question of understanding,
+  not of layout. **Left as is:** the evaluation case "shares: buy back (quarter total)" keeps failing on purpose, and the
+  units fix (above) stays. **If this matters later,** the way that fits the rest of the app is a stored, Python-computed
+  figure (share repurchases by period, from the SEC company facts, like the other fundamentals) that the model only
+  quotes, which is a feature of its own with its own checks against the filings; or a check that notices when a quoted
+  figure is a part of a larger total. Not started.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
