@@ -126,6 +126,18 @@ WHY_RE = re.compile(
 )
 
 
+# "How many shares does Apple have?" asks for the stored share count. The price rules used to read "shares does" as a
+# price verb and answer it from price data, which has no share count. A question about what was done with shares
+# (repurchased, issued, owned, sold, can I buy) is a filings question: the phrase is still cut out so it isn't read as a
+# price question, but no figure is asked for.
+HOW_MANY_SHARES_RE = re.compile(r"\bhow\s+many\s+(?:[\w.&'’-]+\s+){0,2}?shares\b", re.IGNORECASE)  # "how many Nvidia shares"
+SHARES_ACTION_RE = re.compile(
+    r"\b(?:repurchas\w*|buy\s?backs?|bought|buy|buying|issu\w*|sold|sell|selling|trad\w*|split\w*|own\w*|held|hold|"
+    r"granted|vest\w*|award\w*|short|dividends?)\b",
+    re.IGNORECASE,
+)
+
+
 def _topics(text: str, patterns) -> tuple[set[str], str]:
     found, rest = set(), text
     for topic, pattern in patterns:
@@ -243,6 +255,8 @@ def detect_intent(question: str) -> Intent:
     With no market wording the copilot behaves exactly as it did before (filings only)."""
     advice = asks_for_advice(question)
     unstored, question = unstored_figures(question)
+    share_count = bool(HOW_MANY_SHARES_RE.search(question)) and not SHARES_ACTION_RE.search(question)
+    question = HOW_MANY_SHARES_RE.sub(" ", question)  # "shares does" is not a price verb, so cut the phrase out first
     # "stock" plus a named period ("Apple stock or Microsoft stock, this month?") is a price question even without a verb
     prices = (
         bool(PRICE_RE.search(question)) or bool(INDEX_RE.search(question)) or bool(BARE_STOCK_RE.search(question))
@@ -252,6 +266,8 @@ def detect_intent(question: str) -> Intent:
     general = bool(GENERAL_RE.search(question)) and not STOCK_WORD_RE.search(question)  # "How's Nvidia doing?" wants both
     headlines = bool(NEWS_RE.search(question)) or sentiment or general or (prices and bool(CAUSE_RE.search(question)))
     topics, rest = question_topics(question)
+    if share_count:
+        topics = topics | {"shares"}
     market = prices or headlines or sentiment or bool(topics)
     # The words that sent the question to the figures ("revenue", "income") aren't also a reason to search the filings
     return Intent(

@@ -505,6 +505,29 @@ benchmarks.
   (no company named, a ratio it doesn't compute). (4) "Do you think I should get out of Tesla before earnings?" is routed
   to the figures because "earnings" reads as a profit question. (5) Not viewed in a browser; `AnswerView` renders any
   caution in the list.
+- **Copilot trust, step 5: "How many shares does Apple have?" goes to the stored share count (2026-10-14).** The price
+  rules read "shares does" as a price verb, so share-count questions were answered from price data, which has no share
+  count ("How many shares does Apple have?", "...have outstanding?", "How many shares did Microsoft repurchase?" all went to
+  prices). `HOW_MANY_SHARES_RE` in `ai/market.py` now cuts "how many [a company word] shares" out before the price rules
+  run. Unless the question also says what was done with shares (repurchase, buy back, issue, sold, owns, held, can I
+  buy...), it asks for the stored shares-outstanding figure; if it does, it is a filings question and no figure is
+  asked for. The older wordings ("shares outstanding", "share count") are unchanged. **Tests:** 22 new, and four
+  deliberate breakages each caught; 557 Python tests pass. **Held-out result:** four wordings written before running
+  anything scored **2 of 4**: "How many Nvidia shares are out there?" went to prices (a company word between "many" and
+  "shares"), and the buy-back case was written about Amazon, which has no buyback to find. The phrase was widened for the
+  first, the second was swapped for Apple, and all four are tuning material now (`ROUND_EIGHT`; `HELD_OUT` is empty).
+  **Evaluation:** `ai.eval_followups` 17 of 17 and 10 of 10, unchanged. `ai.eval_market --repeat 3 --show` (85 cases)
+  scored **245 of 255**: the three share-count cases passed 3 of 3, and the misses are "crashing premise", "price target",
+  "how is X doing" (2 of 3, flaky on `main` too) and the case below. **A wrong answer the checks cannot see:** "How many
+  shares did Apple buy back last quarter?" is routed correctly but answered "Apple repurchased 26,223 shares" (one
+  month's row of the 10-Q table). The quarter's total in the same table is 79,611, both figures are in thousands, and the
+  extracted passage doesn't say so. The digits are in the cited source, so the numbers check passes it: a citation doesn't
+  prove a number is right. The case wants "79,611" and fails 3 of 3 on purpose, so this stays visible. Not fixed: it is
+  about reading filing tables (units and totals), not about routing. **Weak spots:** (1) Up to two words are allowed
+  between "many" and "shares", so "How many of those shares..." is handled but "How many total outstanding shares..." is not.
+  (2) The exclusion list is a keyword list; a verb it lacks sends a question about what was done with shares to the stored
+  count. (3) Table units are lost in extraction anywhere in the filings, so any thousands-or-millions figure from a
+  table is at risk of the same error.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
