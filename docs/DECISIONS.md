@@ -425,6 +425,54 @@ benchmarks.
   word-for-word identical answers, so "0 of 3" is close to one sample. (4) The newest stored price is 2026-10-12 even
   though the 5pm job on 10-13 succeeded and headlines run to 10-13; not investigated. (5) A bare switch is recognized by
   a short list of filler words, so wordings outside it ("Tesla, please") fall back to the old behavior.
+- **Copilot trust, step 2: ratios the app doesn't compute are declined in code (2026-10-14).** "What is Microsoft's
+  dividend yield?" and "What is Nvidia's price-to-book ratio?" went to the filings only, so the model saw no price and
+  wrote "the stock price is not provided" (and, for the dividend question, a stray share count) although prices are
+  stored. Both passed the old checks because they admitted the gap, but the reason they gave was false. **The fix**
+  (`unstored_figures` in `ai/market.py`, `not_calculated` in `ai/copilot.py`): nine explicit ratio names (dividend yield,
+  price-to-book, price-to-sales, PEG, EV/EBITDA, enterprise value, return on equity, return on assets, debt-to-equity)
+  are recognized by keyword. When one is the whole question, the copilot answers in code, without asking the model or
+  searching: it says it doesn't calculate that ratio and lists what it can give. When one is mixed into an answerable
+  question ("Apple's P/E and also its price-to-sales ratio"), the question is answered as usual and the note is
+  attached to the answer as a caution, like the data cautions. The words are cut out before routing, so "price-to-book"
+  is not read as a price question. I chose declining over computing the ratios because the figures rule is that Python
+  computes everything and the model only quotes it, and these need data (dividends, equity) that is not stored;
+  computing them would be a feature of its own, with its own checks against the filings. **Tests:** 30 new, six
+  deliberate breakages each caught (never declines, note never attached, words not cut out, mixed question also
+  declined, message claiming prices are unavailable, a pattern wide enough to swallow P/E); 459 Python tests pass.
+  **Evaluation:** `ai.eval_followups` 17 of 17 and 10 of 10, unchanged. `ai.eval_market --repeat 3 --show` scored **197 of
+  210** (70 cases; 196 of 207 before). "Dividend yield", "figure that isn't stored", and the new mixed case each passed 3
+  of 3; the two old cases now expect a decline (no evidence, the "don't calculate" wording, no "not provided"), a change
+  of expectation, not a looser check. The other misses are the ones already listed ("crashing premise", "price target",
+  "buy on P/E", and one-run variation in "how is X doing", "should I sell", "good time to buy"). **Weak spots:**
+  (1) Only the nine explicit names are caught. "How much does Microsoft pay out to shareholders?", "book value",
+  "free cash flow yield", or "what's the payout ratio" still go to the filings and could produce the old false claim.
+  (2) A plain "dividends" question is deliberately left to the filings, which can state an amount paid. (3) The decline
+  text is generic; it does not say which of the listed figures is closest to what was asked. (4) The three cases were
+  written with the fix in mind, so there is no held-out result for it yet.
+- **Copilot trust, step 3: "What about Tesla's stock?" and other bare stock questions (2026-10-14).** A company and
+  its stock with nothing else in the question has no verb, so `PRICE_RE` missed it and the question went to the filings
+  (the answer was Tesla's headcount and lawsuits). `BARE_STOCK_RE` in `ai/market.py` now reads it as a price question:
+  only filler words ("what about", "and", "ok,") before one name-like word, then "stock" or "shares", then nothing but
+  a time word ("now", "today", "please"). It is narrow on purpose: "Should I buy Tesla stock?", "Tesla's stock-based
+  compensation", "What does Tesla say about its stock?", "What stock?" and "Any growth stock?" are not caught (tests pin
+  both sides). **A second bug was hiding behind it:** after a risks question, the model rewrote "ok, and Alphabet
+  stock?" into "What are Alphabet's biggest risks?" and dropped the one word the user asked for. When a bare stock
+  question comes back from the rewrite with no price intent, the user's own words are now used instead
+  (`resolve_question`). **Held-out result:** five cases written in different wording from the unit tests, run once
+  before any tuning, scored **3 of 5**; "ok, and Alphabet stock?" and "Amazon stock now?" missed (a comma after the
+  filler, a time word after "stock"). The pattern was widened for those two and the rewrite guard added, so all five
+  are tuning material now (`ROUND_SIX`, and `HELD_OUT` is empty again). **Tests:** 26 new routing and rewrite tests
+  and six deliberate breakages, each caught; 485 Python tests pass. **Evaluation:** `ai.eval_followups` 17 of 17 and 10 of
+  10, unchanged. `ai.eval_market --repeat 3 --show` (75 cases) scored 211 of 225 and then 209 of 225; the five new
+  cases passed 3 of 3 in the final run. The two-point drop is "how is X doing" and "should I sell" going to 0 of 3,
+  which a 10-run A/B against `main` showed is not the change: "how is X doing" 2 of 10 on `main` and 3 of 10 on this
+  branch, "should I sell" 3 of 10 and 4 of 10. Both are flaky cases, so a single three-run total can move by several
+  points with no code change. **Weak spots:** (1) The pattern knows one name-like word, so "Berkshire Hathaway stock?"
+  or "What about Coca Cola's stock?" is not caught. (2) "What's Amazon's stock?" is answered "Amazon's stock is
+  referred to as AMZN in the stock market", a pointless sentence that passes every check. (3) "How many shares does
+  Apple have?" is routed to price data today (found while writing the lookalike tests; not changed here), so it can't
+  answer a share-count question; the shares-outstanding figure exists but the phrase isn't recognized.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

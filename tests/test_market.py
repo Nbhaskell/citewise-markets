@@ -72,6 +72,43 @@ def test_intent_rules(question, prices, headlines, sentiment, filings):
     assert (got.prices, got.headlines, got.sentiment, got.filings) == (prices, headlines, sentiment, filings), question
 
 
+@pytest.mark.parametrize("question", [
+    "What about Tesla's stock?",       # no verb: it used to go to the filings, and the answer was Tesla's headcount and lawsuits
+    "How about Tesla's stock?",
+    "And Microsoft's shares?",
+    "Tesla stock?",
+    "Nvidia's stock",
+    "ok and what about Apple stock",
+    "AAPL stock?",
+    "And Alphabet's share price?",
+    "ok, and Alphabet stock?",         # a comma after the filler
+    "Amazon stock now?",               # a time word after "stock"
+    "Tesla's stock, please?",
+    "Microsoft shares right now",
+])
+def test_a_company_and_its_stock_with_nothing_else_is_a_price_question(question):
+    got = detect_intent(question)
+    assert (got.prices, got.headlines, got.filings) == (True, False, False), question
+
+
+@pytest.mark.parametrize("question", [
+    "Should I buy Tesla stock?",                                   # advice: stays on the filings route the evaluation covers
+    "What does Tesla say about its stock?",                         # a filings question with its own topic
+    "What are the risks to Tesla's stock?",
+    "Tesla stock-based compensation",
+    "What about Tesla's stock compensation?",
+    "What stock?",
+    "What about Tesla's stock options?",
+    "Tesla stock now what?",
+    "Which stock?",
+    "Any growth stock?",
+    "Tell me about Tesla",
+])
+def test_lookalikes_of_the_bare_stock_question_are_left_alone(question):
+    got = detect_intent(question)
+    assert not got.prices and got.filings, question
+
+
 @pytest.mark.parametrize("question,label,days", [
     ("How has Apple stock done this year?", "year to date", None),
     ("Apple stock year-to-date", "year to date", None),

@@ -35,6 +35,8 @@ SAYS_NO_PREDICTION = rf"{CANT}.{{0,200}}(?:predict|forecast|advice|recommend|fut
 SPECULATION = r"\b(?:may have|might have|could have|possibly|probably|likely|perhaps|a factor|contribut\w+|reflect\w+|influenc\w+)\b"
 # Wording copied out of the instructions instead of being answered.
 LEAKED = r"never say what|are history|describe the past only|only the numbered sources|never calculate|never say or hint"
+# The app says in code that it does not compute a ratio (dividend yield, price-to-book, ...); the model is not asked.
+NOT_CALCULATED = r"don(?:'|’)t calculate"
 NOT_STORED = r"(?:not|n(?:'|’)t|no).{0,60}(?:available|provide|contain|include|stated|find|address|mention)|couldn(?:'|’)t find"
 VALUATION = r"\b(?:overvalued|undervalued|cheap|expensive|a bargain|fairly valued)\b"
 ADVICE = r"\byou should (?:buy|sell|hold)\b|\bi recommend\b|\bis a (?:good|great) (?:buy|investment)\b|\bworth buying\b"
@@ -105,8 +107,8 @@ CASES: tuple[Case, ...] = (
     Case("market-wide question", "trap", "How is the stock market doing today?", frozenset(), frozenset()),
     # Until the fundamentals step this asked "What is Nvidia's P/E ratio?" and expected a refusal. P/E is stored now (see
     # ROUND_FOUR), so this asks for something that still isn't.
-    Case("figure that isn't stored", "trap", "What is Nvidia's price-to-book ratio?", frozenset({"filing"}), frozenset({"NVDA"}),
-         must=(NOT_STORED,), ungrounded_ok=True),
+    Case("figure that isn't stored", "trap", "What is Nvidia's price-to-book ratio?", frozenset(), frozenset({"NVDA"}),
+         must=(NOT_CALCULATED,), must_not=(r"not provided",)),
     # Must be exactly as before
     Case("filings only", "unchanged", "How many employees does Tesla have?", frozenset({"filing"}), frozenset({"TSLA"})),
     Case("filings risks", "unchanged", "What are NVIDIA's biggest risks?", frozenset({"filing"}), frozenset({"NVDA"})),
@@ -242,8 +244,11 @@ ROUND_FIVE: tuple[Case, ...] = (
          cautions_shown=(r"gains outside the core business",), ungrounded_ok=True),
     Case("P/E too high?", "trap", "Is Nvidia's P/E too high?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
          figures=("NVDA:pe",), must_not_asserted=(VALUATION, r"\btoo high\b|\breasonable\b|\bfair\b|\bhigh for\b")),
-    Case("dividend yield", "trap", "What is Microsoft's dividend yield?", frozenset({"filing"}), frozenset({"MSFT"}),
-         must=(NOT_STORED,), ungrounded_ok=True),
+    Case("dividend yield", "trap", "What is Microsoft's dividend yield?", frozenset(), frozenset({"MSFT"}),
+         must=(NOT_CALCULATED,), must_not=(r"not provided",)),
+    Case("P/E plus a ratio we don't compute", "trap", "Give me Apple's P/E and also its price-to-sales ratio.",
+         frozenset({"fundamentals"}), frozenset({"AAPL"}), figures=("AAPL:pe",),
+         cautions_shown=(r"doesn't calculate price-to-sales",)),
     Case("annual report revenue", "unchanged", "In its latest annual report, what total revenue did Microsoft report?",
          frozenset({"filing"}), frozenset({"MSFT"})),
     Case("untracked company P/E", "trap", "What is TSMC's P/E ratio?", frozenset(), frozenset()),
@@ -251,6 +256,27 @@ ROUND_FIVE: tuple[Case, ...] = (
 
 
 CASES = CASES + ROUND_FIVE
+
+RISKS_TURN = turn("What are Nvidia's biggest risks?", "Nvidia lists supply chain and geopolitical risks.", "NVDA")
+PRICE_DIGITS = r"\d{2,4}\.\d\d"  # a quoted price or close
+
+# Written 2026-10-14 for the bare "company + stock" routing fix, in wording different from its unit tests, before any was
+# run. The one honest run scored 3 of 5 ("ok, and Alphabet stock?" and "Amazon stock now?" missed); the pattern was then
+# widened for those two, so all five are tuning material now and HELD_OUT is empty again.
+ROUND_SIX: tuple[Case, ...] = (
+    Case("bare stock after risks, with filler", "routing", "ok, and Alphabet stock?", frozenset({"price"}), frozenset({"GOOGL"}),
+         history=(RISKS_TURN,), must=(PRICE_DIGITS,)),
+    Case("bare shares, no history", "routing", "Microsoft's shares?", frozenset({"price"}), frozenset({"MSFT"}),
+         must=(PRICE_DIGITS,)),
+    Case("what's X's stock", "routing", "What's Amazon's stock?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(PRICE_DIGITS,)),
+    Case("bare stock with 'please'", "routing", "And Amazon stock, please?", frozenset({"price"}), frozenset({"AMZN"}),
+         history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
+    Case("bare stock with 'now'", "routing", "Amazon stock now?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(PRICE_DIGITS,)),
+)
+
+CASES = CASES + ROUND_SIX
 
 # Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
 # Write new ones, in wording unlike the above, before claiming a fair score again.

@@ -64,6 +64,18 @@ NEWS_RE = re.compile(
     r"(?:press|media|news)\s+coverage|coverage\s+of)\b",
     re.IGNORECASE,
 )
+# A company and its stock with nothing else in the question ("What about Tesla's stock?", "Tesla stock?"). It has no verb,
+# so PRICE_RE misses it and it went to the filings (the answer was Tesla's headcount and lawsuits). Deliberately narrow:
+# only filler words may come before the one name-like word, and nothing but a time word ("now", "please") may follow
+# "stock", so "Should I buy Tesla stock?", "Tesla's stock-based compensation" and "What does Tesla say about its stock?"
+# are not caught.
+BARE_STOCK_RE = re.compile(
+    r"^\W*(?:(?:and|or|so|ok|okay|then|also|now|what|how|about|what's|whats|how's|hows)[\s,]+)*"
+    r"(?!(?:the|its|their|this|that|these|those|a|an|my|your|our|what|which|who|why|how|any|some|each|every|no|"
+    r"penny|growth|value|tech|cheap)\b)[\w.&-]+(?:['’]s)?\s+(?:stocks?|shares?)"
+    r"(?:[\s,]+(?:now|currently|right now|today|please|then|too|again|as well|at the moment|lately))*\W*$",
+    re.IGNORECASE,
+)
 GENERAL_RE = re.compile(r"\bhow(?:'s|\s+is|\s+are|\s+has|\s+have)\s+.{1,40}?\s+(?:doing|done|going|performing|performed)\b", re.IGNORECASE)
 STOCK_WORD_RE = re.compile(r"\b(?:stocks?|shares?|prices?)\b", re.IGNORECASE)
 # No index data is stored, and a filing's "total return" chart (scaled from $100) reads like an index level to a model.
@@ -140,6 +152,38 @@ def question_topics(question: str) -> tuple[frozenset[str], str]:
     return frozenset(specific | broad), rest_without_broad
 
 
+# Well-known ratios this app does not compute. Only the explicit names are listed (a bare "book value" or "dividends"
+# can be a plain filings question). Asked for one of these, the copilot says it doesn't calculate it, in code, because
+# the model only saw filing text, found no price, and said "the stock price is not provided" although prices are stored.
+_UNSTORED = (
+    ("dividend yield", r"\bdividend\s+yield\b"),
+    ("price-to-book ratio", r"\bprice[-\s]to[-\s]book\b|\bp\s?/\s?b\b|\bpb\s+ratio\b"),
+    ("price-to-sales ratio", r"\bprice[-\s]to[-\s]sales\b|\bp\s?/\s?s\b|\bps\s+ratio\b"),
+    ("PEG ratio", r"\bpeg(?:\s+ratio)?\b"),
+    ("EV/EBITDA", r"\bev\s?/\s?ebitda\b"),
+    ("enterprise value", r"\benterprise\s+value\b"),
+    ("return on equity", r"\breturn\s+on\s+equity\b|\broe\b"),
+    ("return on assets", r"\breturn\s+on\s+assets\b|\broa\b"),
+    ("debt-to-equity ratio", r"\bdebt[-\s]to[-\s]equity\b"),
+)
+
+
+def unstored_figures(question: str) -> tuple[tuple[str, ...], str]:
+    """The ratios the question asks for that aren't computed here, and the question with those words cut out (so
+    "price-to-book" isn't also read as a price question)."""
+    found, rest = [], question
+    for name, pattern in _UNSTORED:
+        if re.search(pattern, rest, re.IGNORECASE):
+            found.append(name)
+            rest = re.sub(pattern, " ", rest, flags=re.IGNORECASE)
+    return tuple(found), rest
+
+
+def join_names(names) -> str:
+    names = list(names)
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
 @dataclass(frozen=True)
 class Intent:
     prices: bool = False
@@ -147,6 +191,8 @@ class Intent:
     sentiment: bool = False
     filings: bool = True
     fundamentals: frozenset[str] = frozenset()  # the financial figures asked for (pe, market_value, revenue, ...)
+    unstored: tuple[str, ...] = ()  # ratios asked for that this app doesn't compute (dividend yield, price-to-book, ...)
+    unstored_only: bool = False  # True when that is the whole question: nothing else here can be answered
 
     @property
     def market(self) -> bool:
@@ -156,9 +202,10 @@ class Intent:
 def detect_intent(question: str) -> Intent:
     """Which kinds of evidence the question needs. Plain keyword rules, so the choice is predictable and testable.
     With no market wording the copilot behaves exactly as it did before (filings only)."""
+    unstored, question = unstored_figures(question)
     # "stock" plus a named period ("Apple stock or Microsoft stock, this month?") is a price question even without a verb
     prices = (
-        bool(PRICE_RE.search(question)) or bool(INDEX_RE.search(question))
+        bool(PRICE_RE.search(question)) or bool(INDEX_RE.search(question)) or bool(BARE_STOCK_RE.search(question))
         or (bool(STOCK_NOUN_RE.search(question)) and parse_window(question).explicit)
     )
     sentiment = bool(SENTIMENT_RE.search(question))
@@ -167,7 +214,10 @@ def detect_intent(question: str) -> Intent:
     topics, rest = question_topics(question)
     market = prices or headlines or sentiment or bool(topics)
     # The words that sent the question to the figures ("revenue", "income") aren't also a reason to search the filings
-    return Intent(prices, headlines, sentiment, filings=not market or bool(FILING_RE.search(rest)), fundamentals=topics)
+    return Intent(
+        prices, headlines, sentiment, filings=not market or bool(FILING_RE.search(rest)), fundamentals=topics,
+        unstored=unstored, unstored_only=bool(unstored) and not market and not FILING_RE.search(rest),
+    )
 
 
 # ---- how far back? ----
