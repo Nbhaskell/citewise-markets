@@ -68,7 +68,8 @@ The owner is building this step by step and is not a professional developer, so 
   themselves. The database container must be running. Run the suite before committing.
 - Ollama (with `qwen3:latest`) must be running for the copilot and sentiment.
 - Web app: `cd web`, then `npm install` (first time), `npm test`, `npm run typecheck`, `npm run build`. To see it,
-  start `python -m api` and `npm run dev` (port 5173).
+  start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
+  web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
 
 ## Rules
