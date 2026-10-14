@@ -393,6 +393,38 @@ benchmarks.
   five-run comparison is not enough to judge a prompt change here: the same case scored 1 of 5 and 7 of 10 with identical
   code. (6) The model sometimes explains a P/E with a share-count caution that concerns market value, because the
   answer mentions both. (7) No test covers a rate that is exactly flat.
+- **Copilot trust, step 1: the 69-case set scored as a whole, and the "What about Tesla?" bug fixed in code
+  (2026-10-14).** `ai.eval_market --repeat 3 --show` on `main`: 63 of 69 on the first run, **190 of 207** over three runs
+  (the same level as the earlier 153 to 155 of 165 once the 14 older held-out cases are counted). Reading the answers,
+  the seven cases that lost points are not one problem. *A real bug:* "What about Tesla?" after an Nvidia price question
+  scored 0 of 3. The rewrite prompt says to return a question that switches company exactly as written (rule 3), so it
+  came back as "What about Tesla?" and the search ran on a company name alone; the answer was a mix of Tesla's headcount,
+  legal proceedings, and letters of credit. "How about Tesla?" and "And Tesla?" already worked; "What about Tesla's
+  stock?" fails the same way (see below). *Correct answers the checks mark wrong:* "price target" (the numbers check flags
+  the user's own "$600", left as decided above) and "crashing premise" ("no evidence of a crash in the data", the open
+  decision above). *Refusals the pattern doesn't recognize:* "buy on P/E", "good time to buy", "should I sell". *A check
+  doing its job:* "how is X doing" when a paraphrased headline says "may gain due to...".
+  **The fix** is in code, not the prompt (`ai/copilot.py`, `carry_topic`): when the rewrite hands back a question
+  unchanged, and that question is only company names and filler words ("What about Tesla?", "And Tesla's?"), the last
+  question that has a topic is asked again about the new company ("How has Nvidia stock done this month?" becomes
+  "How has Tesla stock done this month?"). Only the earlier *question* is reused, never its answer, so earlier answers
+  still can't become evidence; the reader sees it as "Understood as". It does nothing when the question has a topic of
+  its own, names the company just discussed, has explicit companies chosen, or when the earlier question names two
+  companies or none and has no pronoun to swap. A pronoun in the earlier question ("And its news?") becomes the new
+  company's name. Earlier bare switches are skipped, because the browser sends questions as typed and a chain of "What
+  about X?" would otherwise lose the topic. **Tests:** 19 new, and five deliberate breakages (rule never runs, bare
+  turns not skipped, same company not excluded, bare check removed, explicit companies overridden) were each caught;
+  429 Python tests pass. **Evaluation:** `ai.eval_followups` 17 of 17 and `--held-out` 10 of 10, both unchanged. The
+  market set scored **196 of 207** (65 of 69 on the first run); "follow-up other company" went from 0 of 3 to 3 of 3, and
+  its answer is the Tesla price move. The other six points are ordinary variation ("should I sell" 1 of 3 to 3 of 3,
+  "how is X doing" 1 of 3 to 2 of 3 with no code change that touches them). The remaining misses are the four above that
+  are check problems. **Weak spots found on the way, not fixed:** (1) "What about Tesla's stock?" still goes to the filings:
+  `detect_intent` does not treat "Tesla's stock" with no verb as a price question. (2) "Dividend yield" and "price-to-book"
+  go to the filings, and the answers say "the stock price is not provided" although the price is stored; they pass the
+  checks because they admit the gap. (3) Repeats add less than they look: in several failing cases the three runs gave
+  word-for-word identical answers, so "0 of 3" is close to one sample. (4) The newest stored price is 2026-10-12 even
+  though the 5pm job on 10-13 succeeded and headlines run to 10-13; not investigated. (5) A bare switch is recognized by
+  a short list of filler words, so wordings outside it ("Tesla, please") fall back to the old behavior.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
