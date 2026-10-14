@@ -528,6 +528,36 @@ benchmarks.
   (2) The exclusion list is a keyword list; a verb it lacks sends a question about what was done with shares to the stored
   count. (3) Table units are lost in extraction anywhere in the filings, so any thousands-or-millions figure from a
   table is at risk of the same error.
+- **Filing tables lose their units, and the fix (2026-10-14).** Found by reading the one answer the numbers check had
+  passed: "Apple repurchased 26,223 shares" for last quarter. Two separate faults. **(1) Units:** Apple's table is in
+  thousands, and the sentence saying so ("in millions, except number of shares, which are reflected in thousands") is in
+  the filing, but filings are cut into passages of about 1,000 characters and the cut fell between that sentence and its
+  table (the end of one passage, the start of the next). The question retrieved only the table, so the model could not
+  know. **How widespread:** of 5,899 stored passages, 1,479 are number tables; 875 of those carry their own unit
+  statement, and for 420 the statement is in one of the two passages before. Another 184 have none nearby. So around
+  30% of table passages (420 of 1,479) reached the model without units, for every company. **The fix**
+  (`ai/table_units.py`, called in `answer_question`): when a table passage has no unit statement of its own, the nearest
+  one from the two passages before it is attached on the first line, as "[Units stated just before this table: ...]", in
+  code, when the prompt is built. It only copies words the filing states and says where from; if none is found it adds
+  nothing. The stored passages and the search index are untouched and the change is a few lines to undo. **The other
+  option, not taken:** re-chunk so a table keeps its caption and re-embed all 5,899 passages; more thorough, but it
+  rewrites real data and changes search results for every question. **(2) Which row:** not fixed. Asked "last quarter", the
+  model still quotes the last month's row (26,223) rather than the "Total" row (79,611). Asked for "the three months ended
+  June 27, 2026", it answers "79,611 thousand shares" 3 of 3. The flattened table (one cell per line) makes rows hard to
+  tell apart. **Tests:** 11 new in `tests/test_table_units.py`, six deliberate breakages each caught (never applied,
+  looks too far back, farthest statement first, own units ignored, prose also given units, another filing's units
+  borrowed); 568 Python tests pass. **Real data:** the rule was run over all 1,479 table passages (420 gained a note, 404 of
+  them "in millions") and ten random notes read against their tables. **Evaluation:** `ai.eval_followups` 17 of 17 and 10
+  of 10, unchanged. `ai.eval_market --repeat 3 --show` (86 cases) scored **249 of 258**; the seven "unchanged" filings
+  cases passed 3 of 3, no answer echoed the note, and a new case ("three months ended June 27, 2026" must give "79,611
+  thousand") passed 3 of 3. "Last quarter" ("shares: buy back (quarter total)") still fails 3 of 3 on purpose, and
+  "price target" and "crashing premise" fail as before. With the real model "How many shares did Apple buy back last
+  quarter?" now says "26,223 thousand shares": right unit, wrong row. **Weak spots:** (1) The nearest unit statement may
+  belong to a different table in the previous passage (a percentages table after a millions table), and the note would
+  then be wrong; its wording says only "stated just before this table". (2) A passage that is mostly prose with a table at
+  its end can get a note. (3) 184 table passages still get nothing because no unit statement is within two passages.
+  (4) The numbers check still only looks for digits, so it cannot see a wrong unit, row, or period. (5) The reader's
+  excerpt now shows the extra line; not viewed in a browser.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

@@ -24,6 +24,7 @@ from .market import (
     relevant_cautions,
 )
 from .search import SearchResult, search_filings
+from .table_units import add_units
 
 DISCLAIMER = (
     "This summarizes stored public filings, prices, financial figures, and news headlines. It is not financial advice. "
@@ -543,6 +544,7 @@ def answer_question(
     if not market and not passages:
         return refuse(NO_EVIDENCE)
 
+    passages = add_units(conn, passages)  # a table whose unit sentence was cut off into the passage before gets it back
     evidence = market + passages  # prices and headlines first: they are short, and the passages are numbered after them
     text, cited, bad, causes = _generate_checked_full(llm, search_question, evidence)
     cautions = (
