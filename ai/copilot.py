@@ -50,6 +50,12 @@ def not_calculated(names) -> str:
     )
 
 
+ADVICE_CAUTION = (
+    "This app can't tell you whether to buy, sell, or hold. Nothing in this answer is a recommendation: it only shows "
+    "stored prices, figures, headlines, and filing text."
+)
+
+
 def not_calculated_note(names) -> str:
     return f"This app doesn't calculate {join_names(names)}, so that part of your question is not answered here."
 
@@ -540,7 +546,8 @@ def answer_question(
     evidence = market + passages  # prices and headlines first: they are short, and the passages are numbered after them
     text, cited, bad, causes = _generate_checked_full(llm, search_question, evidence)
     cautions = (
-        ([CAUSE_CAUTION] if causes else []) + relevant_cautions(evidence, intent.fundamentals, text)
+        ([CAUSE_CAUTION] if causes else []) + ([ADVICE_CAUTION] if intent.advice else [])
+        + relevant_cautions(evidence, intent.fundamentals, text)
         + ([not_calculated_note(intent.unstored)] if intent.unstored else [])
     )
     return Answer(

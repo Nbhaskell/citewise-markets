@@ -179,6 +179,44 @@ def unstored_figures(question: str) -> tuple[tuple[str, ...], str]:
     return tuple(found), rest
 
 
+# A request for a buy, sell, or hold call. The model refused these in its own words only some of the time ("Is it a good
+# time to buy Nvidia?" 3 of 10 runs), so the refusal is attached to the answer in code instead. People ask in endless ways
+# (seven realistic wordings, none in the first phrase list, were all missed), so a question also counts when it has a
+# trading word AND a decision cue. Missing a request is worse than flagging a harmless question (one extra notice), so
+# this leans towards flagging. "Why did insiders sell Tesla shares?" has a trading word and no cue; "Will Tesla stock go
+# up?" is a prediction with its own rule, not a request for a recommendation.
+ADVICE_ASK_RE = re.compile(
+    r"""\b(?:
+        should\s+(?:i|we|one)\s+(?:\w+\s+){0,2}?(?:buy|sell|hold|invest|short|keep|dump|trim|add)\b|
+        (?:good|bad|right|wrong|best|worst|smart)\s+(?:time|moment|idea)\s+to\s+(?:buy|sell|invest|hold)\b|
+        (?:is|are|was)\b.{0,50}?\b(?:a\s+)?(?:good|great|better|best|bad|smart|safe|solid|risky)\s+(?:buy|sell|investment|bet|hold|pick|choice|play)\b|
+        worth\s+(?:buying|selling|investing|holding)\b|
+        (?:buy|sell)\s+or\s+(?:sell|hold|buy)\b|buy,?\s+sell,?\s+or\s+hold\b|
+        would\s+you\s+(?:buy|sell|recommend|invest|hold)\b|
+        do\s+you\s+(?:recommend|suggest)\b|(?:recommend|suggest)\s+(?:buying|selling|holding)\b|
+        what\s+(?:stocks?|shares?)\s+should\s+(?:i|we)\b
+    )""",
+    re.IGNORECASE | re.VERBOSE,
+)
+TRADE_WORD_RE = re.compile(
+    r"\b(?:buy(?:ing)?|sell(?:ing)?|hold(?:ing)?|invest(?:ing)?|dump|trim|short(?:ing)?|add(?:ing)?\s+to|accumulat\w+|"
+    r"load(?:ing)?\s+up|get(?:ting)?\s+(?:in|out)|exit|position|put\s+(?:my|our)\s+(?:savings|money|cash)\s+(?:in|into))\b",
+    re.IGNORECASE,
+)
+DECISION_CUE_RE = re.compile(
+    r"\b(?:should|whether|wise|smart|safe(?:ly)?|good\s+idea|bad\s+idea|thinking\s+(?:about|of)|can\s+i|could\s+i|may\s+i|"
+    r"my|our|worth|recommend\w*|advice|advise|suggest\w*|thoughts|opinion|would\s+you|do\s+you\s+think|right\s+time|"
+    r"best\s+time|good\s+time|bad\s+time|reason\s+(?:not\s+)?to|enough\s+to|right\s+(?:stock|company|one)\s+to)\b",
+    re.IGNORECASE,
+)
+
+
+def asks_for_advice(question: str) -> bool:
+    return bool(ADVICE_ASK_RE.search(question)) or (
+        bool(TRADE_WORD_RE.search(question)) and bool(DECISION_CUE_RE.search(question))
+    )
+
+
 def join_names(names) -> str:
     names = list(names)
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
@@ -193,6 +231,7 @@ class Intent:
     fundamentals: frozenset[str] = frozenset()  # the financial figures asked for (pe, market_value, revenue, ...)
     unstored: tuple[str, ...] = ()  # ratios asked for that this app doesn't compute (dividend yield, price-to-book, ...)
     unstored_only: bool = False  # True when that is the whole question: nothing else here can be answered
+    advice: bool = False  # the question asks for a buy, sell, or hold call
 
     @property
     def market(self) -> bool:
@@ -202,6 +241,7 @@ class Intent:
 def detect_intent(question: str) -> Intent:
     """Which kinds of evidence the question needs. Plain keyword rules, so the choice is predictable and testable.
     With no market wording the copilot behaves exactly as it did before (filings only)."""
+    advice = asks_for_advice(question)
     unstored, question = unstored_figures(question)
     # "stock" plus a named period ("Apple stock or Microsoft stock, this month?") is a price question even without a verb
     prices = (
@@ -216,7 +256,7 @@ def detect_intent(question: str) -> Intent:
     # The words that sent the question to the figures ("revenue", "income") aren't also a reason to search the filings
     return Intent(
         prices, headlines, sentiment, filings=not market or bool(FILING_RE.search(rest)), fundamentals=topics,
-        unstored=unstored, unstored_only=bool(unstored) and not market and not FILING_RE.search(rest),
+        unstored=unstored, unstored_only=bool(unstored) and not market and not FILING_RE.search(rest), advice=advice,
     )
 
 

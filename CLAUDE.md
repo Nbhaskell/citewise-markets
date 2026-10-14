@@ -42,10 +42,15 @@ them (the owner hasn't confirmed the order):
    time, but the answers are correct and the checks are the problem (see DECISIONS); the refusal checks for "buy on P/E",
    "good time to buy" and "should I sell" also miss real refusals. Ratios the app doesn't compute (dividend yield,
    price-to-book, and seven more) are now declined in code (`unstored_figures` in `ai/market.py`), and a company plus its
-   stock with nothing else ("What about Tesla's stock?") is a price question (`BARE_STOCK_RE`). The set is 75 cases and
-   scored 209 to 211 of 225 (two cases, "how is X doing" and "should I sell", are flaky on `main` too, so a total moves by
-   a few points with no change). Not done: the refusal checks, "How many shares does Apple have?" (goes to price data),
-   the one-day-old newest price (under investigation), and fresh held-out cases.
+   stock with nothing else ("What about Tesla's stock?") is a price question (`BARE_STOCK_RE`). A request for a buy, sell,
+   or hold call now always carries a fixed notice, attached in code (`asks_for_advice` in `ai/market.py`, `ADVICE_CAUTION` in
+   `ai/copilot.py`), because the model refused in its own words as little as 3 times in 10 on some wordings. The set is 81
+   cases and scored 237 of 243, with only "crashing premise" and "price target" failing (correct answers, checks to be
+   decided); the buy/sell checks now ask for the notice instead of the model's wording, so that number is not the same bar
+   as the earlier ones. Two cases, "how is X doing" and "should I sell", are flaky on `main` too, so a total moves by a few
+   points with no change. Not done: "How many shares does Apple have?" (goes to price data), the one-day-old newest price
+   (under investigation), the content of advice-adjacent answers (a list of "factors to consider" still leans advice-like),
+   and fresh held-out cases.
 
 ## Working with the owner
 
@@ -102,7 +107,10 @@ The owner is building this step by step and is not a professional developer, so 
   written and run against a real key.
 - **Verify AI output against its sources.** A citation doesn't prove a number is right. Keep the numbers check and
   the relevance gate in the copilot, and don't loosen them to make answers look better.
-- **No investment advice.** The copilot must keep refusing buy/sell/hold recommendations and keep the disclaimer.
+- **No investment advice.** The copilot must keep refusing buy/sell/hold recommendations and keep the disclaimer. The
+  refusal notice (`ADVICE_CAUTION`) is attached in code whenever `asks_for_advice` matches, so never rely on the model's
+  own wording for it, and lean towards flagging: a missed request is worse than one extra notice. New phrasings need a
+  case in `tests/test_copilot_advice.py` and fresh evaluation cases in different wording.
 - **Tests that touch vectors:** `tests/conftest.py` vacuums `filing_chunks` first because dead index entries made
   search tests flaky. Keep that.
 - **Windows console:** set `PYTHONIOENCODING=utf-8` when printing filing text. Edit files with the editor tools,
