@@ -311,6 +311,27 @@ CASES = CASES + ROUND_SEVEN
 
 # Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
 # Write new ones, in wording unlike the above, before claiming a fair score again.
+# Written 2026-10-14 for the share-count routing fix, in wordings unlike its unit tests, before any was run. The one honest
+# run scored 2 of 4 ("How many Nvidia shares are out there?" went to prices, and the buy-back case, written about Amazon,
+# was swapped for Apple, which has a buyback); the phrase was widened for the first, so all four are tuning material now.
+ROUND_EIGHT: tuple[Case, ...] = (
+    Case("shares: out there", "routing", "How many Nvidia shares are out there?", frozenset({"fundamentals"}),
+         frozenset({"NVDA"}), must=(r"\d",)),
+    Case("shares: total count", "routing", "What's Tesla's total share count these days?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), must=(r"\d",)),
+    Case("shares: has Alphabet got", "routing", "How many shares has Alphabet got?", frozenset({"fundamentals"}),
+         frozenset({"GOOGL"}), must=(r"\d",)),
+    # The routing is right, but the answer quotes one month's row (26,223) as "last quarter"; the quarter's total in the same
+    # table is 79,611 (and both are in thousands, which the passage doesn't say). The numbers check can't see this: the digits
+    # are in the cited source. A known failure of reading tables, not of routing; the case wants the total.
+    Case("shares: buy back (quarter total)", "routing", "How many shares did Apple buy back last quarter?",
+         frozenset({"filing"}), frozenset({"AAPL"}), must=(r"79,611",)),
+)
+
+CASES = CASES + ROUND_EIGHT
+
+# Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
+# Write new ones, in wording unlike the above, before claiming a fair score again.
 HELD_OUT: tuple[Case, ...] = ()
 
 
