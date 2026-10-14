@@ -47,8 +47,11 @@ them (the owner hasn't confirmed the order):
 
 The owner is building this step by step and is not a professional developer, so explain things plainly.
 
-- **After each technical step**, end with a short "in plain terms" summary written so a 12-year-old could follow it
-  (simple analogies, no jargon). Skip it for anything that isn't a technical step: commits, pushes, pulls, branch cleanup, and reviewing or catching up on past work.
+- **"In plain terms" summary: only after a technical step.** A technical step is one where code, tests, evaluations,
+  data, or settings were built, changed, run, or debugged. End that turn with a short "in plain terms" paragraph written
+  so a 12-year-old could follow it (simple analogies, no jargon). **Never** add it after commits, pushes, pull requests,
+  merges, pulls, creating or deleting branches, reading or catching up on past work, or answering a question about the
+  project. If one turn does both (a fix, then a commit), the summary covers the fix and is written before the commit.
 - **At the start of each step**, say whether it deserves a feature branch and why. Small docs changes can go straight to
   `main`.
 - **Ask before you commit, push, or open a pull request.** The owner merges pull requests themselves on GitHub; once
