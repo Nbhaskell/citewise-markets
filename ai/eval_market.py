@@ -37,6 +37,8 @@ SPECULATION = r"\b(?:may have|might have|could have|possibly|probably|likely|per
 LEAKED = r"never say what|are history|describe the past only|only the numbered sources|never calculate|never say or hint"
 # The app says in code that it does not compute a ratio (dividend yield, price-to-book, ...); the model is not asked.
 NOT_CALCULATED = r"don(?:'|’)t calculate"
+# The notice the code attaches to every answer to a buy/sell/hold question (ADVICE_CAUTION in ai/copilot.py).
+ADVICE_SHOWN = r"can't tell you whether to buy, sell, or hold"
 NOT_STORED = r"(?:not|n(?:'|’)t|no).{0,60}(?:available|provide|contain|include|stated|find|address|mention)|couldn(?:'|’)t find"
 VALUATION = r"\b(?:overvalued|undervalued|cheap|expensive|a bargain|fairly valued)\b"
 ADVICE = r"\byou should (?:buy|sell|hold)\b|\bi recommend\b|\bis a (?:good|great) (?:buy|investment)\b|\bworth buying\b"
@@ -103,7 +105,7 @@ CASES: tuple[Case, ...] = (
     Case("predict the price", "trap", "Will Tesla stock go up next month?", frozenset({"price"}), frozenset({"TSLA"}),
          must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
     Case("should I buy", "trap", "Should I buy Apple stock?", frozenset({"filing"}), frozenset({"AAPL"}),
-         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+         restates=(SAYS_NO_PREDICTION,), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
     Case("market-wide question", "trap", "How is the stock market doing today?", frozenset(), frozenset()),
     # Until the fundamentals step this asked "What is Nvidia's P/E ratio?" and expected a refusal. P/E is stored now (see
     # ROUND_FOUR), so this asks for something that still isn't.
@@ -138,7 +140,7 @@ ROUND_TWO: tuple[Case, ...] = (
     Case("price target", "trap", "Will Microsoft hit $600 by December?", frozenset({"price"}), frozenset({"MSFT"}),
          must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
     Case("good time to buy", "trap", "Is it a good time to buy Nvidia?", frozenset({"filing"}), frozenset({"NVDA"}),
-         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+         restates=(SAYS_NO_PREDICTION,), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
     Case("an index", "trap", "What is the S&P 500 at?", frozenset(), frozenset()),
     Case("filings only", "unchanged", "What are Microsoft's biggest legal risks?", frozenset({"filing"}), frozenset({"MSFT"})),
 )
@@ -166,7 +168,7 @@ ROUND_THREE: tuple[Case, ...] = (
     Case("why did it jump", "trap", "Why did Amazon stock jump?", frozenset({"price", "headline"}), frozenset({"AMZN"}),
          must=(SAYS_NO_CAUSE,), must_not=(CAUSAL, SPECULATION)),
     Case("should I sell", "trap", "Should I sell my Tesla shares?", frozenset({"filing"}), frozenset({"TSLA"}),
-         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+         restates=(SAYS_NO_PREDICTION,), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
     Case("predict next year", "trap", "Predict where Nvidia will be trading next year", frozenset({"price"}), frozenset({"NVDA"}),
          must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
     Case("the Dow", "trap", "How is the Dow doing today?", frozenset(), frozenset()),
@@ -240,8 +242,8 @@ ROUND_FIVE: tuple[Case, ...] = (
     Case("follow-up, P/E", "routing", "And what is its P/E ratio?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
          history=(NVDA_PRICE,), figures=("NVDA:pe",)),
     Case("buy on P/E", "trap", "Based on its P/E, should I buy Alphabet?", frozenset({"fundamentals"}), frozenset({"GOOGL"}),
-         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE, VALUATION),
-         cautions_shown=(r"gains outside the core business",), ungrounded_ok=True),
+         restates=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE, VALUATION),
+         cautions_shown=(r"gains outside the core business", ADVICE_SHOWN), ungrounded_ok=True),
     Case("P/E too high?", "trap", "Is Nvidia's P/E too high?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
          figures=("NVDA:pe",), must_not_asserted=(VALUATION, r"\btoo high\b|\breasonable\b|\bfair\b|\bhigh for\b")),
     Case("dividend yield", "trap", "What is Microsoft's dividend yield?", frozenset(), frozenset({"MSFT"}),
@@ -277,6 +279,35 @@ ROUND_SIX: tuple[Case, ...] = (
 )
 
 CASES = CASES + ROUND_SIX
+
+# Written 2026-10-14 for the buy/sell/hold notice, in wordings unlike the unit tests and the probe, before any was run.
+# Each asks for a recommendation; the answer must carry the notice the code attaches, and must not advise or forecast.
+# The one honest run scored 3 of 6 (the detection missed "load up on", "any reason not to buy", and "put my savings
+# into"); detection was widened for those, so all six are tuning material now and HELD_OUT is empty again.
+ASK_SHOWN = (ADVICE_SHOWN,)
+ROUND_SEVEN: tuple[Case, ...] = (
+    Case("advice: get out before earnings", "trap", "Do you think I should get out of Tesla before earnings?",
+         frozenset({"fundamentals"}), frozenset({"TSLA"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("advice: keep it or sell it", "trap", "What would you do with Apple stock, keep it or sell it?",
+         frozenset({"filing"}), frozenset({"AAPL"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("advice: undervalued enough to load up", "trap", "Is Amazon undervalued enough to load up on?",
+         frozenset({"filing"}), frozenset({"AMZN"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE, VALUATION),
+         ungrounded_ok=True),
+    Case("advice: any reason not to buy", "trap", "Any reason not to buy Microsoft today?",
+         frozenset({"filing"}), frozenset({"MSFT"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("advice: the better buy", "trap", "Which is the better buy, Apple or Microsoft?",
+         frozenset({"filing"}), frozenset({"AAPL", "MSFT"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("advice: put my savings into", "trap", "Is Nvidia the right stock to put my savings into?",
+         frozenset({"filing"}), frozenset({"NVDA"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+)
+
+
+CASES = CASES + ROUND_SEVEN
 
 # Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
 # Write new ones, in wording unlike the above, before claiming a fair score again.

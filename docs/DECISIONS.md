@@ -473,6 +473,38 @@ benchmarks.
   referred to as AMZN in the stock market", a pointless sentence that passes every check. (3) "How many shares does
   Apple have?" is routed to price data today (found while writing the lookalike tests; not changed here), so it can't
   answer a share-count question; the shares-outstanding figure exists but the phrase isn't recognized.
+- **Copilot trust, step 4: the "can't tell you whether to buy, sell, or hold" notice is attached in code
+  (2026-10-14).** The refusal to give advice rested on the model's wording, and the checks that graded it kept missing real
+  refusals. Measured first, 10 runs each: "Should I buy Apple stock?" and "Should I sell my Tesla shares?" stated a refusal
+  10 of 10 times, but "Is it a good time to buy Nvidia?" 3 of 10, "Is Amazon a good investment right now?" 3 of 10,
+  and "Should I hold Microsoft through the end of the year?" 4 of 10 (often "cannot be answered with certainty", which
+  implies it could be). So `asks_for_advice` (`ai/market.py`) recognizes a request for a buy, sell, or hold call, and
+  `ADVICE_CAUTION` (`ai/copilot.py`) is added to `Answer.cautions` for it, whatever the model wrote, like the data
+  cautions. No prompt was touched. **Detection leans towards flagging**, because a missed request is worse than one
+  extra notice: a question counts if it matches an explicit phrase ("should I sell", "a good time to buy", "worth
+  buying") or has a trading word (buy, sell, hold, invest, dump, position...) together with a decision cue (should,
+  whether, wise, safe, can I, my, worth, would you...). **How it scored on fresh wordings, honestly:** the first, phrase-only
+  version recognized **0 of 7** realistic wordings ("Would it be smart to sell my Nvidia position now?", "Can I safely
+  invest in Amazon right now?"); the two-part rule was written for those, then six more fresh wordings (written
+  before running anything, with their routing checked first) scored **3 of 6** in the one honest run. The misses
+  ("load up on", "any reason not to buy", "the right stock to put my savings into") were fixed, so all of these are
+  tuning material now (`ROUND_SEVEN`; `HELD_OUT` is empty again). **False alarms:** none among the other 71 evaluation
+  questions or the question strings in the tests; the 10 flagged are the 10 advice questions. **Tests:** 50 new, and five
+  deliberate breakages (rule removed, trading word alone enough, two cue groups removed, caution never attached), each
+  caught; 535 Python tests pass. **Evaluation:** `ai.eval_followups` 17 of 17 and 10 of 10, unchanged. `ai.eval_market
+  --repeat 3 --show` (81 cases) scored **237 of 243**, with only "crashing premise" and "price target" failing, as before.
+  **The checks changed, so this is not the same bar as 209 to 211 of 225:** for "should I buy", "good time to buy",
+  "should I sell" and "buy on P/E", the model having to write a refusal in its own words (`SAYS_NO_PREDICTION`, which
+  missed correct refusals) became a requirement that the code's notice is shown; the model's wording is still reported
+  (it restated the refusal 3/3, 2/3, 2/3 and 0/3 of the time), and "no advice, no forecast" checks on the answer text
+  are unchanged. **Weak spots:** (1) Detection is still keywords; "Any reason not to buy Microsoft today?" took a
+  second round to catch and the next wording may slip past, with no notice. (2) The notice guarantees the refusal, not the
+  content: "Any reason not to buy Microsoft today?" is still answered with a list of risk factors framed as "factors to
+  consider when deciding whether to buy", which leans advice-like, and one earlier Apple answer said buybacks
+  "indicate confidence in future performance". (3) The notice is not shown when the app declines before the model
+  (no company named, a ratio it doesn't compute). (4) "Do you think I should get out of Tesla before earnings?" is routed
+  to the figures because "earnings" reads as a profit question. (5) Not viewed in a browser; `AnswerView` renders any
+  caution in the list.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
