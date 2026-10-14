@@ -15,7 +15,8 @@ benchmarks.
 | Headlines only for news | The free feed has no article text. Enough for a mood score, not for deep analysis |
 | Filings stored whole, then chunked | Keeps the original text so re-chunking or re-embedding never needs a re-download |
 | Nightly job as a plain Python command, scheduled by Windows Task Scheduler | No extra services to run. Works for a personal dev machine. A hosted deployment would use a cron job or a cloud scheduler running the same command |
-| Task runs only while logged in (interactive principal) | Avoids storing a Windows password. Docker Desktop and Ollama start at login anyway, and the job needs both |
+| Task runs only while logged in (interactive principal) | Avoids storing a Windows password. Docker Desktop and Ollama start at login anyway, and the job needs both. Docker Desktop starting did not start the database container until it got `restart: unless-stopped` (2026-10-14; before that it was found stopped, which would have failed the nightly refresh and backup) |
+| `scripts\start.ps1` and `scripts\stop.ps1` start and stop the API and web app; the database is left running | Five manual steps in the right order become one command, and the checks (Docker running, database healthy, Ollama answering, ports free) say what is wrong in plain words. They never start Docker Desktop or Ollama, and never touch Windows settings or the scheduled tasks. `stop` closes only the windows `start` opened (found by window title) and any server whose command line is this app's; an unrelated program on those ports is reported and left alone. The database keeps running because the 5pm and 6pm jobs need it |
 | Missing prerequisites are skipped and flagged `partial`, not failed | One missing piece (Ollama down, no SEC contact) shouldn't block prices and news, but it shouldn't pass silently either |
 | Postgres advisory lock for "one run at a time" | The database is already the shared source of truth, and the lock disappears automatically if the process dies |
 | Backend in Python (FastAPI), not Node | All the data and AI code is Python, so the API calls it directly instead of through a second service. Node.js is still needed later, only for building the web screens |
@@ -165,6 +166,21 @@ benchmarks.
   (refused), a reload (history restored, in the new shape), old saved answers (still showing), and a 375 px phone
   width. Dark mode only. The browser pane's own history was used, so these answers sit in that pane's saved history.
 - **Search is vector-only.** A keyword (full-text) search was considered for exact-term lookups and not built.
+- **Start and stop scripts and the restart policy: what was tested (2026-10-14).** The restart policy was applied by
+  recreating the container, and every table's row count was identical before and after (7,524 prices, 5,899 filing
+  chunks, 3,363 financial facts, and so on). `start.ps1` was run from a cold state (database stopped): everything up
+  and answering with real data in 11 seconds; run twice (the second run started nothing); with an unrelated program on
+  the API port (reported and skipped in 4 seconds, not a 60-second wait); with Ollama unreachable (a warning, exit 0);
+  and with Docker missing from PATH (a clean one-line error, nothing started). `stop.ps1` closed the windows `start`
+  opened, stopped servers started by hand (matched by command line), and left an unrelated Python program on the API
+  port running. **Not tested:** the restart policy itself after a real reboot or Docker Desktop restart (I did not
+  crash the database to find out; it rests on Docker's documented behaviour), "Docker is installed but not running"
+  (the check is there, but Docker was running), a reboot with the scripts, and the browser opening (`-NoBrowser` was
+  used so tests didn't open windows). The server windows are ordinary PowerShell windows left open on purpose, so an
+  error stays readable. **Weak spots:** `stop.ps1` finds servers by command-line text, so a program whose command line
+  happens to contain `-m api` on port 8000 would be stopped; the 60-second wait on a slow first start could be too
+  short on a very slow PC (it then says so and exits 1, and the windows keep running); the first copilot request after
+  a start still loads the embedding model (a few seconds), which the script does not warm up.
 - **The nightly job needs the PC on and you logged in, with Docker Desktop and Ollama running.** Otherwise it
   catches up the next time it can. A bad run shows a desktop alert (see below), but if the PC is off or you aren't
   logged in, nothing runs and so nothing alerts you; the dashboard's stale-data warning is the backstop.

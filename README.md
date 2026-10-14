@@ -210,7 +210,18 @@ the local web app's address (`localhost:5173` or `:3000`). Don't expose it to a 
 
 ## The web app
 
-The dashboard lives in `web/`. Start the API, then the app:
+The quickest way to start everything (database, an Ollama check, the API, and the web app, then open the browser):
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts\start.ps1
+```
+
+Docker Desktop and Ollama must already be open (the script checks both and says what's missing; Ollama only gets a
+warning). Safe to run again: anything already running is left alone, and if something else is using the API or web
+port it says so and doesn't touch it. Stop the API and web app with `powershell -File scripts\stop.ps1`. The database
+keeps running on purpose, because the nightly refresh and backup need it (`docker compose stop` stops it too).
+
+The dashboard lives in `web/`. To start the pieces yourself, start the API, then the app:
 
 ```bash
 .venv\Scripts\python -m api
@@ -255,7 +266,8 @@ generated from the API.
 | Database shell | `docker exec -it stockmarket-db psql -U stockmarket` | |
 
 Start and stop the database with `docker compose up -d` and `docker compose stop`. The data lives in a Docker volume
-and survives restarts.
+and survives restarts. The container has `restart: unless-stopped`, so it comes back by itself whenever Docker Desktop
+starts (for example after a reboot); one you stopped with `docker compose stop` stays stopped.
 
 If printing filing text fails with an encoding error in a Windows console, set `PYTHONIOENCODING=utf-8`.
 
