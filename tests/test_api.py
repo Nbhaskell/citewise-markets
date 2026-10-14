@@ -329,6 +329,26 @@ def test_copilot_answers_a_price_question_from_stored_prices(client, llm):
     assert src["as_of"] == str(LATEST) and "as of 2026-10-09" in src["title"] and "Latest close: 499.00" in src["excerpt"]
 
 
+def test_copilot_answers_a_pe_question_from_the_figures_and_carries_the_caution(client, llm):
+    llm.reply = "Zeta Co's P/E ratio is 104.0 [1]."  # the model says nothing about the caution; the response still has it
+    body = client.post("/api/copilot", json={"question": "What is the ZZAPI P/E ratio?"}).json()
+    assert body["companies"] == [SYM] and body["evidence_kinds"] == ["fundamentals"] and body["searches"] == []
+    assert body["grounded"] and not body["refused"] and body["unverified_numbers"] == []
+    src = body["sources"][0]
+    assert src["kind"] == "fundamentals" and src["url"] is None and src["form"] is None and src["as_of"] == "2026-06-30"
+    assert "P/E ratio: 104.0" in src["excerpt"] and "financial figures" in src["title"]
+    # net income (48B) is 1.6 times operating income (30B): the warning rides with the answer
+    assert any(c.startswith(f"Caution for {SYM}:") and "1.6 times operating income" in c and "may flatter" in c
+               for c in body["cautions"])
+
+
+def test_copilot_a_revenue_answer_does_not_carry_the_earnings_caution(client, llm):
+    llm.reply = "Revenue over the last 12 months was $120.0 billion [1]."
+    body = client.post("/api/copilot", json={"question": "What was the ZZAPI revenue over the last twelve months?"}).json()
+    assert body["evidence_kinds"] == ["fundamentals"] and body["unverified_numbers"] == []
+    assert not any("operating income" in c for c in body["cautions"])
+
+
 def test_copilot_reports_headlines_as_sources_with_their_links(client, llm):
     llm.reply = "There was a headline about a deal [1]."
     body = client.post("/api/copilot", json={"question": "Any news on ZZAPI?"}).json()

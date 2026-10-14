@@ -191,7 +191,7 @@ def copilot(
     }
 
 
-KIND_ORDER = ["price", "sentiment", "headline", "filing"]
+KIND_ORDER = ["price", "fundamentals", "sentiment", "headline", "filing"]
 
 
 def kind_of(item: SearchResult | MarketEvidence) -> str:

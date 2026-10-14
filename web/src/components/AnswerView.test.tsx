@@ -49,6 +49,24 @@ describe("AnswerView with prices and headlines", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("may suggest a reason for the price move");
   });
 
+  it("labels financial figures in words, links nothing, and shows the caution that goes with them", () => {
+    const figures: CopilotSource = {
+      number: 1, kind: "fundamentals", symbol: "GOOGL", title: "GOOGL financial figures from SEC filings (calculated), latest period ends 2026-06-30",
+      as_of: "2026-06-30", url: null, excerpt: "P/E ratio: 17.7 (the latest stored close divided by diluted earnings per share).",
+    };
+    const caution = "Caution for GOOGL: net income is 1.7 times operating income, which usually means gains outside the core business.";
+    render(<AnswerView result={copilotAnswer({
+      answer: "Alphabet's P/E ratio is 17.7 [1].", companies: ["GOOGL"], evidence_kinds: ["fundamentals"], sources: [figures],
+      cautions: [caution],
+    })} />);
+    expect(screen.getByText("Looked at financial figures for GOOGL")).toBeInTheDocument();
+    const [item] = within(screen.getByRole("list", { name: "Sources" })).getAllByRole("listitem");
+    expect(item).toHaveTextContent("Financial figures GOOGL financial figures from SEC filings");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    // a warning says so in words ("Caution for ...") and is announced as an alert, not just coloured
+    expect(screen.getByRole("alert")).toHaveTextContent(/^Caution for GOOGL: net income is 1\.7 times operating income/);
+  });
+
   it("keeps the original wording when only filings were used", () => {
     render(<AnswerView result={copilotAnswer()} />);
     expect(screen.getByText("Searched filings for NVDA")).toBeInTheDocument();

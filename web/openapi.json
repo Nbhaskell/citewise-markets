@@ -56,7 +56,7 @@
             "type": "string"
           },
           "cautions": {
-            "description": "Plain-language warnings to show with the answer, for example when it may suggest a reason for a price move that the data cannot show",
+            "description": "Plain-language warnings to show with the answer, for example when it may suggest a reason for a price move that the data cannot show, or when a financial figure it quotes can mislead (a P/E flattered by investment gains)",
             "items": {
               "type": "string"
             },
@@ -81,7 +81,8 @@
                 "filing",
                 "price",
                 "headline",
-                "sentiment"
+                "sentiment",
+                "fundamentals"
               ],
               "type": "string"
             },
@@ -1018,12 +1019,13 @@
             "title": "Form"
           },
           "kind": {
-            "description": "filing = a passage from an SEC filing; price = figures worked out from stored daily closes; headline = a news title; sentiment = a summary of headline labels",
+            "description": "filing = a passage from an SEC filing; price = figures worked out from stored daily closes; headline = a news title; sentiment = a summary of headline labels; fundamentals = revenue, profit, margins, market value and P/E worked out from SEC filings and the latest price",
             "enum": [
               "filing",
               "price",
               "headline",
-              "sentiment"
+              "sentiment",
+              "fundamentals"
             ],
             "title": "Kind",
             "type": "string"

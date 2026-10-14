@@ -6,6 +6,7 @@ import argparse
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 
 import psycopg
 
@@ -13,11 +14,11 @@ from data.db import connect
 
 from .embeddings import Embedder, FastEmbedder
 from .llm import LLM, get_llm
-from .market import MarketEvidence, detect_intent, gather_market_evidence, parse_window
+from .market import MarketEvidence, detect_intent, gather_market_evidence, parse_window, relevant_cautions
 from .search import SearchResult, search_filings
 
 DISCLAIMER = (
-    "This summarizes stored public filings, prices, and news headlines. It is not financial advice. "
+    "This summarizes stored public filings, prices, financial figures, and news headlines. It is not financial advice. "
     "It can contain mistakes, so check the cited sources."
 )
 NO_EVIDENCE = (
@@ -26,7 +27,7 @@ NO_EVIDENCE = (
     "competition, revenue, legal proceedings, recent price moves, or news."
 )
 NO_COMPANY = (
-    "Tell me which company you mean (a name or ticker) and I can look at its stored prices and headlines. "
+    "Tell me which company you mean (a name or ticker) and I can look at its stored prices, headlines, and financial figures. "
     "I only have data for the companies tracked here, and nothing for the market as a whole."
 )
 MIN_SCORE = 0.62  # below this, the best passage for the question is judged unrelated and the model isn't asked
@@ -50,6 +51,11 @@ Rules:
 8. If the question assumes something the sources contradict (for example it asks why a stock fell when the data shows it rose), say so first, then state what the sources show.
 9. Sentiment labels come from an automatic model and are imperfect. Say "labeled", not "is", and mention that most headlines are labeled neutral when you quote a summary.
 10. Be concise: a short paragraph or a few bullet points. Mention the filing form and date when comparing across filings, and the date range when quoting prices or sentiment."""
+
+# Added to the prompt only when a financial-figures source is among the evidence. Sent with every question it made the
+# local model paraphrase headlines in a way the cause check flags ("news and stock" went from 10 of 10 to 5 of 10).
+FIGURES_RULES = """
+11. One of the sources is a financial figures source: revenue, profit, margins, market value, and P/E ratio worked out from SEC filings and the latest stored price. Those figures are available, so rule 3 does not apply to them, and like prices they are history (rule 7). It covers the last 12 months unless it says otherwise. Quote each figure exactly, with the period it covers. If the question asks for another period (one quarter, a calendar year), say the source covers the last 12 months and give that figure. When your answer uses a figure and a CAUTION line in the source concerns it, say that caution in plain words next to the figure. Never call a P/E, market value, margin, or growth rate cheap, expensive, high, low, good, or bad, and never say whether a stock is overvalued or undervalued. These figures do not explain why a company's revenue or profit changed; if asked why, say so."""
 
 EXPAND_PROMPT = """Rewrite a question about a company into short search queries for finding the answer inside its SEC filings (10-K and 10-Q).
 Write 2 queries, one per line, no numbering and no commentary. Use wording and section names a filing would use (for example "human capital management employees headcount" or "legal proceedings litigation contingencies"). Do not include the company name."""
@@ -126,6 +132,14 @@ def passage_block(number: int, r: SearchResult | MarketEvidence) -> str:
     return f"{header}\n{r.text}"
 
 
+def system_prompt(passages: list[SearchResult | MarketEvidence]) -> str:
+    """The rules for the model. The financial-figures rules are added only when such a source is present, so every other
+    kind of question gets exactly the prompt it was evaluated with."""
+    if any(isinstance(p, MarketEvidence) and p.kind == "fundamentals" for p in passages):
+        return SYSTEM_PROMPT + FIGURES_RULES
+    return SYSTEM_PROMPT
+
+
 def build_prompt(question: str, passages: list[SearchResult | MarketEvidence]) -> str:
     blocks = [passage_block(i, r) for i, r in enumerate(passages, 1)]
     return "Sources:\n\n" + "\n\n".join(blocks) + f"\n\nQuestion: {question}"
@@ -159,11 +173,13 @@ def _numbers(text: str) -> set[str]:
 
 SIGNED_RE = re.compile(r"(?:(?<=\s)|(?<=\()|^)([-−–])\s?\$?(\d[\d,]*(?:\.\d+)?)")  # "-3.68", but not the dashes in dates or "10-K"
 DOWN_RE = re.compile(
-    r"\b(?:fell|fall(?:s|en|ing)?|drop(?:s|ped|ping)?|declin\w+|decreas\w+|down|lower|lost|loss|slump\w*|dip(?:s|ped)?|sank|plung\w+)\b",
+    r"\b(?:fell|fall(?:s|en|ing)?|drop(?:s|ped|ping)?|declin\w+|decreas\w+|down|lower|lost|loss|slump\w*|dip(?:s|ped)?|sank|plung\w+|"
+    r"shr(?:ank|unk|ink\w*))\b",
     re.IGNORECASE,
 )
 UP_RE = re.compile(
-    r"\b(?:rose|ris(?:e|es|en|ing)|gain(?:s|ed)?|increas\w+|up|higher|climb\w*|rall(?:y|ied|ies)|jump\w*|surg\w+|advanc\w+)\b",
+    r"\b(?:rose|ris(?:e|es|en|ing)|gain(?:s|ed)?|increas\w+|up|higher|climb\w*|rall(?:y|ied|ies)|jump\w*|surg\w+|advanc\w+|"
+    r"grew|grow(?:s|ing)?|expand\w*)\b",
     re.IGNORECASE,
 )
 
@@ -172,23 +188,31 @@ def _negatives(text: str) -> set[str]:
     return {m.group(2).replace(",", "") for m in SIGNED_RE.finditer(text)}
 
 
+def _stored_moves(ev: MarketEvidence):
+    """Each change a source states with its direction: (the figures that state it, did it rise, how to describe it).
+    A price move is checked on its dollar and percent figures; a growth figure (revenue, profit) on its percent."""
+    if ev.kind == "price" and ev.change is not None and ev.change_pct is not None and round(ev.change_pct, 2) != 0:
+        rose = ev.change_pct > 0
+        yield ({f"{abs(ev.change):.2f}", f"{abs(ev.change_pct):.2f}"}, rose,
+               f"{abs(ev.change_pct):.2f} ({ev.symbol}'s stored change is {ev.change_pct:+.2f}%, {'a rise' if rose else 'a fall'})")
+    for pct in ev.growth_pcts:
+        if round(pct, 1) != 0:
+            yield ({f"{abs(pct):.1f}"}, pct > 0,
+                   f"{abs(pct):.1f} ({ev.symbol}'s stored growth is {pct:+.1f}%, {'an increase' if pct > 0 else 'a decrease'})")
+
+
 def direction_errors(plain: str, evidence: list[MarketEvidence]) -> list[str]:
-    """Price moves the answer describes in the wrong direction: a sentence that gives the stored change figure
+    """Moves the answer describes in the wrong direction: a sentence that gives the stored change (or growth) figure
     but says it fell when the data shows a rise (or the reverse). The digits alone would pass the figures check."""
     out = []
     sentences = re.split(r"(?<=[.!?])\s+|\n+", plain)
     for ev in evidence:
-        if ev.kind != "price" or ev.change is None or ev.change_pct is None or round(ev.change_pct, 2) == 0:
-            continue
-        rose = ev.change_pct > 0
-        figures = {f"{abs(ev.change):.2f}", f"{abs(ev.change_pct):.2f}"}
-        for s in sentences:
-            if not any(re.search(rf"(?<![\d.]){re.escape(f)}(?![\d])", s) for f in figures):
-                continue
-            wrong, right = (DOWN_RE, UP_RE) if rose else (UP_RE, DOWN_RE)
-            if wrong.search(s) and not right.search(s):
-                label = f"{abs(ev.change_pct):.2f} ({ev.symbol}'s stored change is {ev.change_pct:+.2f}%, {'a rise' if rose else 'a fall'})"
-                if label not in out:
+        for figures, rose, label in _stored_moves(ev):
+            for s in sentences:
+                if not any(re.search(rf"(?<![\d.]){re.escape(f)}(?![\d])", s) for f in figures):
+                    continue
+                wrong, right = (DOWN_RE, UP_RE) if rose else (UP_RE, DOWN_RE)
+                if wrong.search(s) and not right.search(s) and label not in out:
                     out.append(label)
     return out
 
@@ -328,7 +352,8 @@ def _generate_checked_full(
     """The answer, its citations, figures/directions that don't match the sources, and causes it implies. One retry
     when anything is wrong: the model must stop doing its own arithmetic and stop explaining price moves."""
     prompt = build_prompt(question, passages)
-    text, cited = clean_citations(strip_thinking(llm.generate(SYSTEM_PROMPT, prompt)), len(passages))
+    system = system_prompt(passages)
+    text, cited = clean_citations(strip_thinking(llm.generate(system, prompt)), len(passages))
     bad, causes = unverified_numbers(text, cited, passages), causal_claims(text, passages)
     if bad or causes:
         complaints = []
@@ -344,7 +369,7 @@ def _generate_checked_full(
                 "show why a price moved. Remove that and say only that the stored data can't show the cause."
             )
         correction = f"{prompt}\n\nYour previous answer:\n{text}\n\n{' '.join(complaints)} Leave out anything you can't support."
-        text, cited = clean_citations(strip_thinking(llm.generate(SYSTEM_PROMPT, correction)), len(passages))
+        text, cited = clean_citations(strip_thinking(llm.generate(system, correction)), len(passages))
         bad, causes = unverified_numbers(text, cited, passages), causal_claims(text, passages)
     return text, cited, bad, causes
 
@@ -398,9 +423,11 @@ def answer_question(
     limit: int = 6,
     expand: bool = True,
     history: list[Turn] | None = None,
+    today: date | None = None,
 ) -> Answer:
-    """Answer from filings, stored prices, and headlines. `history` only helps understand a follow-up; the answer
-    itself is written from the retrieved sources alone, so earlier answers can never be used as evidence."""
+    """Answer from filings, stored prices, financial figures, and headlines. `history` only helps understand a follow-up;
+    the answer itself is written from the retrieved sources alone, so earlier answers can never be used as evidence.
+    `today` is only for tests (it dates the freshness notes and cautions)."""
     search_question, symbols, interpreted = resolve_question(conn, llm, question, symbols, history)
     intent = detect_intent(search_question)
 
@@ -413,7 +440,7 @@ def answer_question(
         return refuse(NO_COMPANY)
     market: list[MarketEvidence] = []
     if intent.market:
-        market = gather_market_evidence(conn, symbols, intent, parse_window(search_question), getattr(llm, "name", ""))
+        market = gather_market_evidence(conn, symbols, intent, parse_window(search_question), getattr(llm, "name", ""), today)
 
     passages: list[SearchResult] = []
     queries: list[str] = []
@@ -433,7 +460,7 @@ def answer_question(
 
     evidence = market + passages  # prices and headlines first: they are short, and the passages are numbered after them
     text, cited, bad, causes = _generate_checked_full(llm, search_question, evidence)
-    cautions = [CAUSE_CAUTION] if causes else []
+    cautions = ([CAUSE_CAUTION] if causes else []) + relevant_cautions(evidence, intent.fundamentals, text)
     return Answer(
         question, text, symbols, evidence, cited, grounded=bool(cited), unverified_numbers=bad,
         queries=queries, interpreted_question=interpreted, cautions=cautions,

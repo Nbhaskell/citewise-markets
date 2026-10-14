@@ -216,6 +216,15 @@ describe("answers saved before prices and headlines were added", () => {
     expect(loadExchanges().map((e) => e.id)).toEqual(["id-2"]);
   });
 
+  it("accept the financial-figures kind, with its caution", () => {
+    const e = done(4);
+    const source = { number: 1, kind: "fundamentals" as const, symbol: "NVDA", title: "NVDA financial figures", as_of: "2026-07-26",
+      url: null, excerpt: "P/E ratio: 28.6" };
+    const result = { ...e.result!, evidence_kinds: ["fundamentals" as const], sources: [source], cautions: ["Caution for NVDA: x."] };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([{ ...e, result }]));
+    expect(loadExchanges().map((x) => x.id)).toEqual(["id-4"]);
+  });
+
   it("reject a source kind the app doesn't know", () => {
     const e = done(3);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify([{ ...e, result: { ...e.result, evidence_kinds: ["rumour"] } }]));

@@ -26,7 +26,7 @@ export const MAX_QUESTION = 500;
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null && !Array.isArray(x);
 const isStrings = (x: unknown): x is string[] => Array.isArray(x) && x.every((s) => typeof s === "string");
 
-const KINDS = ["filing", "price", "headline", "sentiment"];
+const KINDS = ["filing", "price", "headline", "sentiment", "fundamentals"];
 const isKinds = (x: unknown): boolean => Array.isArray(x) && x.every((k) => typeof k === "string" && KINDS.includes(k));
 const isTextOrAbsent = (x: unknown): boolean => x === undefined || x === null || typeof x === "string";
 

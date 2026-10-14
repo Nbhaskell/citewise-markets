@@ -7,9 +7,11 @@ What works today:
 
 - Daily prices, news headlines, and SEC filings (10-K / 10-Q) stored in one Postgres database
 - Semantic search over the filings
-- A copilot that answers questions from the filings, the stored daily prices, and news headlines (with their
-  sentiment labels), with `[1]`-style citations. It flags figures not found in the cited sources and price moves
-  described the wrong way, and it can't say why a price moved, predict prices, or give advice
+- A copilot that answers questions from the filings, the stored daily prices, the company's financial figures
+  (revenue, profit, margins, market value, P/E), and news headlines (with their sentiment labels), with `[1]`-style
+  citations. It flags figures not found in the cited sources and moves described the wrong way, shows a caution
+  whenever a figure it quotes can mislead (Alphabet's P/E is flattered by investment gains), and it can't say why a
+  price moved, predict prices, or give advice
 - News headline sentiment (positive / negative / neutral / irrelevant) per company
 - A nightly refresh job that keeps all of the above up to date (you register it once, see below)
 - A read-only HTTP API (FastAPI) over all of it, for the web screens to use (see "The API" below)
@@ -20,7 +22,7 @@ Everything runs locally and costs nothing. The AI uses a local model through Oll
 
 > **Prototype data only.** Yahoo Finance (prices) and Google News (headlines) are free, unofficial sources and are
 > not licensed for a public product. Replace them with licensed feeds before any launch. SEC EDGAR is public and fine.
-> The copilot summarizes stored public filings, prices, and headlines. It is not financial advice and it can be wrong.
+> The copilot summarizes stored public filings, prices, financial figures, and headlines. It is not financial advice and it can be wrong.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and [docs/DECISIONS.md](docs/DECISIONS.md) for why
 things are the way they are, including known weak spots.
@@ -198,7 +200,7 @@ every endpoint. The database must be running, and Ollama for the copilot.
 | `GET /api/stocks/{symbol}/fundamentals` | Revenue, profit, EPS, margins, market value, and P/E from the SEC filings, each with how it was built, its source filings, and cautions. `available` is false for a company with no figures |
 | `GET /api/stocks/{symbol}/filings` | Stored SEC filings and whether each is searchable |
 | `GET /api/filings/search?q=...&symbol=AAPL&form=10-K&latest=true` | Matching filing passages with source links |
-| `POST /api/copilot` with `{"question": "...", "symbols": ["NVDA"], "history": [...]}` | A cited answer from filings, prices, and headlines. Each source has a `kind` (`filing`, `price`, `headline`, or `sentiment`). `history` (optional, up to 4 earlier question and answer pairs) only helps understand a follow-up; the reply's `interpreted_question` says how it was read |
+| `POST /api/copilot` with `{"question": "...", "symbols": ["NVDA"], "history": [...]}` | A cited answer from filings, prices, financial figures, and headlines. Each source has a `kind` (`filing`, `price`, `fundamentals`, `headline`, or `sentiment`). `history` (optional, up to 4 earlier question and answer pairs) only helps understand a follow-up; the reply's `interpreted_question` says how it was read |
 
 The copilot can take several seconds, so show a loading state. Check `unverified_numbers` and `cautions` in its reply
 and show them to the user if they aren't empty.
@@ -293,9 +295,8 @@ docker-compose.yml   The database container
 
 - Adding a company from the app (today it is one command, `python -m jobs.add_company`; see "Keeping data fresh")
 - Filings for foreign companies that file a 20-F (only 10-K and 10-Q are stored)
-- Fundamentals in the copilot. The figures are stored, computed, and shown on the stock detail page (and by
-  `python -m data.fundamentals AAPL`), but the copilot doesn't use them yet, so it still refuses P/E and revenue
-  questions. Foreign filers (TSM, ASML) have none.
+- Fundamentals for foreign filers (TSM, ASML): they report under another accounting standard, so they have no stored
+  figures, and the copilot says so. Also not stored: dividends, debt, cash, price-to-book, and analyst targets
 - Index data (S&P 500 level), so the copilot can answer those instead of refusing
 - Backups on a second disk or off this PC (they go to `BACKUP_DIR`; you have to point it somewhere safe), and an alert
   when no backup has happened for days (a PC that is off sends none)
