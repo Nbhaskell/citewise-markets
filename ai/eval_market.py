@@ -326,6 +326,11 @@ ROUND_EIGHT: tuple[Case, ...] = (
     # are in the cited source. A known failure of reading tables, not of routing; the case wants the total.
     Case("shares: buy back (quarter total)", "routing", "How many shares did Apple buy back last quarter?",
          frozenset({"filing"}), frozenset({"AAPL"}), must=(r"79,611",)),
+    # Added with the table-units fix: the table's unit sentence ("reflected in thousands") sits in the passage before it, and
+    # used to be cut off, so the figure came back with no unit. With the quarter spelled out the model reads the Total row.
+    Case("table units: buy back, quarter named", "routing",
+         "How many shares did Apple repurchase during the three months ended June 27, 2026?",
+         frozenset({"filing"}), frozenset({"AAPL"}), must=(r"79,611\s+thousand",)),
 )
 
 CASES = CASES + ROUND_EIGHT

@@ -41,13 +41,15 @@ them (the owner hasn't confirmed the order):
    not in the prompt: a follow-up that only names another company keeps the earlier topic (`carry_topic`); ratios the app
    doesn't compute are declined (`unstored_figures`); "Tesla's stock" with nothing else is a price question
    (`BARE_STOCK_RE`); "how many shares does X have" goes to the stored share count (`HOW_MANY_SHARES_RE`); and a request
-   for a buy, sell, or hold call always carries a fixed notice (`asks_for_advice`, `ADVICE_CAUTION`). The set is 85 cases
-   and scored 245 of 255 (`--repeat 3`). The misses: "price target" and "crashing premise" (correct answers; the checks are
-   the problem and need the owner's decision), "how is X doing" (flaky on `main` too), and "shares: buy back" (a real wrong
-   answer on purpose: it quotes one month of a table that is in thousands; the numbers check cannot see it). Scores from
-   different steps are not the same bar, because some checks changed. Not done: the one-day-old newest price (under
-   investigation), reading filing tables (units and totals), the content of advice-adjacent answers (a list of "factors to
-   consider" still leans advice-like), and fresh held-out cases.
+   for a buy, sell, or hold call always carries a fixed notice (`asks_for_advice`, `ADVICE_CAUTION`). The set is 86 cases
+   and scored 249 of 258 (`--repeat 3`). The misses: "price target" and "crashing premise" (correct answers; the checks are
+   the problem and need the owner's decision), "how is X doing" (flaky on `main` too), and "shares: buy back (quarter total)" (a real wrong
+   answer on purpose: it quotes one month's row, not the Total; the numbers check cannot see it). Scores from
+   different steps are not the same bar, because some checks changed. A table passage that lost its unit sentence to the cut
+   between passages gets it back at prompt time (`ai/table_units.py`), so "26,223" now comes back as "26,223 thousand".
+   Not done: which row of a table answers "last quarter" (it quotes the last month, not the Total), the one-day-old newest
+   price (under investigation), the content of advice-adjacent answers (a list of "factors to consider" still leans
+   advice-like), and fresh held-out cases.
 
 ## Working with the owner
 
