@@ -108,17 +108,23 @@ class Answer:
         return [(n, self.retrieved[n - 1]) for n in self.cited]
 
 
-def detect_symbols(conn: psycopg.Connection, question: str) -> list[str]:
-    found = []
+def company_mentions(conn: psycopg.Connection, text: str) -> dict[str, list[re.Match]]:
+    """Every tracked company the text names (by ticker, first word of its name, or alias), with where it does so."""
+    found: dict[str, list[re.Match]] = {}
     for symbol, name in conn.execute("SELECT symbol, name FROM instruments ORDER BY symbol"):
         patterns = [(rf"\b{re.escape(symbol)}\b", 0)]
         first = re.match(r"[A-Za-z]+", name or "")
         if first and len(first.group()) >= 4:
             patterns.append((rf"\b{re.escape(first.group())}\b", re.IGNORECASE))
         patterns += [(rf"\b{alias}\b", re.IGNORECASE) for alias, s in ALIASES.items() if s == symbol]
-        if any(re.search(p, question, flags) for p, flags in patterns):
-            found.append(symbol)
+        matches = [m for p, flags in patterns for m in re.finditer(p, text, flags)]
+        if matches:
+            found[symbol] = sorted(matches, key=lambda m: m.start())
     return found
+
+
+def detect_symbols(conn: psycopg.Connection, question: str) -> list[str]:
+    return list(company_mentions(conn, question))
 
 
 def passage_block(number: int, r: SearchResult | MarketEvidence) -> str:
@@ -380,6 +386,49 @@ def _generate_checked(
     return _generate_checked_full(llm, question, passages)[:3]
 
 
+SWITCH_FILLER_RE = re.compile(
+    r"\b(?:what|how|about|and|or|then|also|so|ok|okay|now|next|instead|regarding|with|for|on|the|as|well|too|s)\b", re.IGNORECASE
+)
+PRONOUN_RE = re.compile(r"\b(its|their)\b|\b(it|they)\b", re.IGNORECASE)
+
+
+def _is_bare_switch(text: str, mentions: dict[str, list[re.Match]]) -> bool:
+    """Only company names and filler words: "What about Tesla?", "And Tesla's?". Nothing says what to ask about it."""
+    rest = text
+    for match in sorted((m for ms in mentions.values() for m in ms), key=lambda m: m.start(), reverse=True):
+        rest = rest[: match.start()] + " " + rest[match.end():]
+    return not re.sub(r"[\W_]+", "", SWITCH_FILLER_RE.sub(" ", rest))
+
+
+def _swap_company(text: str, old: list[re.Match], new: str) -> str:
+    for match in sorted(old, key=lambda m: m.start(), reverse=True):
+        text = text[: match.start()] + new + text[match.end():]
+    return text
+
+
+def carry_topic(conn: psycopg.Connection, question: str, history: list[Turn]) -> str | None:
+    """"What about Tesla?" after a question about Nvidia means the same question about Tesla. The rewriting step is told
+    to leave a question that switches company alone, so it hands this back unchanged and the search ran on nothing but
+    a company name. Only the earlier *question* is reused (its answer never is), and only when it is clear what to swap:
+    the earlier question names exactly one tracked company, or has a pronoun standing for it. Returns None otherwise."""
+    named = company_mentions(conn, question)
+    if not named or not _is_bare_switch(question, named) or set(named) & {c.upper() for c in history[-1].companies}:
+        return None
+    typed = " and ".join(  # the company as the user wrote it, in the order they wrote it
+        m.group(0) for m in sorted((ms[0] for ms in named.values()), key=lambda m: m.start())
+    )
+    for earlier in reversed(history):
+        before = company_mentions(conn, earlier.question)
+        if before and _is_bare_switch(earlier.question, before):
+            continue  # an earlier "What about Tesla?" has no topic either; the one before it does
+        if len(before) == 1:
+            return _swap_company(earlier.question, next(iter(before.values())), typed)
+        if not before and PRONOUN_RE.search(earlier.question):
+            return PRONOUN_RE.sub(lambda m: f"{typed}'s" if m.group(1) else typed, earlier.question)
+        return None
+    return None
+
+
 def resolve_question(
     conn: psycopg.Connection,
     llm: LLM,
@@ -391,6 +440,8 @@ def resolve_question(
     understood or None). Chosen companies always win; otherwise they come from the standalone question."""
     history = history or []
     search_question = condense_question(llm, question, history) if history else question
+    if history and not symbols and " ".join(search_question.lower().split()) == " ".join(question.lower().split()):
+        search_question = carry_topic(conn, question, history) or search_question
     if (
         not symbols
         and history

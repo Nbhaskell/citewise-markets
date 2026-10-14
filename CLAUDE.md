@@ -37,8 +37,11 @@ them (the owner hasn't confirmed the order):
    (`ai/market.py`), and attaches the relevant cautions to the answer in code. US-GAAP filers only; foreign filers show "not available".
    Python computes every ratio and the model only quotes it as a numbered source. A screener can't exist without these.
 4. **A daily "what changed" view** (new filings, big moves, notable headlines) from data already stored.
-5. **Copilot trust.** "Follow-up to another company" and "price target" fail in `ai.eval_market` every time, and the
-   evaluation set is small.
+5. **Copilot trust.** In progress. The 69-case set scored 190 of 207 on `main` and 196 of 207 after the "What about
+   Tesla?" fix (built, in code: `carry_topic` in `ai/copilot.py`). "Price target" and "crashing premise" still fail every
+   time, but the answers are correct and the checks are the problem (see DECISIONS); the refusal checks for "buy on P/E",
+   "good time to buy" and "should I sell" also miss real refusals. Not done: dividend yield and price-to-book going to the
+   filings, "What about Tesla's stock?", and fresh held-out cases.
 
 ## Working with the owner
 
@@ -130,7 +133,7 @@ The owner is building this step by step and is not a professional developer, so 
   passes. `HELD_OUT` in that file is empty on purpose: write fresh cases in different wording before claiming a fair
   score, and don't tune against them once run. Before the fundamentals step, three runs scored about 121 to 123 of 129;
   after it, 153 to 155 of 165 on the same 43 cases plus 12 new ones (the 14 held-out cases that were then run, 13 passing,
-  are now in `CASES` too, so the set is 69 and a full run hasn't been scored yet). A swing of two is normal model
+  are now in `CASES` too, so the set is 69; scored whole on 2026-10-14: 190 of 207, then 196 of 207 after the follow-up fix). A swing of two is normal model
   variation, and a case that drops to 0 of 3 is not: A/B it against the old code (a `git worktree` of `main`, 10 to 20
   runs, since 5 is not enough) before explaining it away. Headlines change daily, so some cases drift on their own.
   **Never edit `SYSTEM_PROMPT` for a new feature**: even three small wording edits moved unrelated cases ("should I

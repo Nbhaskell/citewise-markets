@@ -266,3 +266,73 @@ def test_chosen_companies_are_never_second_guessed_by_the_safeguard(conn):
     llm = RoutingLLM(rewrite="What about Omegaware's legal proceedings?")
     ans, _ = ask(conn, llm, "What about its legal proceedings?", history=[OLDER, LATEST], symbols=["ZZCB"])
     assert ans.symbols == ["ZZCB"]
+
+
+# ---- a bare switch to another company ("What about Tesla?") keeps the topic ----
+#
+# The rewrite step is told to leave a question alone when it switches company, so it returned "What about Tesla?"
+# untouched and the answer was a random mix of Tesla's filings. The topic is carried over in code instead.
+
+
+@pytest.mark.parametrize("question", [
+    "What about Omegaware?", "And Omegaware?", "How about Omegaware?", "Omegaware?", "What about OMEGAWARE then?",
+    "Ok, and what about ZZCB?", "What about Omegaware's?",
+])
+def test_a_bare_company_switch_asks_the_previous_question_about_the_new_company(conn, question):
+    llm = RoutingLLM(rewrite=question)  # the model leaves it as written, which is the bug
+    ans, emb = ask(conn, llm, question)
+    assert ans.interpreted_question is not None
+    assert ans.interpreted_question.replace("ZZCB", "Omegaware").replace("OMEGAWARE", "Omegaware") == (
+        "How many employees does Omegaware have?")
+    assert ans.symbols == ["ZZCB"]
+    assert emb.queries == [ans.interpreted_question]
+    assert ans.question == question  # the user's own words are kept
+    assert "SENTINEL-PRIOR-ANSWER" not in llm.answer_prompts[0]  # still only the question is carried, never the answer
+
+
+def test_the_new_company_is_written_as_the_user_typed_it(conn):
+    ans, _ = ask(conn, RoutingLLM(rewrite="And ZZCB?"), "And ZZCB?")
+    assert ans.interpreted_question == "How many employees does ZZCB have?"
+
+
+def test_a_pronoun_in_the_previous_question_becomes_the_new_company(conn):
+    history = [Turn("And what about its biggest risks?", PRIOR_ANSWER, ("ZZCA",))]
+    ans, _ = ask(conn, RoutingLLM(rewrite="What about Omegaware?"), "What about Omegaware?", history=history)
+    assert ans.interpreted_question == "And what about Omegaware's biggest risks?" and ans.symbols == ["ZZCB"]
+
+
+def test_a_chain_of_bare_switches_keeps_the_original_topic(conn):
+    """The browser sends the questions as typed, so the earlier "What about Omegaware?" is itself bare."""
+    history = [HISTORY[0], Turn("What about Omegaware?", "Omegaware has 5 employees.", ("ZZCB",))]
+    ans, _ = ask(conn, RoutingLLM(rewrite="What about Zetacorp?"), "What about Zetacorp?", history=history)
+    assert ans.interpreted_question == "How many employees does Zetacorp have?" and ans.symbols == ["ZZCA"]
+
+
+def test_nothing_is_swapped_when_the_previous_question_names_no_tracked_company(conn):
+    history = [Turn("How many employees does Fakeco have?", PRIOR_ANSWER, ("ZZCC",))]  # not a tracked company
+    ans, _ = ask(conn, RoutingLLM(rewrite="What about Omegaware and ZZCA?"), "What about Omegaware and ZZCA?", history=history)
+    assert ans.interpreted_question is None  # nothing tracked to swap out, so the question is left alone
+
+
+@pytest.mark.parametrize("question,history", [
+    ("What about Omegaware's legal proceedings?", HISTORY),   # it has a topic of its own
+    ("What about Omegaware stock?", HISTORY),                 # so does this one
+    ("What about Zetacorp?", HISTORY),                        # the same company again: nothing to switch
+    ("What about that?", HISTORY),                            # names no company
+    ("What about Omegaware?", [Turn("How do Zetacorp and Omegaware compare on risks?", PRIOR_ANSWER, ("ZZCA", "ZZCB"))]),  # two to swap
+    ("What about Omegaware?", [Turn("Which company has the most risks?", "x", ("ZZCA",))]),  # nothing to swap in
+])
+def test_the_switch_rule_stays_out_of_the_way(conn, question, history):
+    ans, _ = ask(conn, RoutingLLM(rewrite=question), question, history=history)
+    assert ans.interpreted_question is None
+
+
+def test_a_rewrite_that_did_something_is_trusted(conn):
+    llm = RoutingLLM(rewrite="How many employees does Omegaware have?")
+    ans, _ = ask(conn, llm, "And Omegaware?")
+    assert ans.interpreted_question == "How many employees does Omegaware have?" and llm.calls.count("condense") == 1
+
+
+def test_chosen_companies_are_never_second_guessed_by_the_switch_rule(conn):
+    ans, _ = ask(conn, RoutingLLM(rewrite="What about Omegaware?"), "What about Omegaware?", symbols=["ZZCA"])
+    assert ans.symbols == ["ZZCA"] and ans.interpreted_question is None
