@@ -1,7 +1,7 @@
 # Decisions, gotchas, and known weak spots
 
 A record of why things are the way they are, and what testing showed. Numbers are from October 2026 on six companies
-(AAPL, MSFT, NVDA, GOOGL, AMZN, TSLA). Most evaluations were small and hand-read, so treat them as spot checks, not
+(AAPL, MSFT, NVDA, GOOGL, AMZN, TSLA); AMD was added on 2026-10-15, so later entries (the "What changed" ones) cover seven. Most evaluations were small and hand-read, so treat them as spot checks, not
 benchmarks.
 
 ## Decisions
@@ -588,10 +588,13 @@ benchmarks.
   after UTC midnight does not get the day's bar", but I cannot reproduce 5pm conditions during the day. **The change**
   (owner's go-ahead; `scripts\register_nightly_task.ps1 -Time 15:00`, the only thing changed): the task now runs at 3pm
   Pacific, which is two hours after the US market closes (1pm) and before UTC midnight all year (3pm Pacific standard time
-  is 23:00 UTC), and the 6pm backup still follows it. **Not yet verified:** the first 3pm run is the test. If the newest
+  is 23:00 UTC), and the 6pm backup still follows it. **Verification:** the first 3pm run is the test (result further down). If the newest
   price in `python -m jobs.refresh --status` is the same day after it, the cause is confirmed; if it is still a day
   behind, the timing was not the cause and the next thing to try is asking Yahoo for explicit start and end dates instead
-  of "the last month". **Still open:** the nightly report says "0 problems" when the newest price is a day old; once the
+  of "the last month". **Result (checked 2026-10-15 with `python -m jobs.refresh --status`):** after the first scheduled 3pm
+  run (#2252, success, 49 s) the newest price for all seven companies was 2026-10-15, the same day, where every 5pm run had
+  left it a day behind. That fits the timing explanation, but it is one run: look again after a few more, and on a half-day
+  or a holiday. **Still open:** the nightly report says "0 problems" when the newest price is a day old; once the
   timing is fixed, flagging that is worth doing (a trading-day calendar is needed so holidays don't raise false alarms).
   Earlier documented 5pm times (older entries above) are left as they were written.
 - **Copilot trust, step 6: "price target" and "crashing premise" resolved (2026-10-15).** Both had failed every run since

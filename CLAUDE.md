@@ -7,7 +7,8 @@ history see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md]
 
 An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
 refresh job (`jobs/`, scheduled in Windows Task Scheduler for 3pm Pacific), a FastAPI backend (`api/`) that is read-only except for starting an add, and a
-React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot that understands follow-ups
+React web app (`web/`) with four screens: dashboard (with a small "What changed" card), stock detail, "What changed"
+(`/changes`), and a full-page copilot that understands follow-ups
 and answers from filings, daily prices, and news headlines. Not built: accounts and
 login, portfolios, a screener, fundamentals for foreign (20-F) filers, adding a company from the app, backups
 kept anywhere but this PC's disk, email or phone alerts, a Claude (Anthropic API) provider, and anything that puts it online. See the
@@ -62,9 +63,17 @@ them (the owner hasn't confirmed the order):
    and flaky cases ("news and stock", "press coverage", "sentiment", "how is X doing") that swing between runs on the same
    code. Scores from different steps are not the same bar, because some checks changed. Not done: the fixes the second
    round points to, in the order DECISIONS gives (price questions with a period first), whether to weigh a model-based
-   routing step against more keyword rules, the newest stored price being a day old after every run (the nightly task
-   moved to 3pm on 2026-10-15; check `python -m jobs.refresh --status` after a run), the content of advice-adjacent
-   answers, and a new set of held-out cases, written after those fixes, to measure them fairly.
+   routing step against more keyword rules, the content of advice-adjacent answers, and a new set of held-out cases, written after those fixes, to measure them
+   fairly. (The newest-stored-price-a-day-old problem looks fixed by moving the nightly task to 3pm: the 2026-10-15 run
+   left every price on the same day. It is one run, so keep checking `python -m jobs.refresh --status`.)
+
+   **Next up (as of 2026-10-15): this step.** Order from DECISIONS ("Second held-out round"): (a) price questions that name
+   a period or compare with the start of the year ("over the last three months", "since July", "above where it started
+   2026"), one phrase at a time because routing changes move other cases; (b) honor the period the question names, or say
+   in code that the window used is not the one asked (`parse_window` knows no month names or dates); (c) follow-up
+   carrying ("Now do X", "better or worse than X" keeping both companies); (d) "earn" and "sales" wording; (e) advice and
+   sentiment wording again; (f) non-company questions. Before starting, agree with the owner whether to weigh a
+   model-based routing step against more keyword rules. Write each phrasing as a test first, then fresh held-out cases.
 
 ## Working with the owner
 
@@ -100,6 +109,8 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
+- Baseline as of 2026-10-15 (after PR #31): 771 Python tests, 253 web tests, all passing. Tracked companies: AAPL, AMD,
+  AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly refresh ran at 3pm that day (success, 0 problems).
 
 ## Rules
 
@@ -127,6 +138,12 @@ The owner is building this step by step and is not a professional developer, so 
   case in `tests/test_copilot_advice.py` and fresh evaluation cases in different wording.
 - **Tests that touch vectors:** `tests/conftest.py` vacuums `filing_chunks` first because dead index entries made
   search tests flaky. Keep that.
+- **Shell gotchas (Bash tool on Windows):** a stray `python -` or `cat >` with no input waits for stdin until the timeout, so
+  write multi-line files with the editor tools. Python `open(path, "w")` writes CRLF into an LF file; pass `newline=""`.
+  Stopping a background `npm run dev` can leave Vite's `node` process on port 5173, so after a manual check confirm ports
+  8000 and 5173 are free and stop only what you started. To check that tests mean something, break the code on purpose (copy
+  the file, change one expression, run the new tests, expect a failure, restore, `diff`); in the "What changed" work two
+  breakages were missed at first, and each pointed at a weak test.
 - **Windows console:** set `PYTHONIOENCODING=utf-8` when printing filing text. Edit files with the editor tools,
   not shell heredocs that carry escape sequences (`\n`, `\b`), which have corrupted files before.
 - **Commits and pushes:** only when the user asks. The GitHub repo is private.
