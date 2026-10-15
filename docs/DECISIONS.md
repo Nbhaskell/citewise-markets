@@ -691,6 +691,24 @@ benchmarks.
   (d)), "payout ratio", "revenue growing" (1 of 3), and "shares: buy back" on purpose. **Not covered:** "change" and
   "performance" with a period ("two-year change") are deliberately not price questions, since they are often revenue or
   segment questions. Fair measurement of this step needs new cases in new wording.
+- **More ratios declined in code, and a caution on a false "no price" claim (fix (c) of the held-out round), 2026-10-15.**
+  "Tell me Apple's price to free cash flow" was not one of the nine ratios the app names as not computed, so it went to the
+  filings and the answer said the stock price was not in the sources, which is false. `_UNSTORED` in `ai/market.py` now
+  also names price to free cash flow (and P/FCF), price to cash flow, free cash flow yield, earnings yield, EV/sales,
+  current ratio, quick ratio, return on invested capital, and interest coverage. "Dividend payout ratio" is deliberately
+  not on the list: the model's answer to it (the two stated amounts, no ratio worked out) is better than a flat decline.
+  Second, `false_price_claim` in `ai/copilot.py`: when the sources given to the model include no price source, the answer
+  says a stock price or price data is missing, and prices are stored for every company named, a caution says that
+  stored daily closing prices exist and were not used. Worded to be true even when a filing really does not state a price.
+  Names are matched by regular expression, so it can fire on a sentence like "the 10-K does not discuss stock price
+  targets"; that would be a harmless but needless caution. **Full `eval_market`, 3 repeats, 122 cases: 343 of 366 (94%)**,
+  against 338 after the price-wording step. "Price to free cash flow" went from 0 of 3 to 3 of 3. Not a fair score (tuning
+  material). The new caution did not fail any case's `no_cautions` check, but the evaluation does not print cautions, so
+  how often it fires on real answers is **not measured**. **A/B on main, 10 runs each:** "press coverage" 9 of 10 on main
+  and 8 of 10 on this branch (its 0 of 3 in the full run was noise); "ho fund: revenue growing" **0 of 10 on both**, so it
+  is not caused by this step: the numbers check flags "2025" in an answer that says "the 12 months ending 2025-06-30",
+  a false positive worth its own look (the 1 of 3 earlier was luck). Still open from the held-out list: market value
+  ("worth in total"), sentiment ("tone turning sour") and advice ("park my money") wording, and the template headline.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
