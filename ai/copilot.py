@@ -254,13 +254,42 @@ def direction_errors(plain: str, evidence: list[MarketEvidence]) -> list[str]:
     return out
 
 
-def unverified_numbers(answer: str, cited: list[int], passages: list[SearchResult | MarketEvidence]) -> list[str]:
+DECLINE_RE = re.compile(r"\b(?:not|no|nothing|none|never|cannot|unable|nor|neither)\b|n['’]t", re.IGNORECASE)
+ECHO_RE = re.compile(r"\b(?:whether|if)\b", re.IGNORECASE)  # restating the question, not asserting
+FORECAST_MODAL_RE = re.compile(
+    r"\b(?:will|would|going\s+to|shall|expected\s+to|likely\s+to|bound\s+to)\b|\b(?:won|wouldn|shan)['’]t\b", re.IGNORECASE
+)  # "won't" and "wouldn't" are predictions that happen to contain a decline marker
+
+
+def _users_own_numbers(question: str, plain: str, missing: set[str]) -> set[str]:
+    """Missing figures that the question itself contains, when every sentence of the answer that uses them declines or
+    restates the question without predicting anything. "Will Microsoft hit $600?" answered "the sources do not say whether
+    Microsoft will hit $600" is correct, and the number is the user's, not a claim. Narrow on purpose, since this check is
+    the only code-level guard on figures: "Microsoft will not hit $600" (a prediction), "Microsoft is at $600" (a claim),
+    and a number the user didn't type are all still flagged."""
+    mine = _numbers(question)
+    sentences = re.split(r"(?<=[.!?])\s+|\n+", plain)
+    out = set()
+    for number in missing & mine:
+        uses = [s for s in sentences if number in _numbers(s)]
+        if uses and all(
+            DECLINE_RE.search(s) and (ECHO_RE.search(s) or not FORECAST_MODAL_RE.search(s)) for s in uses
+        ):
+            out.add(number)
+    return out
+
+
+def unverified_numbers(
+    answer: str, cited: list[int], passages: list[SearchResult | MarketEvidence], question: str = ""
+) -> list[str]:
     """Figures in the answer that appear nowhere in the passages it cites (or the headers above them), a minus sign
-    the sources don't have, and price moves described in the wrong direction."""
+    the sources don't have, and price moves described in the wrong direction. A figure the question itself contains is
+    let through when the answer only declines or restates (see _users_own_numbers)."""
     used = list(cited or range(1, len(passages) + 1))
     blocks = [passage_block(n, passages[n - 1]) for n in used]
     known, plain = _numbers("\n".join(blocks)), CITE_RE.sub("", answer)
     missing = _numbers(plain) - known
+    missing -= _users_own_numbers(question, plain, missing)
     known_negatives = _negatives("\n".join(blocks))
     missing |= {f"-{v}" for v in _negatives(plain) if len(v) >= 2 and v not in known_negatives}
     market = [passages[n - 1] for n in used if isinstance(passages[n - 1], MarketEvidence)]
@@ -391,7 +420,7 @@ def _generate_checked_full(
     prompt = build_prompt(question, passages)
     system = system_prompt(passages)
     text, cited = clean_citations(strip_thinking(llm.generate(system, prompt)), len(passages))
-    bad, causes = unverified_numbers(text, cited, passages), causal_claims(text, passages)
+    bad, causes = unverified_numbers(text, cited, passages, question), causal_claims(text, passages)
     if bad or causes:
         complaints = []
         if bad:
@@ -407,7 +436,7 @@ def _generate_checked_full(
             )
         correction = f"{prompt}\n\nYour previous answer:\n{text}\n\n{' '.join(complaints)} Leave out anything you can't support."
         text, cited = clean_citations(strip_thinking(llm.generate(system, correction)), len(passages))
-        bad, causes = unverified_numbers(text, cited, passages), causal_claims(text, passages)
+        bad, causes = unverified_numbers(text, cited, passages, question), causal_claims(text, passages)
     return text, cited, bad, causes
 
 
