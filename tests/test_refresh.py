@@ -309,14 +309,14 @@ def test_a_crash_shows_an_alert_and_exit_code_4(conn, monkeypatch, quiet_main):
     assert len(alerts.shown) == 1 and "something unexpected" in alerts.shown[0][1]
 
 
-def test_another_run_in_progress_is_not_an_alert(conn, monkeypatch, quiet_main):
+def test_another_run_in_progress_is_an_alert_so_a_skipped_night_is_visible(conn, monkeypatch, quiet_main):
     monkeypatch.setattr(refresh, "default_deps", make_deps)
     alerts = Alerts()
     with connect() as other:
         other.execute("SELECT pg_advisory_lock(%s)", (LOCK_KEY,))
         assert refresh.main(["--symbols", A], notify=alerts) == 3
         other.execute("SELECT pg_advisory_unlock(%s)", (LOCK_KEY,))
-    assert alerts.shown == []
+    assert [title for title, _ in alerts.shown] == ["Nightly refresh didn't run"]
 
 
 def test_a_notification_that_fails_never_raises(monkeypatch):

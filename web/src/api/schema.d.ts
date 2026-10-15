@@ -4,6 +4,60 @@
  */
 
 export interface paths {
+    "/api/add-company/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Add Company */
+        post: operations["start_add_company_api_add_company_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/add-company/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Add Company Job */
+        get: operations["add_company_job_api_add_company_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/add-company/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Add Company Lookup
+         * @description Read-only: looks up the company name so the page can ask "Add X?" before anything is written.
+         */
+        get: operations["add_company_lookup_api_add_company_lookup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/copilot": {
         parameters: {
             query?: never;
@@ -214,6 +268,59 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AddJobIn */
+        AddJobIn: {
+            /**
+             * Ticker
+             * @description US ticker, e.g. TSLA or BRK.B
+             */
+            ticker: string;
+        };
+        /** AddJobOut */
+        AddJobOut: {
+            /** Companies */
+            companies: components["schemas"]["ReportCompany"][];
+            /** Finished At */
+            finished_at: string | null;
+            /** Job Id */
+            job_id: number;
+            /**
+             * Message
+             * @description Plain-language note for the page
+             */
+            message?: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "success" | "partial" | "failed" | "interrupted";
+            /**
+             * Step
+             * @description The step now running, while status is running
+             */
+            step?: string | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** AddLookupOut */
+        AddLookupOut: {
+            /** Exchange */
+            exchange: string | null;
+            /** Name */
+            name: string;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Tracked
+             * @description Already tracked. Adding it again brings its data up to date
+             */
+            tracked: boolean;
+        };
         /** CopilotRequest */
         CopilotRequest: {
             /**
@@ -513,6 +620,32 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** ReportCompany */
+        ReportCompany: {
+            /** Lines */
+            lines: components["schemas"]["ReportLine"][];
+            /** Name */
+            name: string | null;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Verdict
+             * @description ADDED, ADDED, WITH GAPS, UPDATED, or NOT ADDED (with WITH GAPS when something is missing)
+             */
+            verdict: string;
+        };
+        /** ReportLine */
+        ReportLine: {
+            /**
+             * Status
+             * @description OK, NONE, SKIPPED, FAILED, or -- (not tried)
+             */
+            status: string;
+            /** Step */
+            step: string;
+            /** Text */
+            text: string;
+        };
         /** RunOut */
         RunOut: {
             /** Finished At */
@@ -731,6 +864,101 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    start_add_company_api_add_company_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddJobIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_company_job_api_add_company_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_company_lookup_api_add_company_lookup_get: {
+        parameters: {
+            query: {
+                ticker: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddLookupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     copilot_api_copilot_post: {
         parameters: {
             query?: never;

@@ -18,6 +18,9 @@ export type StatusOut = S["StatusOut"];
 export type Fundamentals = S["FundamentalsOut"];
 export type FundamentalFigure = S["FundamentalFigure"];
 export type Health = S["Health"];
+export type AddLookupOut = S["AddLookupOut"];
+export type AddJobOut = S["AddJobOut"];
+export type ReportCompany = S["ReportCompany"];
 
 export type PriceRange = "1M" | "3M" | "6M" | "1Y" | "5Y" | "MAX";
 export type NewsLabel = "positive" | "negative" | "neutral";

@@ -110,6 +110,7 @@ def run_refresh(
     steps: tuple = STEPS,
     today: Optional[date] = None,
     job: Optional[str] = None,
+    job_id: Optional[int] = None,
 ) -> RunReport:
     if not conn.execute("SELECT pg_try_advisory_lock(%s)", (LOCK_KEY,)).fetchone()[0]:
         raise AlreadyRunning("another refresh is already running")
@@ -117,15 +118,25 @@ def run_refresh(
     try:
         symbols = [s.upper() for s in symbols] if symbols else active_symbols(conn)
         today = today or date.today()
-        run_id = conn.execute(
-            "INSERT INTO job_runs (job, status) VALUES (%s, 'running') RETURNING id", (job or JOB_NAME,)
-        ).fetchone()[0]
+        if job_id:  # the web app already created this run's row (see api/adding.py); fill it in
+            run_id = job_id
+            conn.execute(
+                "UPDATE job_runs SET status = 'running', symbols = %s, heartbeat_at = now() WHERE id = %s",
+                (symbols, job_id))
+        else:
+            run_id = conn.execute(
+                "INSERT INTO job_runs (job, status) VALUES (%s, 'running') RETURNING id", (job or JOB_NAME,)
+            ).fetchone()[0]
         conn.commit()
         log.info("run %s: %d companies, steps: %s", run_id, len(symbols), ", ".join(steps))
 
         results: list[StepResult] = []
 
         def attempt(step: str, symbol: Optional[str], work: Callable[[], int], unit: str = "rows") -> None:
+            # Tell the web app which step is running, and that this job is still alive (see api/adding.py)
+            conn.execute("UPDATE job_runs SET current_step = %s, heartbeat_at = now() WHERE id = %s",
+                         (f"{step} {symbol}" if symbol else step, run_id))
+            conn.commit()
             try:
                 n = work()
                 results.append(StepResult(step, symbol, "ok", n))
@@ -287,6 +298,8 @@ def main(argv: list[str] | None = None, notify: Callable[[str, str], object] = s
                 report = run_refresh(conn, default_deps(), args.symbols, tuple(args.steps))
             except AlreadyRunning as exc:
                 log.warning("%s; exiting", exc)
+                alert("Nightly refresh didn't run", "Another update was running (an add or a backup), so tonight's "
+                      "refresh was skipped. Check logs/refresh.log.")
                 return 3
     except Exception as exc:  # a crash outside the per-company isolation; it still must not go unnoticed
         log.exception("the refresh crashed")

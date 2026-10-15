@@ -12,6 +12,7 @@ Exit code 0 = everything worked, 1 = something failed, was skipped, or is missin
 2 = the database was unreachable, 3 = another refresh is already running, 4 = the command itself crashed.
 """
 import argparse
+import json
 import logging
 import re
 import sys
@@ -26,6 +27,7 @@ from .refresh import STEPS, AlreadyRunning, Deps, RunReport, StepResult, default
 
 log = logging.getLogger("refresh")
 
+BUSY_TEXT = "Another update was running (the nightly refresh, a backup, or another add), so this add did not start."
 ADD_JOB = "add_company"  # its own name in job_runs, so these runs don't show up as nightly refreshes
 FOREIGN_FORMS = ["20-F", "40-F"]  # what companies based outside the US file instead of a 10-K
 TICKER_RE = re.compile(r"^[A-Z0-9]{1,6}(-[A-Z])?$")
@@ -157,10 +159,12 @@ def describe(conn: psycopg.Connection, deps: Deps, symbol: str, results: list[St
     return out
 
 
-def add_companies(conn: psycopg.Connection, deps: Deps, symbols: list[str]) -> tuple[RunReport, list[Outcome]]:
+def add_companies(conn: psycopg.Connection, deps: Deps, symbols: list[str],
+                  job_id: Optional[int] = None) -> tuple[RunReport, list[Outcome]]:
     """Run the full refresh for these tickers and describe the result per company. Raises AlreadyRunning."""
     before = {r[0]: r[1] for r in conn.execute("SELECT symbol, active FROM instruments WHERE symbol = ANY(%s)", (symbols,))}
-    report = run_refresh(conn, deps, symbols, job=ADD_JOB)
+    extra = {'job_id': job_id} if job_id else {}  # the web box's row; the CLI leaves it out
+    report = run_refresh(conn, deps, symbols, job=ADD_JOB, **extra)
     outcomes = []
     for sym in symbols:
         out = describe(conn, deps, sym, report.results, already_tracked=sym in before)
@@ -170,6 +174,29 @@ def add_companies(conn: psycopg.Connection, deps: Deps, symbols: list[str]) -> t
             out.turned_back_on = True
         outcomes.append(out)
     return report, outcomes
+
+
+def report_for_web(outcomes: list[Outcome], message: Optional[str] = None) -> dict:
+    """The JSON the Add company box reads from job_runs.report: the same facts as the printed report, no more."""
+    return {
+        "message": message,
+        "companies": [
+            {"symbol": o.symbol, "name": o.name, "verdict": o.verdict,
+             "lines": [{"step": s, "status": st, "text": t} for s, st, t in o.lines]}
+            for o in outcomes
+        ],
+    }
+
+
+def save_report(conn: psycopg.Connection, job_id: int, outcomes: list[Outcome], message: Optional[str] = None,
+                status: Optional[str] = None) -> None:
+    """Write what an add job ended with, for the web app. `status` is set only when the job ended without a run."""
+    conn.execute(
+        "UPDATE job_runs SET report = %s::jsonb, status = COALESCE(%s, status), "
+        "finished_at = COALESCE(finished_at, now()) WHERE id = %s",
+        (json.dumps(report_for_web(outcomes, message)), status, job_id),
+    )
+    conn.commit()
 
 
 def format_outcome(out: Outcome) -> str:
@@ -188,6 +215,7 @@ def format_outcome(out: Outcome) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("symbols", nargs="+", metavar="TICKER")
+    parser.add_argument("--job-id", type=int, help="the web app's job row to report into (set by the Add company box)")
     args = parser.parse_args(argv)
     try:
         symbols = list(dict.fromkeys(normalize_ticker(s) for s in args.symbols))
@@ -204,10 +232,14 @@ def main(argv: list[str] | None = None) -> int:
         with conn:
             print(f"Adding {', '.join(symbols)}. This can take a few minutes (is Ollama running?)...")
             try:
-                report, outcomes = add_companies(conn, default_deps(), symbols)
+                report, outcomes = add_companies(conn, default_deps(), symbols, job_id=args.job_id)
             except AlreadyRunning:
                 log.warning("another refresh is running (the nightly job, or another add); try again in a few minutes")
+                if args.job_id:
+                    save_report(conn, args.job_id, [], BUSY_TEXT, status="failed")
                 return 3
+            if args.job_id:
+                save_report(conn, args.job_id, outcomes)
     except Exception:
         log.exception("add_company crashed")
         return 4

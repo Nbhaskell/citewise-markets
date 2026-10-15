@@ -135,7 +135,7 @@ prices -> news -> filings -> index (embed new filings) -> sentiment (score new h
   Exit code 0 only for `success`, so Task Scheduler's "Last Run Result" is meaningful.
 - **Alerts:** a run that ends `partial` or `failed`, can't reach the database, or crashes shows a Windows toast
   notification (`jobs/notify.py`, via PowerShell, no extra software or accounts). A run that finds another run in
-  progress does not alert. A notification that can't be shown is logged and never affects the job. Database
+  progress now alerts ("Nightly refresh didn't run"), so a night skipped because an add or backup held the lock is visible. A notification that can't be shown is logged and never affects the job. Database
   connections time out after 10 seconds, so a stopped Docker fails fast instead of hanging.
 - **Skips, not failures, for missing prerequisites:** no `SEC_USER_AGENT` skips filings, Ollama not answering skips
   sentiment, and an embedding model that won't load skips indexing. The run is marked `partial` so it isn't silent.
@@ -149,10 +149,11 @@ prices -> news -> filings -> index (embed new filings) -> sentiment (score new h
 - **Scheduling:** `scripts/register_nightly_task.ps1` creates a Windows Task Scheduler task (daily, runs when you
   are logged in, catches up after a missed time, never overlaps, 2-hour limit). It is not registered automatically.
 
-## Read-only API (`api/`)
+## API (`api/`)
 
 A FastAPI app that exposes the stored data and the AI tools as JSON, for the web screens. It runs in the same
 Python process space as the AI code, so the copilot and search are plain function calls, not a second service.
+Everything is read-only except one exception the owner approved: the "Add company" box's start endpoint (below).
 
 | File | Role |
 |---|---|
@@ -171,6 +172,14 @@ Python process space as the AI code, so the copilot and search are plain functio
 - **News feed:** `GET /api/news` returns recent headlines across all active companies, optionally filtered by
   company and sentiment label; each row carries the company it was labeled for. A story carried by several outlets
   is listed once per company (newest copy), here and in `/api/stocks/{symbol}/news`.
+- **Add company (the one write):** `GET /api/add-company/lookup?ticker=` resolves a name without writing anything,
+  so the page can ask "Add Tesla, Inc. (TSLA)?". `POST /api/add-company/jobs` starts the add and returns a job id;
+  `GET /api/add-company/jobs/{id}` reports progress. The start endpoint accepts only the local web app's `Origin` and
+  a JSON body (a foreign page, or a plain-text body, starts nothing). If the database lock is held, it returns 409.
+  The add runs as its own process (`python -m jobs.add_company TICKER --job-id N`) and writes into a `job_runs` row
+  (migration 008: the ticker, the current step, a heartbeat, and the per-company report). The status is worked out
+  when read: `queued`, `running`, `interrupted` (the process died or stopped reporting), `success`, `partial`
+  (added with gaps) or `failed`. Nothing removes a company yet.
 - **Screens the API can support:** dashboard, stock detail (except an AI signal), and copilot chat. Not covered: screener,
   portfolio, alerts and settings, because the data or accounts behind them don't exist yet.
 
