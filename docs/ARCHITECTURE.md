@@ -180,6 +180,13 @@ Everything is read-only except one exception the owner approved: the "Add compan
   (migration 008: the ticker, the current step, a heartbeat, and the per-company report). The status is worked out
   when read: `queued`, `running`, `interrupted` (the process died or stopped reporting), `success`, `partial`
   (added with gaps) or `failed`. Nothing removes a company yet.
+- **What changed:** `GET /api/changes?days=` (1 to 30 trading days, default 1) returns new filings, big moves, market-wide
+  days, notable headlines, and mood shifts, built by `data/changes.py` (all rules are named constants at the top of that
+  file) with `api/queries.changes` passing in `label_counts` for the mood comparison. Read-only; nothing is stored, it is
+  computed on read. The window is the last N trading dates that appear in the stored prices, not calendar days. Filings
+  are matched on `filed_at`, never `fetched_at` (the day the app first downloaded them), and the response carries the
+  newest stored filing so an empty list can say what the last one was. A company whose newest bar is older than the
+  window's last date is listed in `stale`.
 - **Screens the API can support:** dashboard, stock detail (except an AI signal), and copilot chat. Not covered: screener,
   portfolio, alerts and settings, because the data or accounts behind them don't exist yet.
 
@@ -199,6 +206,13 @@ Copilot page (/copilot)
   ConversationView   -> POST /api/copilot       one message per question, each with its own AnswerView
   Composer                                      Enter sends; the button becomes Stop while waiting
   useConversation    localStorage               newest 20 finished questions, validated on load
+
+What changed page (/changes)
+  FreshnessBar       <- /api/status, /health       data age, failed refreshes
+  window picker      latest day, 3, or 7 trading days
+  ChangesFilings     <- /api/changes               filings filed in the window, or the newest stored one
+  ChangesMoves       <- /api/changes               big moves, market-wide labels, that day's headlines (timing only)
+  ChangesHeadlines   <- /api/changes               positive and negative headlines per company, and mood shifts
 
 Stock detail page (/stocks/:symbol)
   header + KeyStats  <- /api/stocks/{symbol}    price, change, 52-week range bar, volume, sector, news mood
@@ -227,7 +241,7 @@ Stock detail page (/stocks/:symbol)
   saved, loaded entries are validated field by field, and a blocked or full storage is reported, never thrown.
   `AnswerView` is the one place an answer is rendered (dashboard box, stock page, and copilot page), and gives its
   source elements unique ids so many answers can share a page.
-- **Routing:** `/`, `/stocks/:symbol`, and `/copilot` (React Router), with a main navigation that marks the current page. An unknown ticker (the API's 404) gets a "not tracked" page
+- **Routing:** `/`, `/stocks/:symbol`, `/changes`, and `/copilot` (React Router), with a main navigation that marks the current page. An unknown ticker (the API's 404) gets a "not tracked" page
   with the command to add it, and a malformed one is rejected before any request is made.
 - **Tests:** Vitest with Testing Library against a fake `fetch`. They cover each panel's loading, empty, error, and
   warning states, plus the client's error messages.

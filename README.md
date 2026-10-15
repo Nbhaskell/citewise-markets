@@ -16,7 +16,8 @@ What works today:
 - A nightly refresh job that keeps all of the above up to date (you register it once, see below)
 - An HTTP API (FastAPI) over all of it, for the web screens to use (see "The API" below). Its only write is starting an add from the dashboard's "Add a company" box
 - A web app (React): a dashboard, a stock detail page (price chart, stats, fundamentals, news, filings, a copilot for
-  that company), and a full-page copilot with saved history (see "The web app" below)
+  that company), a "What changed" page (new filings, unusually big moves, notable headlines), and a full-page copilot
+  with saved history (see "The web app" below)
 
 Everything runs locally and costs nothing. The AI uses a local model through Ollama.
 
@@ -197,6 +198,7 @@ every endpoint. The database must be running, and Ollama for the copilot.
 | `GET /api/status` | Nightly job history and how fresh each company's data is |
 | `GET /api/stocks` | Every tracked company: latest price, daily change, news sentiment (the dashboard) |
 | `GET /api/news?days=3&limit=30&sentiment=positive&sentiment=negative` | Latest headlines across all companies (filters: `symbol`, `sentiment`, `include_irrelevant`) |
+| `GET /api/changes?days=1` | What changed over the last 1 to 30 trading days: filings filed in the window, big moves (each with its usual-day size and that day's headlines), market-wide days, notable headlines, and week-over-week news-mood shifts. All worked out in Python from stored data |
 | `GET /api/stocks/{symbol}` | One company, plus 52-week range and volume |
 | `GET /api/stocks/{symbol}/prices?range=1M\|3M\|6M\|1Y\|5Y\|MAX` | Daily price bars for a chart |
 | `GET /api/stocks/{symbol}/news?days=7&limit=30` | Headlines with sentiment labels (add `include_irrelevant=true` to see all) |
@@ -239,6 +241,10 @@ questions with clickable numbered sources. Click a ticker to open its stock deta
 (1M to MAX), key stats, fundamentals (revenue, profit, margins, market value, P/E, each with its calculation and
 source filings one click away, and cautions where a number could mislead), that company's news and SEC filings, and a
 copilot limited to that company's data.
+The What changed page (`/changes`) looks back over the latest trading day, 3, or 7 and lists new filings, big moves, and
+notable headlines. A move counts when it is at least 3% and at least twice that company's own usual daily move; a day on
+which most companies moved the same way is labeled market-wide; headlines beside a move are timing only, never a
+reason. There is no AI summary on it.
 The Copilot page (`/copilot`) is a full-page chat: pick which companies to search, see your recent questions (saved
 in your browser), stop a slow answer, and retry a failed one. You can follow up ("and what about its risks?"): the
 last three questions of the current topic are sent along so the copilot can work out what "its" means, and the page
@@ -317,7 +323,9 @@ docker-compose.yml   The database container
 - Accounts and login, portfolios, and alerts (the API has no login yet)
 - Removing a company from the app (there is no remove command; a mistyped ticker has to be removed by hand)
 - A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
-- More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, and copilot exist.
+- More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, what-changed, and copilot exist.
+- "What changed" has no "since your last visit" mode (that needs per-browser state), no dashboard summary of it, and the
+  copilot can't answer "what changed today" from it
 - Conversation history that follows a user between devices (it's saved per browser; there are no accounts)
 - The wireframe's market indices strip, portfolio value, and "AI daily brief" on the dashboard, because no data or
   accounts sit behind them yet

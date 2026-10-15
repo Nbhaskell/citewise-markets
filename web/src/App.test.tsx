@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
-import { defaultRoutes, mockApi } from "./test/mockApi";
+import { changesData, defaultRoutes, mockApi } from "./test/mockApi";
 
 function renderAt(path: string) {
   return render(
@@ -38,13 +38,22 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "Back to the dashboard" })).toHaveAttribute("href", "/");
   });
 
-  it("has navigation between the dashboard and the copilot, and marks where you are", async () => {
+  it("has navigation between the dashboard, what changed, and the copilot, and marks where you are", async () => {
     mockApi(defaultRoutes());
     renderAt("/copilot");
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getByRole("link", { name: "Copilot" })).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "Dashboard" })).not.toHaveAttribute("aria-current");
     expect(await screen.findByRole("heading", { level: 1, name: "Copilot" })).toBeInTheDocument();
+  });
+
+  it("reaches the what-changed page from the main navigation", async () => {
+    mockApi({ ...defaultRoutes(), "GET /api/changes": changesData });
+    renderAt("/changes");
+    const link = within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "What changed" });
+    expect(link).toHaveAttribute("href", "/changes");
+    expect(link).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByRole("heading", { level: 1, name: "What changed" })).toBeInTheDocument();
   });
 
   it("links the dashboard's copilot box to the full page", async () => {

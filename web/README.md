@@ -5,6 +5,7 @@ The browser screens for stockMarket. React 19, TypeScript, built with Vite. Thre
 - **Dashboard** (`/`): a watchlist, a combined news panel, and a box for asking the copilot questions (it answers from stored filings, prices, and headlines).
 - **Stock detail** (`/stocks/AAPL`): an interactive price chart, key stats with a 52-week range bar, that company's news,
   its SEC filings, and the copilot limited to that company. Click a ticker on the dashboard to get there.
+- **What changed** (`/changes`): new filings, big moves (against each company's own usual day, with market-wide days labeled), and notable headlines over the latest day, 3, or 7 trading days.
 - **Copilot** (`/copilot`): a full-page chat with a saved history, a company filter, and Stop and retry.
 
 ## Run it
@@ -55,7 +56,7 @@ src/lib/          format.ts: prices, percentages, dates, volumes, news mood, saf
 src/components/   Watchlist, NewsPanel, CopilotBox, AnswerText, FreshnessBar, Sparkline, pills,
                   PriceHistory + PriceChart, KeyStats, FilingsList,
                   AnswerView (one copilot answer), Composer, ConversationView, CompanyFilter
-src/pages/        Dashboard, StockPage, CopilotPage
+src/pages/        Dashboard, StockPage, ChangesPage, CopilotPage
 src/test/         setup and a fake API for tests
 ```
 

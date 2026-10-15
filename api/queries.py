@@ -4,6 +4,7 @@ from typing import Optional
 import psycopg
 
 from ai.sentiment import SentimentSummary as Counts, label_counts
+from data.changes import MAX_DAYS as CHANGES_MAX_DAYS, build_changes
 from data.fundamentals import Flow, compute, latest_close, load_facts
 from data.headlines import title_key
 
@@ -142,6 +143,11 @@ def filing_rows(conn: psycopg.Connection, symbol: str) -> list[dict]:
     ).fetchall()
     keys = ("accession_number", "form", "filed_at", "period_of_report", "url", "searchable")
     return [dict(zip(keys, r)) for r in rows]
+
+
+def changes(conn: psycopg.Connection, model: str, days: int, symbols: Optional[list[str]] = None) -> dict:
+    """The "what changed" page: new filings, big moves, notable headlines (see data/changes.py for the rules)."""
+    return build_changes(conn, model, days, lambda n: label_counts(conn, model, n), symbols)
 
 
 def tracked_symbols(conn: psycopg.Connection) -> set[str]:

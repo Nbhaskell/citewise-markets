@@ -40,10 +40,19 @@ const MOOD_THRESHOLD = 0.15;
 
 /** A plain-English reading of the -1..+1 news score. The score is a rough indicator, not a signal. */
 export function moodFor(s: SentimentSummary): Mood {
-  if (s.score == null) return { label: "No news", tone: "none" };
-  if (s.score >= MOOD_THRESHOLD) return { label: "Positive", tone: "up" };
-  if (s.score <= -MOOD_THRESHOLD) return { label: "Negative", tone: "down" };
+  return moodForScore(s.score);
+}
+
+export function moodForScore(score: number | null | undefined): Mood {
+  if (score == null) return { label: "No news", tone: "none" };
+  if (score >= MOOD_THRESHOLD) return { label: "Positive", tone: "up" };
+  if (score <= -MOOD_THRESHOLD) return { label: "Negative", tone: "down" };
   return { label: "Neutral", tone: "flat" };
+}
+
+/** -0.3333 -> "-0.33", 0.6 -> "+0.60". */
+export function formatScore(score: number): string {
+  return `${score > 0 ? "+" : ""}${score.toFixed(2)}`;
 }
 
 /** True if the latest price date is old enough that something is probably wrong (a weekend is fine). */
