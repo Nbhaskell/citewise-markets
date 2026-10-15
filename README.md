@@ -198,7 +198,7 @@ every endpoint. The database must be running, and Ollama for the copilot.
 | `GET /api/status` | Nightly job history and how fresh each company's data is |
 | `GET /api/stocks` | Every tracked company: latest price, daily change, news sentiment (the dashboard) |
 | `GET /api/news?days=3&limit=30&sentiment=positive&sentiment=negative` | Latest headlines across all companies (filters: `symbol`, `sentiment`, `include_irrelevant`) |
-| `GET /api/changes?days=1` | What changed over the last 1 to 30 trading days: filings filed in the window, big moves (each with its usual-day size and that day's headlines), market-wide days, notable headlines, and week-over-week news-mood shifts. All worked out in Python from stored data |
+| `GET /api/changes?days=1` (or `?since=2026-10-13`) | What changed over the last 1 to 30 trading days, or the stored trading days after a date: filings filed in the window, big moves (each with its usual-day size and that day's headlines), market-wide days, notable headlines, and week-over-week news-mood shifts. All worked out in Python from stored data |
 | `GET /api/stocks/{symbol}` | One company, plus 52-week range and volume |
 | `GET /api/stocks/{symbol}/prices?range=1M\|3M\|6M\|1Y\|5Y\|MAX` | Daily price bars for a chart |
 | `GET /api/stocks/{symbol}/news?days=7&limit=30` | Headlines with sentiment labels (add `include_irrelevant=true` to see all) |
@@ -235,13 +235,15 @@ npm install        # first time only
 npm run dev        # opens at http://localhost:5173
 ```
 
-The dashboard shows the watchlist (price, daily change, one-month trend, news mood), the latest positive and negative
+The dashboard shows the watchlist (price, daily change, one-month trend, news mood), a "What changed" card (counts and the
+three biggest moves for the latest trading day, linking to the full page), the latest positive and negative
 headlines, a data-freshness line that warns about stale data or a failed refresh, and a box for asking the copilot
 questions with clickable numbered sources. Click a ticker to open its stock detail page: an interactive price chart
 (1M to MAX), key stats, fundamentals (revenue, profit, margins, market value, P/E, each with its calculation and
 source filings one click away, and cautions where a number could mislead), that company's news and SEC filings, and a
 copilot limited to that company's data.
-The What changed page (`/changes`) looks back over the latest trading day, 3, or 7 and lists new filings, big moves, and
+The What changed page (`/changes`) looks back over the latest trading day, 3, or 7, or "since last visit" (this browser
+remembers the newest trading day it showed you; nothing is stored on the server), and lists new filings, big moves, and
 notable headlines. A move counts when it is at least 3% and at least twice that company's own usual daily move; a day on
 which most companies moved the same way is labeled market-wide; headlines beside a move are timing only, never a
 reason. There is no AI summary on it.
@@ -324,8 +326,8 @@ docker-compose.yml   The database container
 - Removing a company from the app (there is no remove command; a mistyped ticker has to be removed by hand)
 - A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
 - More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, what-changed, and copilot exist.
-- "What changed" has no "since your last visit" mode (that needs per-browser state), no dashboard summary of it, and the
-  copilot can't answer "what changed today" from it
+- "Since last visit" is per browser (clearing site data or using another browser loses it), and "What changed" has no
+  email or phone alert; the copilot can't answer "what changed today" from it
 - Conversation history that follows a user between devices (it's saved per browser; there are no accounts)
 - The wireframe's market indices strip, portfolio value, and "AI daily brief" on the dashboard, because no data or
   accounts sit behind them yet

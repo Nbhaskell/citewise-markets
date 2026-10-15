@@ -834,8 +834,35 @@ benchmarks.
   is measured between two stored closes; if a bar is missing the move spans more than a day (the row shows both
   dates). The last bar can be a partial day while the market is open. (5) The headlines beside a move are chosen by UTC
   date, so an after-hours story can sit on the next trading day's move. (6) Only about a week of headlines is stored, so
-  older moves show "no stored headlines" and a mood shift cannot appear yet. (7) There is no dashboard summary, no
-  "since your last visit", and the copilot cannot answer "what changed today" from this view.
+  older moves show "no stored headlines" and a mood shift cannot appear yet. (7) The copilot cannot answer "what changed
+  today" from this view. (A dashboard card and a "since last visit" option followed; see the next entry.)
+- **What changed: "since last visit" and a dashboard card (2026-10-15).** Two follow-ups to the entry above. **(1) A
+  dashboard card** (`ChangesTeaser`): counts of big moves, new filings, and positive or negative headlines for the latest
+  trading day, the three biggest moves (arrow and sign, market-wide label), and a link to `/changes`. It fetches
+  `days=1` on its own and fails on its own, so a broken endpoint doesn't blank the dashboard. **(2) "Since last visit"**:
+  `GET /api/changes?since=YYYY-MM-DD` means the stored trading dates after that date (at most the newest 30), and wins
+  over `days`. With nothing stored after it, the reply has `days: 0`, `as_of` set to the newest stored date (so the page
+  can say "no new trading days", not "no prices"), and filings and headlines from the day after `since`. The browser
+  remembers the newest trading day the page showed (`lib/lastVisit.ts`, key `stockmarket.changes.lastVisit.v1`; validated
+  as a real date, never moved backwards, never throws), written once when the page first loads. The page reads it once at
+  mount and offers "Since last visit (date)" only when it is there, so the option doesn't change while it is being used.
+  **What "visit" means:** opening the What changed page, not the dashboard (the card doesn't save anything), and any
+  window you looked at counts, so choosing "Latest day" after three days away marks those three days as seen. It is a
+  convenience marker, not a read receipt. **Tests:** 6 new Python (the window rule, the cap at 30, the same window as
+  the matching `days`, the empty window, a filing after the newest price, the endpoint) and 21 web tests (the marker
+  helper, the page's last-visit behavior, the card); 771 Python and 253 web tests pass. Six deliberate Python breakages
+  and eight web breakages (the marker read on every render, never saved, moving backwards, the client ignoring `since`,
+  any string accepted as a date, all moves shown on the card, negatives left out of the headline count, storage errors
+  thrown) were each caught. **In a real browser** (live data, servers stopped afterwards): the card on the dashboard at
+  desktop and 375 px (no overflow); with an earlier visit set to 2026-10-13, the button read "Since last visit (Oct 13,
+  2026)", chose 2 trading days (Oct 14 and 15) with AMD and NVIDIA on the market-wide day, the marker moved to 2026-10-15,
+  and after a reload the button offered Oct 15 and chose "No new trading days since Oct 15, 2026". **Weak spots:** (1) The
+  marker is per browser (cleared with site data, not shared across browsers). (2) The first visit has no marker, so the
+  option doesn't appear until the second. (3) The "usual day" for a move is measured before the window, so the same day
+  can show a slightly different usual size in different windows (AMD on 10-14: 2.37% in a 7-day window, 2.31% in a 2-day one);
+  the bar moves with it. (4) The card's headline count is for the latest trading day (UTC dates), so it can differ from the
+  full page's count over a longer window. (5) Light mode and the empty and error states of the card were checked by
+  tests only, not in a browser.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

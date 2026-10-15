@@ -81,9 +81,12 @@ def daily_moves(bars: list[Bar]) -> list[DailyMove]:
     ]
 
 
-def window_dates(series: dict[str, list[Bar]], days: int) -> list[date]:
-    """The last `days` distinct dates that have a stored price, oldest first."""
+def window_dates(series: dict[str, list[Bar]], days: int, since: Optional[date] = None) -> list[date]:
+    """The last `days` distinct dates that have a stored price, oldest first. With `since`, the dates after it instead
+    (still at most `MAX_DAYS`, the newest ones); none if nothing has been stored after that date."""
     every = sorted({d for bars in series.values() for d, _ in bars})
+    if since is not None:
+        return [d for d in every if d > since][-MAX_DAYS:]
     return every[-days:]
 
 
@@ -234,9 +237,10 @@ def _midnight_utc(day: date) -> datetime:
 
 def build_changes(
     conn: psycopg.Connection, model: str, days: int, mood_counts: Callable[[int], dict[str, dict[str, int]]],
-    symbols: Optional[list[str]] = None,
+    symbols: Optional[list[str]] = None, since: Optional[date] = None,
 ) -> dict:
     """Everything the "what changed" page shows. `symbols` limits it to some companies (default: every active one).
+    `since` replaces `days`: the window is the stored trading dates after that date (the last time the reader looked).
     `mood_counts(n)` returns per-company label counts for the last n days (`ai.sentiment.label_counts`, passed in so
     this layer doesn't depend on the AI layer)."""
     days = max(1, min(days, MAX_DAYS))
@@ -246,8 +250,11 @@ def build_changes(
 
     latest = conn.execute("SELECT max(ts) FROM prices_daily WHERE symbol = ANY(%s)", (symbols,)).fetchone()[0]
     series = _load_series(conn, symbols, (latest or date.today()) - timedelta(days=HISTORY_CALENDAR_DAYS))
-    dates = window_dates(series, days)
-    start_day = dates[0] if dates else date.today() - timedelta(days=days)
+    dates = window_dates(series, days, since)
+    if dates:
+        start_day = dates[0]
+    else:  # no stored price in the window: filings and headlines still go back to the day after `since`
+        start_day = since + timedelta(days=1) if since is not None else date.today() - timedelta(days=days)
     big, market_days = analyze_moves(series, dates)
 
     # A company whose newest bar is older than the newest anywhere has nothing for the latest days; say so.
@@ -285,7 +292,9 @@ def build_changes(
     shifts = mood_shifts({s: c for s, c in mood_counts(MOOD_DAYS).items() if s in wanted},
                          {s: c for s, c in mood_counts(2 * MOOD_DAYS).items() if s in wanted})
     return {
-        "days": days, "as_of": dates[-1] if dates else None, "window_start": start_day if dates else None,
+        "days": len(dates) if since is not None else days, "since": since,
+        "as_of": dates[-1] if dates else (latest if since is not None else None),
+        "window_start": start_day if dates else None,
         "stale": stale, "filings": filings,
         "newest_filing": None if newest is None else dict(zip(
             ("symbol", "form", "filed_at", "period_of_report", "url", "accession_number"), newest)),

@@ -480,7 +480,7 @@ export interface components {
             as_of?: string | null;
             /**
              * Days
-             * @description Trading days in the window
+             * @description Trading days in the window (with `since`, how many stored days came after it: 0 if none)
              */
             days: number;
             /**
@@ -499,6 +499,11 @@ export interface components {
             /** @description The newest stored filing of any company, shown when `filings` is empty */
             newest_filing?: components["schemas"]["ChangeFiling"] | null;
             rules: components["schemas"]["ChangeRules"];
+            /**
+             * Since
+             * @description The `since` date that was asked for, if any
+             */
+            since?: string | null;
             /**
              * Stale
              * @description Companies with no price for the newest date, so the window may be missing their latest days
@@ -1163,6 +1168,8 @@ export interface operations {
             query?: {
                 /** @description Trading days to look back */
                 days?: number;
+                /** @description Instead of `days`: the stored trading days after this date (the newest 30 at most). For "since I last looked" */
+                since?: string | null;
             };
             header?: never;
             path?: never;

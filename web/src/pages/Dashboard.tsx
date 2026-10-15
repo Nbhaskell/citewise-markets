@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { AddCompanyBox } from "../components/AddCompanyBox";
+import { ChangesTeaser } from "../components/ChangesTeaser";
 import { CopilotBox } from "../components/CopilotBox";
 import { FreshnessBar } from "../components/FreshnessBar";
 import { NewsPanel } from "../components/NewsPanel";
@@ -19,6 +20,7 @@ export function Dashboard() {
           </p>
         </div>
         <div className="col">
+          <ChangesTeaser />
           <NewsPanel />
         </div>
       </div>

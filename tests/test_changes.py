@@ -354,3 +354,59 @@ def test_the_endpoint_defaults_to_one_day_and_checks_its_input(seeded, client):
 
 def test_the_endpoint_only_reads(seeded, client):
     assert client.post("/api/changes").status_code == 405
+
+
+# ---- "since I last looked" ---------------------------------------------------------------------------------------
+
+
+def test_since_means_the_stored_dates_after_it_not_a_count_of_days():
+    series = {"A": series_ending(LATEST, [1.0] * 10)}
+    assert ch.window_dates(series, 1, since=LATEST - timedelta(days=3)) == [
+        LATEST - timedelta(days=2), LATEST - timedelta(days=1), LATEST]
+    assert ch.window_dates(series, 1, since=LATEST) == []  # nothing new since the last look
+    assert ch.window_dates(series, 1, since=LATEST + timedelta(days=5)) == []  # a date in the future
+
+
+def test_since_is_capped_at_the_newest_thirty_stored_dates():
+    series = {"A": series_ending(LATEST, [1.0] * 80)}
+    dates = ch.window_dates(series, 1, since=date(2000, 1, 1))
+    assert len(dates) == ch.MAX_DAYS and dates[-1] == LATEST
+
+
+def test_since_gives_the_same_window_as_the_matching_days(seeded):
+    with connect() as c:
+        by_since = ch.build_changes(c, MODEL, 1, lambda n: {}, SYMS, since=LATEST - timedelta(days=1))
+    by_days = build(days=1)
+    assert by_since["days"] == 1 and by_since["since"] == LATEST - timedelta(days=1)
+    for key in ("as_of", "window_start", "moves", "filings", "headlines", "stale"):
+        assert by_since[key] == by_days[key]
+
+
+def test_since_the_newest_day_is_an_honest_empty_window_not_no_data(seeded):
+    with connect() as c:
+        out = ch.build_changes(c, MODEL, 1, lambda n: {}, SYMS, since=LATEST)
+    assert out["days"] == 0 and out["as_of"] == LATEST and out["window_start"] is None
+    assert out["moves"] == [] and out["market_days"] == [] and out["stale"] == []
+    assert out["since"] == LATEST and out["newest_filing"]["filed_at"] == LATEST
+
+
+def test_a_filing_after_the_newest_price_still_shows_when_the_window_has_no_prices(seeded):
+    with connect() as c:
+        c.execute("INSERT INTO filings (accession_number, symbol, cik, form, filed_at, period_of_report, url, text) "
+                  "VALUES ('0-ZZCH-LATE', 'ZZCHA', '1', '8-K', %s, %s, 'https://sec.example/f', 't')",
+                  (LATEST + timedelta(days=1), LATEST))
+        c.commit()
+        try:
+            out = ch.build_changes(c, MODEL, 1, lambda n: {}, SYMS, since=LATEST)
+        finally:
+            c.execute("DELETE FROM filings WHERE accession_number = '0-ZZCH-LATE'")
+            c.commit()
+    assert [f["form"] for f in out["filings"]] == ["8-K"]
+
+
+def test_the_endpoint_takes_since_and_it_wins_over_days(seeded, client):
+    body = client.get("/api/changes", params={"since": "2999-01-01", "days": 7}).json()
+    assert body["days"] == 0 and body["since"] == "2999-01-01" and body["moves"] == []
+    assert body["as_of"] is not None  # the newest stored date, not "no prices"
+    assert client.get("/api/changes", params={"since": "not-a-date"}).status_code == 422
+    assert client.get("/api/changes").json()["since"] is None

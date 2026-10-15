@@ -309,7 +309,8 @@ class ChangeRules(BaseModel):
 
 
 class ChangesOut(BaseModel):
-    days: int = Field(description="Trading days in the window")
+    days: int = Field(description="Trading days in the window (with `since`, how many stored days came after it: 0 if none)")
+    since: Optional[date] = Field(None, description="The `since` date that was asked for, if any")
     as_of: Optional[date] = Field(None, description="Newest stored price date across the companies; null if there are no prices")
     window_start: Optional[date] = Field(None, description="First trading day in the window")
     stale: list[StaleSymbol] = Field(description="Companies with no price for the newest date, so the window may be missing their latest days")
