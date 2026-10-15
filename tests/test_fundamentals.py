@@ -60,6 +60,25 @@ def test_when_the_latest_filing_is_the_annual_report_that_year_is_the_figure():
     assert result.growth == pytest.approx(331.8 / 281 - 1)
 
 
+def test_the_earlier_year_is_named_by_its_real_end_date_not_left_for_the_model_to_work_out():
+    """"A year earlier" had the model write "ending 2025-06-30" itself, a date in no source, and the numbers check
+    flagged a correct answer. The label now gives the stored date (a 52-week filer's year-ago date is not exactly one
+    year back)."""
+    exact = flow("Revenues", [
+        ("2024-07-01", "2025-06-30", 281e9, "m-24", "10-K", "2025-07-30"),
+        ("2025-07-01", "2026-06-30", 331.8e9, "m-25", "10-K", "2026-07-29"),
+    ])
+    assert trailing(exact)[0].growth_label == "the 12 months ending 2026-06-30 vs the 12 months ending 2025-06-30"
+    weeks = flow("Revenues", [
+        ("2024-06-30", "2025-06-28", 400e9, "a-24", "10-K", "2025-08-01"),
+        ("2025-06-29", "2026-06-27", 450e9, "a-25", "10-K", "2026-07-31"),
+    ])
+    assert trailing(weeks)[0].growth_label == "the 12 months ending 2026-06-27 vs the 12 months ending 2025-06-28"
+    alone = flow("Revenues", [("2025-07-01", "2026-06-30", 331.8e9, "m-25", "10-K", "2026-07-29")])
+    result, _ = trailing(alone)
+    assert result.growth is None and result.growth_label.endswith("vs the 12 months a year earlier")
+
+
 def test_a_reported_twelve_month_figure_beats_a_shorter_period_ending_the_same_day():
     # Amazon's 10-Q includes a twelve-month column.
     periods = flow("NetIncomeLoss", [

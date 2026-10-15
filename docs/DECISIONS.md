@@ -728,6 +728,19 @@ benchmarks.
   ("why did it move": "may have been part of the broader market context"; "press coverage" 1 of 3, which was 8 to 9 of 10
   in the earlier A/B). Still open from the held-out list: the template headline (`META_TITLE_QUOTE`, irrelevant headlines
   padding answers), and the "2025" false positive in the numbers check.
+- **The "2025" false positive in the numbers check, 2026-10-15.** "Has Microsoft's revenue been growing?" was flagged
+  (`figures not in the cited sources: 2025`) on a correct answer, 0 of 10 on `main`. The figures source said only "vs the 12
+  months a year earlier", and the model wrote "ending 2025-06-30" itself, a date in no source. The check was right to
+  flag it by its rules; the fix is in the source, not the check. `trailing` in `data/fundamentals.py` now writes the earlier
+  period's real end date ("vs the 12 months ending 2025-06-30"), taken from the stored figure so a 52-week filer's date is
+  its own (Apple: 2025-06-28), and falls back to the old wording when there is no earlier year. The growth label is also
+  shown on the stock detail page, so it reads more precisely there too. Only the full-year wording was changed; the
+  partial-year wording ("the 6 months to X vs the same 6 months a year earlier", with its "only (not the growth of the
+  12-month total)" note) was tuned carefully above and is untouched. **After the change:** the case 10 of 10; full
+  `eval_market`, 3 repeats, 122 cases: **356 of 366 (97%)**, against 351. Remaining misses: "shares: buy back" (on purpose),
+  "ho news: this week" (the invented "October 12-14" range), "payout ratio" 1 of 3, and "sentiment" 1 of 3 (the answer
+  leaves out the word "label"; model wording, as with "press coverage", which swings between 3 and 10 of 10 across
+  runs). Not a fair score. A model that works out other dates (such as "last year" as "2025") is still flagged, correctly.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
