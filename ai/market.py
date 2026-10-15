@@ -85,7 +85,13 @@ INDEX_RE = re.compile(r"\b(?:s&p(?:\s*500)?|dow(?:\s+jones)?|nasdaq(?:\s+composi
 STOCK_NOUN_RE = re.compile(r"\b(?:stocks?(?!-based)|shares)\b", re.IGNORECASE)  # not "stock-based compensation"
 SENTIMENT_RE = re.compile(
     r"\b(?:sentiment|mood|bullish|bearish|optimis\w+|pessimis\w+|tone\s+of|(?:good|bad|positive|negative)\s+news|"
-    r"how\s+(?:do|does)\s+(?:people|investors|the\s+market)\s+feel|"
+    r"how\s+(?:do|does|are)\s+(?:people|investors|the\s+market|reporters|journalists|the\s+press|the\s+media|commentators)\s+"
+    r"(?:feel|think|see|view)|"
+    r"\b(?:media|press|news|coverage)\b[^?.]{0,25}\b(?:tone|mood|vibe)\b|\b(?:tone|mood|vibe)\b[^?.]{0,25}\b(?:media|press|news|coverage)\b|"
+    r"\bvibes?\b|\bsour(?:ing|ed)?\s+on\b|"
+    r"\b(?:turn\w*|get\w*|grow\w*|becom\w*)\s+(?:more\s+)?(?:sour|bullish|bearish)\b|"  # not "negative": cash flow can turn negative
+    r"\b(?:press|media|coverage|reporters|journalists)\b[^?.]{0,30}\b(?:negative|positive)\b|"
+    r"\bcoverage\b[^?.]{0,30}\b(?:trend\w*|shift\w*|chang\w*|improv\w*|worsen\w*|deteriorat\w*)\b|"
     r"feel(?:ing|s)?\s+(?:positive|negative|good|bad)|investors?\s+(?:feel|are\s+feeling|think)|what\s+do\s+investors|"
     r"how\s+(?:negative|positive)\b)",
     re.IGNORECASE,
@@ -102,9 +108,19 @@ FILING_RE = re.compile(
 # Company financial figures (P/E, market value, revenue, profit, margins) from the stored SEC figures.
 # Specific wording first. Every match is cut out of the question before the next pattern runs, so "price-to-earnings"
 # counts once as a P/E question and not again as an "earnings" (profit) one.
+# A company named as the subject of "worth" or "valued at": one or two words with no possessive ("Microsoft", "Apple Inc",
+# "all of Tesla"), so "Microsoft's goodwill", "the inventory" and "its patents" are not a company's total value.
+_SUBJ = r"(?:all\s+of\s+)?(?!(?:the|its|their|a|an|this|that|these|those|my|your|our)\b)[\w.&-]+(?:\s+(?:inc|corp|corporation|company|co)\b\.?)?"
+MARKET_VALUE_PATTERN = (
+    r"\bmarket[-\s]cap(?:italization|italisation)?\b|\bmarket\s+(?:value|valuation)\b|"
+    rf"\b(?:what(?:'s|\s+is|\s+are)|how\s+much\s+(?:is|are))\s+{_SUBJ}\s+worth\b(?!\s+(?:buying|selling|investing|holding|owning|it\b|the\b|a\b|an\b|to\b))|"
+    rf"\bwhat(?:'s|\s+is|\s+was)\s+{_SUBJ}\s+valued\s+at\b|"
+    r"\b(?:total|combined|overall|aggregate)\s+value\s+of\s+(?:all\s+of\s+)?[\w.&'’ -]{0,30}?\b(?:shares|stock|equity)\b|"
+    r"\bcompany['’]?s?\s+value\b|\bcost\s+to\s+(?:buy|purchase|acquire)\s+(?:all\s+of|the\s+(?:whole|entire))\b"
+)
 _SPECIFIC_TOPICS = (
     ("pe", r"\bp\s?/\s?e\b|\bpe\s+(?:ratio|multiple)\b|\bprice[-\s]to[-\s]earnings\b|\bearnings\s+multiple\b"),
-    ("market_value", r"\bmarket[-\s]cap(?:italization|italisation)?\b|\bmarket\s+(?:value|valuation)\b"),
+    ("market_value", MARKET_VALUE_PATTERN),
     ("eps", r"\beps\b|\bearnings\s+per\s+share\b"),
     ("shares", r"\bshares\s+outstanding\b|\bshare\s+count\b|\bnumber\s+of\s+shares\b"),
 )
@@ -218,7 +234,12 @@ ADVICE_ASK_RE = re.compile(
         (?:buy|sell)\s+or\s+(?:sell|hold|buy)\b|buy,?\s+sell,?\s+or\s+hold\b|
         would\s+you\s+(?:buy|sell|recommend|invest|hold)\b|
         do\s+you\s+(?:recommend|suggest)\b|(?:recommend|suggest)\s+(?:buying|selling|holding)\b|
-        what\s+(?:stocks?|shares?)\s+should\s+(?:i|we)\b
+        what\s+(?:stocks?|shares?)\s+should\s+(?:i|we)\b|
+        (?:a|an)\s+(?:smart|safe|wise|sensible|sound|good|solid|reasonable)\s+(?:place|home|spot|vehicle|holding|investment)\b|
+        better\s+off\s+(?:with|in|buying|owning|holding)\b|
+        (?:do|would)\s+you\s+(?:like|favou?r|prefer|pick|choose)\b|
+        \b(?:smart|wise|sensible|sound|safe|prudent|good|great|solid)\b.{0,60}?\bfor\s+(?:me|us)\b|
+        (?:put|putting|park|parking)\s+(?:(?:any|some|a\s+little|a\s+lot\s+of)\s+)?(?:money|cash|savings)\s+(?:in|into|with)\b
     )""",
     re.IGNORECASE | re.VERBOSE,
 )
@@ -235,8 +256,15 @@ DECISION_CUE_RE = re.compile(
 )
 
 
+# The reader's own money in the question ("park my money", "my retirement account", "my savings") is a request for a
+# recommendation however it is worded. "its cash" and "an employee savings plan" are the company's, and are not caught.
+OWN_MONEY_RE = re.compile(
+    r"\b(?:my|our)\s+(?:money|cash|savings|retirement|nest\s+egg|portfolio|ira|401\s?\(?k\)?|brokerage|funds)\b", re.IGNORECASE
+)
+
+
 def asks_for_advice(question: str) -> bool:
-    return bool(ADVICE_ASK_RE.search(question)) or (
+    return bool(ADVICE_ASK_RE.search(question)) or bool(OWN_MONEY_RE.search(question)) or (
         bool(TRADE_WORD_RE.search(question)) and bool(DECISION_CUE_RE.search(question))
     )
 
@@ -270,8 +298,9 @@ def detect_intent(question: str) -> Intent:
     share_count = bool(HOW_MANY_SHARES_RE.search(question)) and not SHARES_ACTION_RE.search(question)
     question = HOW_MANY_SHARES_RE.sub(" ", question)  # "shares does" is not a price verb, so cut the phrase out first
     # "stock" plus a named period ("Apple stock or Microsoft stock, this month?") is a price question even without a verb
+    price_text = re.sub(MARKET_VALUE_PATTERN, " ", question, flags=re.IGNORECASE)  # "How much is Apple worth?" is not "how much is" a price
     prices = (
-        bool(PRICE_RE.search(question)) or bool(INDEX_RE.search(question)) or bool(BARE_STOCK_RE.search(question))
+        bool(PRICE_RE.search(price_text)) or bool(INDEX_RE.search(question)) or bool(BARE_STOCK_RE.search(question))
         or (bool(STOCK_NOUN_RE.search(question)) and parse_window(question).explicit)
     )
     sentiment = bool(SENTIMENT_RE.search(question))
