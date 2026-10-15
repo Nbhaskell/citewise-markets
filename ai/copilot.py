@@ -412,17 +412,68 @@ def causal_claims(text: str, evidence: list[SearchResult | MarketEvidence]) -> l
     return [c.strip()[:120] for c in clauses if CAUSE_HINT_RE.search(c) and not NEGATION_RE.search(c)]
 
 
+TITLE_MIN_WORDS = 3  # a shorter quote is a scare-quoted word or a phrase, not a headline
+SENTIMENT_TAG_RE = re.compile(r"\[\s*sentiment\s*:[^\]]*\]|\(\s*sentiment\s*:[^)]*\)", re.IGNORECASE)
+LIST_MARK_RE = re.compile(r"^\s*(?:(?:[-*•]|\d+[.)])\s*)?(?:(?:headline|title)\s*:\s*)?", re.IGNORECASE)
+ELLIPSIS_RE = re.compile(r"\.\.\.|…")
+
+
+def _squash(text: str) -> str:
+    """Lower case, letters and digits only, one space between words: so a quote matches its source whatever the punctuation."""
+    return " ".join(re.sub(r"[\W_]+", " ", text.lower()).split())
+
+
+def quoted_titles(text: str) -> list[str]:
+    """What the answer presents as a headline or a quotation: text inside quotation marks, and the words before a
+    "[Sentiment: ...]" tag (the model's own list format for headlines). Short ones are left out (see TITLE_MIN_WORDS)."""
+    plain = CITE_RE.sub("", text)
+    found = [part for span in QUOTED_RE.findall(plain) for part in ELLIPSIS_RE.split(span.strip('"“”'))]
+    for line in plain.splitlines():
+        if tag := SENTIMENT_TAG_RE.search(line):
+            found.append(LIST_MARK_RE.sub("", line[: tag.start()]).strip(" \t\"“”'‘’:-–—"))
+    return [t.strip() for t in found if len(_squash(t).split()) >= TITLE_MIN_WORDS]
+
+
+def invented_titles(text: str, passages: list[SearchResult | MarketEvidence], question: str = "") -> list[str]:
+    """Titles or quotations in the answer that appear in none of the sources and not in the question. The numbers check
+    cannot see these: "Tesla Faces Legal Challenges [Sentiment: Negative]" has no digits and no citation, and it was
+    written by the model, not found in the data. Looks at every source given to the model, cited or not, and matches the
+    words regardless of punctuation and case, so a quote that merely drops a trailing " - Reuters" still passes."""
+    known = _squash(question + "\n" + "\n".join(passage_block(n, p) for n, p in enumerate(passages, 1)))
+    out: list[str] = []
+    for title in quoted_titles(text):
+        if _squash(title) not in known and title not in out:
+            out.append(title)
+    return out
+
+
+def invented_titles_caution(titles: list[str]) -> str:
+    shown = "; ".join(f"“{t[:90]}”" for t in titles[:3])
+    return (
+        f"This answer quotes {'a headline or quotation' if len(titles) == 1 else 'headlines or quotations'} that "
+        f"{'is' if len(titles) == 1 else 'are'} not in the stored sources: {shown}. The wording was made up by the model, "
+        "so don't rely on it."
+    )
+
+
 def _generate_checked_full(
     llm: LLM, question: str, passages: list[SearchResult | MarketEvidence]
-) -> tuple[str, list[int], list[str], list[str]]:
-    """The answer, its citations, figures/directions that don't match the sources, and causes it implies. One retry
-    when anything is wrong: the model must stop doing its own arithmetic and stop explaining price moves."""
+) -> tuple[str, list[int], list[str], list[str], list[str]]:
+    """The answer, its citations, figures/directions that don't match the sources, causes it implies, and titles it
+    invents. One retry when anything is wrong: the model must stop doing its own arithmetic, stop explaining price moves,
+    and quote only what the sources say."""
     prompt = build_prompt(question, passages)
     system = system_prompt(passages)
     text, cited = clean_citations(strip_thinking(llm.generate(system, prompt)), len(passages))
     bad, causes = unverified_numbers(text, cited, passages, question), causal_claims(text, passages)
-    if bad or causes:
+    titles = invented_titles(text, passages, question)
+    if bad or causes or titles:
         complaints = []
+        if titles:
+            complaints.append(
+                f"It quotes headlines or text that are not in the sources: {'; '.join(titles[:5])}. List only headlines "
+                "copied exactly from the sources, or say the sources contain none."
+            )
         if bad:
             complaints.append(
                 f"It contains figures or directions that do not match the sources: {', '.join(bad)}. "
@@ -437,7 +488,8 @@ def _generate_checked_full(
         correction = f"{prompt}\n\nYour previous answer:\n{text}\n\n{' '.join(complaints)} Leave out anything you can't support."
         text, cited = clean_citations(strip_thinking(llm.generate(system, correction)), len(passages))
         bad, causes = unverified_numbers(text, cited, passages, question), causal_claims(text, passages)
-    return text, cited, bad, causes
+        titles = invented_titles(text, passages, question)
+    return text, cited, bad, causes, titles
 
 
 def _generate_checked(
@@ -575,9 +627,10 @@ def answer_question(
 
     passages = add_units(conn, passages)  # a table whose unit sentence was cut off into the passage before gets it back
     evidence = market + passages  # prices and headlines first: they are short, and the passages are numbered after them
-    text, cited, bad, causes = _generate_checked_full(llm, search_question, evidence)
+    text, cited, bad, causes, titles = _generate_checked_full(llm, search_question, evidence)
     cautions = (
-        ([CAUSE_CAUTION] if causes else []) + ([ADVICE_CAUTION] if intent.advice else [])
+        ([CAUSE_CAUTION] if causes else []) + ([invented_titles_caution(titles)] if titles else [])
+        + ([ADVICE_CAUTION] if intent.advice else [])
         + relevant_cautions(evidence, intent.fundamentals, text)
         + ([not_calculated_note(intent.unstored)] if intent.unstored else [])
     )
