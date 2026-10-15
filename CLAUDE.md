@@ -37,20 +37,20 @@ them (the owner hasn't confirmed the order):
    (`ai/market.py`), and attaches the relevant cautions to the answer in code. US-GAAP filers only; foreign filers show "not available".
    Python computes every ratio and the model only quotes it as a numbered source. A screener can't exist without these.
 4. **A daily "what changed" view** (new filings, big moves, notable headlines) from data already stored.
-5. **Copilot trust.** In progress; the history is in DECISIONS.md ("Copilot trust, steps 1 to 5"). Built, all in code and
+5. **Copilot trust.** In progress; the history is in DECISIONS.md ("Copilot trust, steps 1 to 6"). Built, all in code and
    not in the prompt: a follow-up that only names another company keeps the earlier topic (`carry_topic`); ratios the app
    doesn't compute are declined (`unstored_figures`); "Tesla's stock" with nothing else is a price question
-   (`BARE_STOCK_RE`); "how many shares does X have" goes to the stored share count (`HOW_MANY_SHARES_RE`); and a request
-   for a buy, sell, or hold call always carries a fixed notice (`asks_for_advice`, `ADVICE_CAUTION`). The set is 86 cases
-   and scored 249 of 258 (`--repeat 3`). The misses: "price target" and "crashing premise" (correct answers; the checks are
-   the problem and need the owner's decision), "how is X doing" (flaky on `main` too), and "shares: buy back (quarter total)" (a real wrong
-   answer on purpose: it quotes one month's row, not the Total; the numbers check cannot see it). Scores from
-   different steps are not the same bar, because some checks changed. A table passage that lost its unit sentence to the cut
-   between passages gets it back at prompt time (`ai/table_units.py`), so "26,223" now comes back as "26,223 thousand".
-   Not done: which row of a table answers "last quarter" (it quotes the last month, not the Total; rebuilding rows was tried and
-   dropped, see DECISIONS, so don't retry it), the one-day-old newest
-   price (under investigation), the content of advice-adjacent answers (a list of "factors to consider" still leans
-   advice-like), and fresh held-out cases.
+   (`BARE_STOCK_RE`); "how many shares does X have" goes to the stored share count (`HOW_MANY_SHARES_RE`); a request for a
+   buy, sell, or hold call always carries a fixed notice (`asks_for_advice`, `ADVICE_CAUTION`); a table passage that lost
+   its unit sentence to the cut between passages gets it back at prompt time (`ai/table_units.py`); and a figure the
+   question itself contains is not flagged as unverified when the answer only declines or restates (`_users_own_numbers`).
+   The set is 86 cases and scored 252 of 258 (`--repeat 3`); "price target" and "crashing premise" now pass. The misses:
+   "shares: buy back (quarter total)" (a real wrong answer, kept failing on purpose: it quotes one month's row, not the
+   Total; rebuilding rows was tried and dropped, see DECISIONS, so don't retry it), and flaky cases ("news and stock",
+   "how is X doing", "advice: keep it or sell it") that also fail on `main` some runs. Scores from different steps are not
+   the same bar, because some checks changed. Not done: the newest stored price was a day old after every 5pm run (the
+   nightly task moved to 3pm on 2026-10-15; check `python -m jobs.refresh --status` after a run), the content of
+   advice-adjacent answers (a list of "factors to consider" still leans advice-like), and fresh held-out cases.
 
 ## Working with the owner
 

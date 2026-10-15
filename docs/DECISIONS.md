@@ -146,8 +146,10 @@ benchmarks.
   check existed). Checks in code, not the prompt, are what hold the line: the numbers, direction, minus-sign, and
   cause checks, and the refusals.
 - **The numbers check can warn about a figure the user typed.** "Will Microsoft hit $600 by December?" is answered
-  correctly, but the model repeats "$600" and the check flags it as not in the sources. Left as is: a spurious warning
-  is the safer way to fail than trusting numbers a user supplies.
+  correctly, but the model repeats "$600" and the check flags it as not in the sources. Left as is at first: a spurious
+  warning is the safer way to fail than trusting numbers a user supplies. **Changed 2026-10-15** (see "Copilot trust, step
+  6" below): a figure the question itself contains is let through when every sentence of the answer that uses it declines
+  or restates without predicting.
 - **The cause check only looks for certain wording** ("due to", "may have contributed", "driven by"). A cause implied
   in other words would pass, and it only runs when the answer was given both prices and headlines.
 - **Headlines in answers are shallow.** Titles only, the newest six (so usually all from one day, whatever period was
@@ -590,6 +592,41 @@ benchmarks.
   of "the last month". **Still open:** the nightly report says "0 problems" when the newest price is a day old; once the
   timing is fixed, flagging that is worth doing (a trading-day calendar is needed so holidays don't raise false alarms).
   Earlier documented 5pm times (older entries above) are left as they were written.
+- **Copilot trust, step 6: "price target" and "crashing premise" resolved (2026-10-15).** Both had failed every run since
+  the first full score, with correct answers, and both were left for the owner to decide because each changes what
+  "pass" means. The owner chose to fix both. **(1) The user's own number.** "Will Microsoft hit $600 by December?" is
+  answered "the sources do not provide information about future stock prices, including whether Microsoft will hit $600",
+  and the numbers check flagged "600" as missing from the sources, so a correct answer carried a warning (and cost a
+  second model call to retry). `_users_own_numbers` (`ai/copilot.py`) now lets a figure through when the question itself
+  contains it and **every** sentence of the answer that uses it declines (not, no, nothing, cannot, n't...) and either
+  restates (whether, if) or makes no prediction of its own (will, would, going to, expected to, won't...). Still flagged:
+  "Microsoft will not hit $600" and "won't hit $600" (predictions), "Microsoft is at $600" and "far below $600" (claims),
+  a declining sentence followed by a claim with the same number, and a number the user did not type. The question is
+  passed to the check on both the first answer and the retry. **Tests:** 18 new in `tests/test_copilot_own_number.py`,
+  and six deliberate breakages each caught (one needed a new test first: accepting the number if *any* sentence declines
+  instead of *all*; another gap, "won't" read as a decline rather than a prediction, was found by re-reading the rule
+  and fixed with a test written first). **(2) The premise correction.** "Why is Apple stock crashing?" is answered "the
+  sources do not indicate that Apple stock is crashing... up 2.62%... no evidence of a crash", which is better than the
+  wording the check wanted ("the stored data can't show the cause"). `ai/eval_market.py` now accepts either, but still
+  requires a stored price in the answer, still rejects any invented or hedged cause (`CAUSAL` and `SPECULATION`, unchanged),
+  and rejects an answer that claims the stock crashed. That last check first matched the word "crash" in a denial ("none
+  directly explain a stock crash") and wrongly failed a good answer in one run; it now needs a verb about the stock itself
+  and is run on asserted sentences only. It was checked against nine hand-written answers (two good, one premise
+  correction, six bad including one that affirms the premise, invents a cause, or hedges one) with no mismatches.
+  **Evaluation:** `ai.eval_followups` 17 of 17 and 10 of 10, unchanged. 586 Python and 207 web tests pass. `ai.eval_market
+  --repeat 3 --show` (86 cases) scored **252 of 258** (250 on an earlier run, before the crash check was narrowed): both
+  cases pass 3 of 3 and all 27 "trap" cases pass; the misses are the on-purpose buyback case and flaky ones. A 10-run
+  A/B against `main` (the same day's data): "price target" 0 of 10 on `main` and 10 of 10 here; "advice: keep it or sell
+  it" 9 of 10 and 10 of 10; "crashing premise" 10 of 10 on both, because that day's headlines made the model use the older
+  wording, which shows how much these answers drift with the news. **Read the score carefully:** the "crashing premise"
+  case changed what it accepts, so 252/258 is not the same bar as earlier totals; the change is that a premise correction
+  passes, not that any answer does. **Weak spots:** (1) Decline and prediction words are keyword lists; a prediction in
+  words they lack ("it is unlikely to reach $600" has no decline word, so it is still flagged, but "I doubt it hits $600"
+  would be let through) is not covered. (2) If Apple really did crash, a premise correction would be wrong, and the case
+  would need new data; the check cannot know. (3) The exemption covers only numbers in the question given to the model,
+  which for a follow-up is the rewritten question. (4) One full evaluation run crashed when a single request to the local
+  model took more than the 600-second limit and timed out; Ollama answered normally right afterwards. The app would wait
+  just as long on such a stall, because the chat request's timeout is 600 seconds. Not changed.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
@@ -619,7 +656,8 @@ benchmarks.
 - A Claude implementation of `LLM` (needs an Anthropic API key), then compare answers against Qwen on the same questions
 - Keyword plus vector hybrid search; a reranker
 - Skipping quote and template pages before labeling, so the model isn't asked about them
-- Moving the copilot onto the broader template rules (needs a decision on the "crashing premise" case first)
+- Moving the copilot onto the broader template rules (the "crashing premise" case was decided on 2026-10-15 and now
+  accepts a premise correction; the 8-of-8-to-0-of-8 experiment above has not been re-run against the new check)
 - Fixing the phone-width watchlist so the 1-month chart and News mood columns are reachable
 - A proper evaluation set of questions with known answers
 - Index and fundamentals data (S&P 500, P/E, market value) so those questions can be answered instead of refused
