@@ -741,6 +741,54 @@ benchmarks.
   "ho news: this week" (the invented "October 12-14" range), "payout ratio" 1 of 3, and "sentiment" 1 of 3 (the answer
   leaves out the word "label"; model wording, as with "press coverage", which swings between 3 and 10 of 10 across
   runs). Not a fair score. A model that works out other dates (such as "last year" as "2025") is still flagged, correctly.
+- **Template placeholder headline (fix (e) of the held-out round), 2026-10-15.** `_QUOTE_PAGE_RULES` in `data/headlines.py`
+  now also takes a title that is only an UPPER_SNAKE_CASE token ("META_TITLE_QUOTE", seen in two stored rows and two
+  answers), so the copilot, the sentiment totals, and the news lists all leave it out. Mixed case and titles with other
+  words are not matched (tests in `tests/test_headlines.py`). Full `eval_market`, 3 repeats, 122 cases: 356 of 366, unchanged,
+  and no placeholder text in any answer. **Not done, still a decision for the owner:** moving the copilot onto the broad
+  data-page rules. In the last 8 days the copilot saw about 53 titles the broad rule drops ("Holding History", "Options
+  Chain", "Stock Analysis" pages); the experiment that flipped "crashing premise" from 8 of 8 to 0 of 8 predates the
+  premise-correction fix and has not been re-run. Irrelevant headlines that pad answers ("Dividend ETFs Don't Work The Way
+  You Think" for Microsoft) are a relevance-labeling matter and are unchanged.
+- **Second held-out round: the fair score is 68 of 105 (65%), 2026-10-15.** After the five fixes above (all merged), 35 new
+  cases were written in wording used nowhere else (not even in the unit tests written for those fixes), with expectations
+  set from the right behavior, run once with 3 repeats, and every answer read, passing ones too. They are now `ROUND_TEN`
+  and count as tuning material (`HELD_OUT` is empty again; the set is 157 cases, one name, "filings only", is duplicated
+  from before). **The honest reading:** this is not better than the first fresh round (72%), and the questions were
+  different and deliberately include stretches, so the two numbers are not a trend. What it shows is that fixing the
+  eight failures found last time did not make the wording rules general: new everyday phrasings miss in the same places.
+  **By group (first pass):** prices, news, and sentiment 6 of 10; financial figures 3 of 6; filings 5 of 5 (the one clean
+  group again); traps 5 of 9; follow-ups 3 of 5. **Thirteen failures,
+  by cause:** (1) **Price questions that still go to the filings and are answered "no price data in the sources"** (3):
+  "Is Amazon above where it started 2026?", "Show me how Alphabet has moved over the last three months", "Has the stock
+  market been kind to Amazon over the last few weeks?". The false "no price" claim was one of the things the last round's
+  caution (`false_price_claim`) is meant to flag; the evaluation does not print cautions, so whether it fired is not
+  measured. (2) **Financial-figure wording** (2 real): "How much did Amazon earn over the past twelve months?" goes to price
+  because "how much did" is a price phrase; "How many dollars of sales did Nvidia bring in over the last four quarters?"
+  goes to the filings, which have no twelve-month total. A third, "What multiple of earnings is Alphabet trading at?", was
+  answered correctly (P/E 17.8) and failed only because a price source came along too; that expectation was too strict.
+  (3) **Sentiment wording** (1): "Are reporters being kind or harsh to Nvidia right now?" (no sentiment words the rule knows).
+  (4) **Advice wording** (2): "My friend says Nvidia is a sure thing. Is she right?" and "Would you say Alphabet is cheap
+  right now?" got no notice. (5) **A non-company question answered from a company filing** (1): "What did Bitcoin do this
+  month?" was answered from Tesla's Bitcoin holdings note; the right behavior is the "tell me which company" refusal.
+  (6) **A checker artifact** (1): "What caused Nvidia's last big drop?" was answered well (no cause in the data, and the
+  stock actually rose) but failed on the word "reflects" in `SPECULATION`; it also got only the price source, since
+  "caused" is not one of the cause words. (7) **Follow-ups** (2): "Is that better or worse than Amazon?" dropped Nvidia
+  from the companies (history was ignored), and "Now do Alphabet." after a risks question was not read as the same question
+  for Alphabet ("do" is not a filler word in `carry_topic`), so the model summarized the company and listed 21 figures
+  that the numbers check flagged. **Passing answers that were not right when read:** "What was Microsoft's closing price at
+  the end of last week?" was answered with the latest close (10-13) as if it were last week's; "How did Apple shares and
+  Microsoft shares do since July?" was answered over the past month (`parse_window` knows no month names or dates) without
+  saying the period was different; "How did Tesla's stock finish today?" gave the 10-13 close as "today" (it was 10-15; the
+  stale-price problem). The rules passed these because they check for figures and sources, not for the period asked. **Order
+  I would fix them in:** (a) price questions without the usual words, in particular a period ("over the last three months",
+  "since July", "last few weeks") or a comparison with the start of the year, tested one phrase at a time; (b) honoring the
+  period the question names, or saying in code that the window used is not the one asked; (c) follow-up carrying ("Now do
+  X", "better or worse than X" keeping both companies); (d) the "earn" and "sales" figure wording; (e) advice and sentiment
+  wording again; (f) non-company questions. The pattern after two rounds is that each fix covers its own phrasings; a
+  more general approach (a routing step that asks the model to classify the question, checked in code) is worth weighing
+  against more keyword rules, which keep needing new patches. Not decided; it would be a change to how every question is
+  routed and would need its own evaluation.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

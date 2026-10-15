@@ -30,6 +30,9 @@ _QUOTE_PAGE_RULES = [
     r"\bprice\s*,",
     # Comparison pages: "X vs Y: Price, Performance & Key Differences", "Compare X vs Y"
     r"\bvs\.?\s",
+    # A page template that was never filled in: the whole title is a placeholder token such as "META_TITLE_QUOTE" (it
+    # showed up as a "headline" in two answers). Only UPPER_SNAKE_CASE with nothing else counts.
+    r"^\s*(?-i:[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\s*$",
 ]
 _DATA_PAGE_RULES = [
     r"\bquotes\b",  # "Stock Options Chain | Quotes & News"

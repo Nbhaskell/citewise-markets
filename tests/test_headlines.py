@@ -13,6 +13,8 @@ QUOTE_AND_COMPARISON_PAGES = [
     "Broadcom vs. Intel: Which Chip Stock Is a Better Buy in 2026?",
     "Apple Stock Price Forecast. Should You Buy AAPL?",
     "Wall Street sets Google (GOOGL) stock price for the next 12 months",
+    "META_TITLE_QUOTE",  # a template placeholder that was never filled in
+    "OG_TITLE_STOCK_2",
 ]
 
 # Not matched by the core rules (the copilot still sees them), but left out of the sentiment totals.
@@ -53,6 +55,9 @@ REAL_STORIES = [
     "Amazon Reportedly in Talks to Buy AI Startup Decart for $7 Billion - Amazon.com (NASDAQ:AMZN)",
     "Intel aims to boost AI turnaround with new GPU chips to take on Nvidia",
     "Nvidia (NVDA) Sees a More Significant Dip Than Broader Market: Some Facts to Know",
+    "SEC Probes Tesla",  # capitals, but not one placeholder token
+    "Meta_Title_Quote",  # underscores in mixed case are not the all-caps placeholder
+    "AAPL_Q3 results beat estimates",
 ]
 
 
