@@ -146,11 +146,15 @@ def trailing(periods: dict[tuple[Optional[date], date], Fact]) -> tuple[Optional
     year_ago = latest[1] - timedelta(days=365)
 
     if _dur(latest) >= 340:  # the filing already covers a full year
-        prior = next((flows[k] for k in sorted(flows, key=lambda k: abs((k[1] - year_ago).days))
-                      if _dur(k) >= 340 and _near(k[1], year_ago, 12)), None)
+        prior_key = next((k for k in sorted(flows, key=lambda k: abs((k[1] - year_ago).days))
+                          if _dur(k) >= 340 and _near(k[1], year_ago, 12)), None)
+        prior = flows[prior_key] if prior_key else None
         growth = last.value / prior.value - 1 if prior and prior.value > 0 else None
+        # The earlier period's real end date is written out: left as "a year earlier" the model worked it out itself
+        # ("ending 2025-06-30"), and the numbers check rightly flagged a date that no source contained.
+        against = f"the 12 months ending {prior_key[1]}" if prior_key else "the 12 months a year earlier"
         return Flow(last.value, f"the 12 months ending {latest[1]}", latest[1], growth,
-                    f"the 12 months ending {latest[1]} vs the 12 months a year earlier",
+                    f"the 12 months ending {latest[1]} vs {against}",
                     (last.accession_number,), (f"{last.form} filed {last.filed_at} (12 months to {latest[1]})",)), ""
 
     months = round(_dur(latest) / 30.4)
