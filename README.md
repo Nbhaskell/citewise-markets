@@ -131,8 +131,11 @@ alerts reach you with `.venv\Scripts\python -m jobs.notify`. Add `--no-alert` to
 **Schedule it** (one time, changes your Windows Task Scheduler):
 
 ```bash
-powershell -ExecutionPolicy Bypass -File scripts\register_nightly_task.ps1 -Time 23:00
+powershell -ExecutionPolicy Bypass -File scripts\register_nightly_task.ps1 -Time 15:00
 ```
+
+Use 3pm (Pacific). Yahoo left out the day's closing price when the job ran at 5pm, so the stored prices stayed a day
+behind; see "Prices were always a day behind" in `docs/DECISIONS.md`.
 
 Remove it with `powershell -File scripts\unregister_nightly_task.ps1`. The task only runs while you are logged in,
 and if the PC was off at the scheduled time it runs when you next log in. **Docker Desktop and Ollama must be running**
@@ -156,7 +159,7 @@ drive for that. The newest 30 automatic backups are kept. It waits for a running
 `verify` restores into a temporary database, compares every table's row count with the note, checks the search index and
 price history work, then deletes the copy. Your live database is not touched. A failed backup shows a desktop alert.
 
-**Schedule it** (one time, changes your Windows Task Scheduler; default 6pm, after the 5pm refresh):
+**Schedule it** (one time, changes your Windows Task Scheduler; default 6pm, after the 3pm refresh):
 
 ```bash
 powershell -ExecutionPolicy Bypass -File scripts\register_backup_task.ps1

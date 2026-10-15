@@ -6,7 +6,7 @@ history see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md]
 ## What this is
 
 An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
-refresh job (`jobs/`, scheduled in Windows Task Scheduler for 5pm Pacific), a read-only FastAPI backend (`api/`), and a
+refresh job (`jobs/`, scheduled in Windows Task Scheduler for 3pm Pacific), a read-only FastAPI backend (`api/`), and a
 React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot that understands follow-ups
 and answers from filings, daily prices, and news headlines. Not built: accounts and
 login, portfolios, a screener, fundamentals for foreign (20-F) filers, adding a company from the app, backups
@@ -163,7 +163,7 @@ The owner is building this step by step and is not a professional developer, so 
   the API news lists show each story once; don't add another counting query. The rules were written from the same
   headlines they are tested on, so new templates need a new rule plus a case in `tests/test_headlines.py`.
 - **Branches:** do new feature work on a `feature/...` branch and tell the user when a step warrants one. The nightly job
-  runs whatever code is checked out, so don't leave half-finished work checked out at 5pm.
+  runs whatever code is checked out, so don't leave half-finished work checked out at 3pm.
 - **Adding companies (`jobs/add_company.py`):** it reuses `run_refresh` (same lock, same isolation) under its own job
   name, `add_company`, and its report is checked against what is stored, not just the step results. Keep "no filings",
   "skipped", and "failed" visible as gaps; never let a ticker that wasn't stored read as OK. Tests set `ADD_JOB` to

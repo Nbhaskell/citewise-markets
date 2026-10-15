@@ -574,6 +574,22 @@ benchmarks.
   figure (share repurchases by period, from the SEC company facts, like the other fundamentals) that the model only
   quotes, which is a feature of its own with its own checks against the filings; or a check that notices when a quoted
   figure is a part of a larger total. Not started.
+- **Prices were always a day behind; the nightly job moved from 5pm to 3pm Pacific (2026-10-15).** Found while reading
+  an answer that said "latest close 2026-10-12" with headlines dated 10-13. The stored newest price was one trading day
+  old after every nightly run, while the run reported "success, 0 problems". **What was measured:** Yahoo has the day's
+  closing bar (confirmed by asking it directly). The 5pm runs on 10-12, 10-13 and 10-14 each fetched "the last month" and
+  got one bar fewer than the same request made earlier (21 vs 22, 20 vs 21): the day that had just ended was missing, and
+  the next night's run filled it in. Two runs made before 5pm (a 3pm manual run on 10-12 and a midday run on 10-13) did get
+  the day's bar. 5pm Pacific (daylight time) is exactly 00:00 UTC. **The cause is not proven:** it fits "a request made
+  after UTC midnight does not get the day's bar", but I cannot reproduce 5pm conditions during the day. **The change**
+  (owner's go-ahead; `scripts\register_nightly_task.ps1 -Time 15:00`, the only thing changed): the task now runs at 3pm
+  Pacific, which is two hours after the US market closes (1pm) and before UTC midnight all year (3pm Pacific standard time
+  is 23:00 UTC), and the 6pm backup still follows it. **Not yet verified:** the first 3pm run is the test. If the newest
+  price in `python -m jobs.refresh --status` is the same day after it, the cause is confirmed; if it is still a day
+  behind, the timing was not the cause and the next thing to try is asking Yahoo for explicit start and end dates instead
+  of "the last month". **Still open:** the nightly report says "0 problems" when the newest price is a day old; once the
+  timing is fixed, flagging that is worth doing (a trading-day calendar is needed so holidays don't raise false alarms).
+  Earlier documented 5pm times (older entries above) are left as they were written.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

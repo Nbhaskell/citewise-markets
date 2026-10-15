@@ -8,7 +8,7 @@
   - If the PC was off or asleep at the scheduled time, it runs as soon as possible afterwards.
   - Never runs two copies at once, and stops after 1 hour.
   - If the nightly refresh is still running, the backup waits for it (up to 15 minutes) so it never captures a
-    half-finished run. Default time is after the 5pm refresh.
+    half-finished run. Default time is after the 3pm refresh.
   Docker Desktop must be running at that time (it normally starts when you log in). A failed backup shows a desktop alert.
 
 .EXAMPLE
