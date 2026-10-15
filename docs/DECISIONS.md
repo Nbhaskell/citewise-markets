@@ -662,6 +662,19 @@ benchmarks.
   fixed in this step by design:** the point was to measure, not to tune. **Combined view:** the 86 tuned cases scored 252
   of 258 on their last run and the 36 fresh ones 78 of 108, which adds to 330 of 366 (90%) across the 122-case set, from
   two separate runs; the tuned number overstates how the copilot does on questions it has not been shaped for.
+- **Quoted titles must be in the sources (fix (a) of the held-out round), 2026-10-15.** `invented_titles` in `ai/copilot.py`
+  takes what the answer presents as a headline or quotation (text in quotation marks of three words or more, and the words
+  before a `[Sentiment: ...]` tag) and looks for it in every source the model was given and in the question, ignoring case
+  and punctuation. Anything not found triggers the same single retry as the numbers check, with the invented titles named
+  in the complaint, and if the second answer still has one, a caution is attached to the answer (`Answer.cautions`, so no
+  new API field and no web change). **Checked on the live model:** "Why is Tesla tanking?" five times; in two runs the
+  model quoted two made-up headlines each (in a quoted-with-label format, not the `[Sentiment:]` format of the first
+  sighting), both survived the retry, and both were flagged with the caution. The other three runs listed filing risks
+  or said there were no headlines. So the retry did not fix the invention in either run: **the check warns, it does not
+  prevent.** **Not covered:** an invented title with no quotation marks and no sentiment tag (for example `[neutral] Some
+  Title` on its own line); a made-up title that happens to be a substring of a real source; and the cause, which is that
+  the question is read as a filings question, not a price question (fix (b), not done). The full `eval_market` set has not
+  been re-run with this change.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
