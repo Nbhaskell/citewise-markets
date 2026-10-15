@@ -675,6 +675,22 @@ benchmarks.
   Title` on its own line); a made-up title that happens to be a substring of a real source; and the cause, which is that
   the question is read as a filings question, not a price question (fix (b), not done). The full `eval_market` set has not
   been re-run with this change.
+- **Price-question wording (fix (b) of the held-out round), 2026-10-15.** `PRICE_RE` in `ai/market.py` now also takes
+  "tanking" (and "will/could/to tank"; the bare noun "tank" no longer counts, which wrongly caught "oil tank leak"),
+  "stock/shares go/going/went/gone up/down/higher/lower/sideways", and a number-plus-period-plus-move phrase ("one-week
+  move", "3-month movement", "two-week swing", "weekly move"). Window parsing was fixed where the new phrases reached it:
+  "two-week" had been read as one week, "weekly" fell back to the default month, and "3-month" with a hyphen was read as
+  one month. Written and probed with fresh wording first (9 of 12 price phrasings missed before, 0 after; 2 of 7 lookalike
+  filings questions wrongly caught before, 0 after), then tested in `tests/test_price_wording.py`. **Full `eval_market`,
+  3 repeats, all 122 cases: 338 of 366 (92%)**, against 330 of 366 from the two earlier runs added together. This is not a
+  fair score: the 36 fresh cases are tuning material now and three of them ("one week", "why up", "tanking premise") are
+  what this fix was aimed at. "Why is Tesla tanking?" now goes to prices plus headlines and the answer corrects the premise
+  (the stock rose over the month) with real headlines; "tanking premise" is 2 of 3 (one run said the stock "might have
+  tanked"). Still failing, unchanged by this step: "ho news: this week" (0 of 3; invented "October 12-14" date range, caught
+  by the numbers check), "tone turning sour", "worth in total", "price to free cash flow", "park my money" (fixes (c) and
+  (d)), "payout ratio", "revenue growing" (1 of 3), and "shares: buy back" on purpose. **Not covered:** "change" and
+  "performance" with a period ("two-year change") are deliberately not price questions, since they are often revenue or
+  segment questions. Fair measurement of this step needs new cases in new wording.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

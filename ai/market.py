@@ -49,7 +49,9 @@ PRICE_RE = re.compile(
         price\s+of|how\s+much\s+(?:is|does|did)|
         (?:stock|shares?)\s+(?:is|are|has|have|was|been|do|does|done|doing|did|up|down|moves?|moved|perform\w*|trad\w+|fell|rose|drop\w*|rall\w+|surg\w+|jump\w*|climb\w*|gain\w*)|
         how(?:'s|\s+is|\s+are)\s+(?:the\s+|its\s+|their\s+)?(?:stock|shares?)\b|
-        trading|traded|closed|closing|rall(?:y|ied|ies)|surg(?:e|ed|es)|plung\w+|tank(?:ed|s)?|sank|fell|fall(?:s|en|ing)?|
+        (?:stock|shares?)\s+(?:go(?:es)?|going|went|gone)\s+(?:up|down|higher|lower|sideways)|
+        \w+[-\s](?:day|week|month|year)s?\s+(?:move|movement|swing)s?|(?:daily|weekly|monthly|yearly)\s+(?:move|movement|swing)s?|
+        trading|traded|closed|closing|rall(?:y|ied|ies)|surg(?:e|ed|es)|plung\w+|tank(?:ed|s|ing)|(?:will|would|could|might|may|to)\s+tank|sank|fell|fall(?:s|en|ing)?|
         drop(?:s|ped|ping)?|rose|rises?|rising|gain(?:ed|s)?|52[-\s]?week|all[-\s]time\s+(?:high|low)|year[-\s]to[-\s]date|ytd|
         crash\w*|tumbl\w+|soar\w*|slump\w*|spik\w+|skyrocket\w*|sell-?off|rebound\w*|
         volatil\w+|up\s+or\s+down|(?:is|was|are|been)\s+\w+\s+(?:up|down)|(?:up|down)\s+(?:today|this|over|since|in\s+the|for\s+the)|
@@ -291,12 +293,13 @@ _WINDOWS = [  # checked in order, so the specific forms win
     (r"year[-\s]to[-\s]date|\bytd\b|this\s+(?:calendar\s+)?year|so\s+far\s+this\s+year|year\s+so\s+far|"
      r"(?:start|beginning)\s+of\s+(?:the\s+|this\s+)?year|since\s+(?:january|jan\b)|since\s+new\s+year",
      Window("year to date", None, True)),
-    (r"\b(?:5|five)\s+years?\b", Window("past 5 years", 1830, True)),
-    (r"\b(?:6|six)\s+months?\b|\bhalf[-\s]year\b", Window("past 6 months", 183, True)),
-    (r"\b(?:3|three)\s+months?\b|\bquarter\b|\b90\s+days\b", Window("past 3 months", 92, True)),
-    (r"\b(?:12|twelve)\s+months?\b|\b(?:1|one)\s+year\b|52[-\s]?week|\byear\b", Window("past year", 366, True)),
-    (r"\bmonth\b|\b30\s+days\b", Window("past month", 31, True)),
-    (r"\bweek\b|\b(?:7|seven)\s+days\b", Window("past week", 7, True)),
+    (r"\b(?:5|five)[-\s]years?\b", Window("past 5 years", 1830, True)),  # "5-year" as well as "5 years"
+    (r"\b(?:6|six)[-\s]months?\b|\bhalf[-\s]year\b", Window("past 6 months", 183, True)),
+    (r"\b(?:3|three)[-\s]months?\b|\bquarter\b|\b90\s+days\b", Window("past 3 months", 92, True)),
+    (r"\b(?:12|twelve)[-\s]months?\b|\b(?:1|one)[-\s]year\b|52[-\s]?week|\byear\b", Window("past year", 366, True)),
+    (r"\bmonth(?:ly)?\b|\b30\s+days\b", Window("past month", 31, True)),
+    (r"\b(?:2|two)[-\s]weeks?\b|\bfortnight\b|\b14\s+days\b", Window("past 2 weeks", 14, True)),  # before "week", which it contains
+    (r"\bweek(?:ly)?\b|\b(?:7|seven)\s+days\b", Window("past week", 7, True)),
     (r"\btoday\b|\byesterday\b|\bpast\s+day\b|\b(?:1|one)\s+day\b|\b24\s+hours\b", Window("past day", 1, True)),
 ]
 
