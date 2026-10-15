@@ -627,6 +627,41 @@ benchmarks.
   which for a follow-up is the rewritten question. (4) One full evaluation run crashed when a single request to the local
   model took more than the 600-second limit and timed out; Ollama answered normally right afterwards. The app would wait
   just as long on such a stall, because the chat request's timeout is 600 seconds. Not changed.
+- **Held-out round: the fair score is 78 of 108 (72%), 2026-10-15.** Every earlier case had been used to adjust the rules,
+  so the 97% on the tuned sets said little about unseen questions. 36 new cases were written in wording used nowhere
+  else, with expectations set from what the right behavior should be (not what the code does), run once with 3 repeats,
+  and every answer read, passing ones too. They are now `ROUND_NINE` and count as tuning material (`HELD_OUT` is empty
+  again). **By group (first pass):** prices, news, and sentiment 7 of 10; financial figures 5 of 6; filings 5 of 5; traps
+  5 of 10; follow-ups 4 of 5. Filings questions were the one clean group. **Eight real failures:** (1) **Invented
+  headlines.** "Why is Tesla tanking?" was not read as a price question, so it went to the filings only; in one of three
+  runs the answer then listed three "headlines" with sentiment tags ("Tesla Faces Legal Challenges [Sentiment:
+  Negative]" and two more) that exist nowhere in the stored headlines or filing text (checked in the database). No check
+  catches this: there are no digits and no citations. The other two runs listed filing risks and said they "could
+  contribute to volatility", a hedged cause. (2) **Price questions without the usual words** go to the filings and are
+  answered "not available": "Give me the one-week move for Tesla", and "Why did Microsoft shares go up lately?" (no price
+  source given, yet the answer says "the stored data shows the price movement"). (3) **Market value wording:** "How much
+  is Apple worth in total?" is answered "the sources do not include the total market value", though the figure is stored
+  (known weak spot, now measured). (4) **Sentiment wording:** "Is the media tone around Apple turning sour?" is not read
+  as a sentiment question, and the answer repeats an irrelevant sentence from the instructions about price moves. (5) **A
+  ratio not on the list of nine** ("Tell me Apple's price to free cash flow") is answered "the sources do not include
+  Apple's stock price", which is false; the stock price is stored. (6) **Advice wording:** "Is Microsoft a smart place to
+  park my money?" is not detected, so no notice (predicted). (7) **An invented date range:** "Any news on Amazon this
+  week?" was answered "during the week of October 12-14", where nothing says October 12; the numbers check caught it,
+  so the check worked. **Two failures were my expectations, corrected afterwards:** "What's the dividend payout ratio for
+  Microsoft?" expected a decline in code, but the answer ("not directly provided", then the two stated figures, no ratio
+  worked out) is better, and "Any of it negative?" expected sentiment evidence when listing the negative headlines needs
+  only the headlines. With those two corrected the same answers would have scored 84 of 108; 78 is the figure as run.
+  **Smaller things seen in passing answers:** a template headline shows up as "META_TITLE_QUOTE" in two answers and
+  irrelevant headlines pad others ("Dividend ETFs Don't Work The Way You Think" for Microsoft); and "Did Tesla stock drop
+  yesterday?" was answered from 10-13 when the day was 10-15, which is the stale-price problem showing up in an answer.
+  **Order I would fix them in:** (a) a check that any title quoted in an answer appears in the sources, with the answer
+  retried or warned when it does not (1 above; highest, because it is a made-up fact the reader cannot detect); (b)
+  price-question wording (2), tested one phrase at a time because routing changes move other cases; (c) the "no stock
+  price" claim on the filings route (5), either by recognizing more ratio names or by not letting a filings-only answer
+  say what is stored; (d) market value, sentiment, and advice wording (3, 4, 6); (e) the template headline. **Not
+  fixed in this step by design:** the point was to measure, not to tune. **Combined view:** the 86 tuned cases scored 252
+  of 258 on their last run and the 36 fresh ones 78 of 108, which adds to 330 of 366 (90%) across the 122-case set, from
+  two separate runs; the tuned number overstates how the copilot does on questions it has not been shaped for.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

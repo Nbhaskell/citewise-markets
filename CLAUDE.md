@@ -44,13 +44,18 @@ them (the owner hasn't confirmed the order):
    buy, sell, or hold call always carries a fixed notice (`asks_for_advice`, `ADVICE_CAUTION`); a table passage that lost
    its unit sentence to the cut between passages gets it back at prompt time (`ai/table_units.py`); and a figure the
    question itself contains is not flagged as unverified when the answer only declines or restates (`_users_own_numbers`).
-   The set is 86 cases and scored 252 of 258 (`--repeat 3`); "price target" and "crashing premise" now pass. The misses:
-   "shares: buy back (quarter total)" (a real wrong answer, kept failing on purpose: it quotes one month's row, not the
-   Total; rebuilding rows was tried and dropped, see DECISIONS, so don't retry it), and flaky cases ("news and stock",
-   "how is X doing", "advice: keep it or sell it") that also fail on `main` some runs. Scores from different steps are not
-   the same bar, because some checks changed. Not done: the newest stored price was a day old after every 5pm run (the
-   nightly task moved to 3pm on 2026-10-15; check `python -m jobs.refresh --status` after a run), the content of
-   advice-adjacent answers (a list of "factors to consider" still leans advice-like), and fresh held-out cases.
+   The set is 122 cases. The 86 tuned ones scored 252 of 258 (`--repeat 3`; "price target" and "crashing premise" now pass);
+   **the 36 fresh ones, written in new wording and run once before any tuning, scored 78 of 108 (72%)**, which is the honest
+   number (DECISIONS: "Held-out round"). It found a serious one: after a question the router misread as a filings
+   question ("Why is Tesla tanking?"), the model invented three headlines with sentiment tags that exist nowhere in the stored
+   data, and no check catches that. Other fresh failures are price, market-value, sentiment and advice questions in wording
+   the keyword rules do not know. Also failing: "shares: buy back (quarter total)" on purpose (a real wrong answer: one
+   month's row, not the Total; rebuilding rows was tried and dropped, see DECISIONS, so don't retry it), and flaky cases
+   ("news and stock", "how is X doing", "advice: keep it or sell it") that also fail on `main` some runs. Scores from
+   different steps are not the same bar, because some checks changed. Not done: the fixes the fresh round points to, in the
+   order DECISIONS gives (a check that quoted titles appear in the sources comes first), the newest stored price being a
+   day old after every 5pm run (the nightly task moved to 3pm on 2026-10-15; check `python -m jobs.refresh --status`
+   after a run), the content of advice-adjacent answers, and a new set of held-out cases to measure the fixes fairly.
 
 ## Working with the owner
 
