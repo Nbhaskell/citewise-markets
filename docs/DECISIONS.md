@@ -709,6 +709,25 @@ benchmarks.
   is not caused by this step: the numbers check flags "2025" in an answer that says "the 12 months ending 2025-06-30",
   a false positive worth its own look (the 1 of 3 earlier was luck). Still open from the held-out list: market value
   ("worth in total"), sentiment ("tone turning sour") and advice ("park my money") wording, and the template headline.
+- **Market value, sentiment, and advice wording (fix (d) of the held-out round), 2026-10-15.** All in `ai/market.py`,
+  each tried on fresh wordings first (none a held-out case). **Market value:** "What is Microsoft worth?", "How much is
+  Apple worth in total?", "valued at", "total value of all of Tesla's shares", "company value", and "cost to buy all of"
+  now go to the stored figures. The company must be the subject of "worth", with no possessive, so "Microsoft's goodwill",
+  "the inventory", and "Apple stock worth buying?" are not caught; the matched phrase is cut out before the price check, so
+  "how much is Apple worth" is not read as a price question. Not caught: "How big is Nvidia as a company, in dollars?".
+  **Sentiment:** media/press/news/coverage near "tone", "mood", or "vibe"; "souring on"; "turning sour/bullish/bearish";
+  press words near "negative/positive"; "how do reporters/journalists/the press feel"; "coverage trending/shifting".
+  "Turning negative" alone is deliberately not a trigger (cash flow can turn negative). **Advice:** a new group of phrases
+  ("a safe place/home to...", "better off with", "do you like...", "wise/sound ... for me", "put/park money in") and any
+  mention of the reader's own money (`OWN_MONEY_RE`: my/our money, cash, savings, retirement, portfolio, IRA, 401k). It
+  leans to flagging, as the rule says; "its cash" and "an employee savings plan" are not caught. **Full `eval_market`, 3
+  repeats, 122 cases: 351 of 366 (96%)**, against 343. "Worth in total", "tone turning sour", and "park my money" all
+  passed 3 of 3 (they are tuning material now, so this is not a fair score). The advice answer for "park my money" still
+  describes Microsoft's business at length before declining; the notice is attached in code, but the content of
+  advice-adjacent answers is unchanged. New failures in the run were model wording on cases these rules do not touch
+  ("why did it move": "may have been part of the broader market context"; "press coverage" 1 of 3, which was 8 to 9 of 10
+  in the earlier A/B). Still open from the held-out list: the template headline (`META_TITLE_QUOTE`, irrelevant headlines
+  padding answers), and the "2025" false positive in the numbers check.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,
