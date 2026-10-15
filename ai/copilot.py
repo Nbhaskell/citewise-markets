@@ -456,6 +456,32 @@ def invented_titles_caution(titles: list[str]) -> str:
     )
 
 
+NO_PRICE_CLAIM_RE = re.compile(
+    r"\b(?:stock|share|market|current|latest)\s+price\b[^.\n]{0,80}\b(?:not|no|n['’]t|unavailable|missing|absent)\b"
+    r"|\b(?:not|no|n['’]t|without|lack\w*|missing)\b[^.\n]{0,80}\b(?:stock|share|market|current|latest)\s+price\b"
+    r"|\bprice\s+(?:data|information)\b[^.\n]{0,60}\b(?:not|no|n['’]t|unavailable|missing)\b",
+    re.IGNORECASE,
+)
+NO_PRICE_CAUTION = (
+    "This answer says a stock price isn't available. This app does store daily closing prices for {names}, but the answer "
+    "was written from filings only and did not use them. Ask for the stock price directly to see them."
+)
+
+
+def false_price_claim(conn: psycopg.Connection, text: str, symbols: list[str], evidence: list) -> str | None:
+    """A caution when an answer written without any price source says the stock price is missing, for companies whose
+    prices are stored. The model only saw filing text, so it reads its own gap as the app's ("the sources do not include
+    Apple's stock price"). Worded to be true either way: a filing really may not state a price, and that is also covered."""
+    if not symbols or not NO_PRICE_CLAIM_RE.search(CITE_RE.sub("", text)):
+        return None
+    if any(isinstance(e, MarketEvidence) and e.kind == "price" for e in evidence):
+        return None
+    stored = {r[0] for r in conn.execute("SELECT DISTINCT symbol FROM prices_daily WHERE symbol = ANY(%s)", (symbols,))}
+    if stored != set(symbols):
+        return None
+    return NO_PRICE_CAUTION.format(names=", ".join(symbols))
+
+
 def _generate_checked_full(
     llm: LLM, question: str, passages: list[SearchResult | MarketEvidence]
 ) -> tuple[str, list[int], list[str], list[str], list[str]]:
@@ -630,6 +656,7 @@ def answer_question(
     text, cited, bad, causes, titles = _generate_checked_full(llm, search_question, evidence)
     cautions = (
         ([CAUSE_CAUTION] if causes else []) + ([invented_titles_caution(titles)] if titles else [])
+        + ([c] if (c := false_price_claim(conn, text, symbols, evidence)) else [])
         + ([ADVICE_CAUTION] if intent.advice else [])
         + relevant_cautions(evidence, intent.fundamentals, text)
         + ([not_calculated_note(intent.unstored)] if intent.unstored else [])
