@@ -44,18 +44,23 @@ them (the owner hasn't confirmed the order):
    buy, sell, or hold call always carries a fixed notice (`asks_for_advice`, `ADVICE_CAUTION`); a table passage that lost
    its unit sentence to the cut between passages gets it back at prompt time (`ai/table_units.py`); and a figure the
    question itself contains is not flagged as unverified when the answer only declines or restates (`_users_own_numbers`).
-   The set is 122 cases. The 86 tuned ones scored 252 of 258 (`--repeat 3`; "price target" and "crashing premise" now pass);
-   **the 36 fresh ones, written in new wording and run once before any tuning, scored 78 of 108 (72%)**, which is the honest
-   number (DECISIONS: "Held-out round"). It found a serious one: after a question the router misread as a filings
-   question ("Why is Tesla tanking?"), the model invented three headlines with sentiment tags that exist nowhere in the stored
-   data, and no check catches that. Other fresh failures are price, market-value, sentiment and advice questions in wording
-   the keyword rules do not know. Also failing: "shares: buy back (quarter total)" on purpose (a real wrong answer: one
-   month's row, not the Total; rebuilding rows was tried and dropped, see DECISIONS, so don't retry it), and flaky cases
-   ("news and stock", "how is X doing", "advice: keep it or sell it") that also fail on `main` some runs. Scores from
-   different steps are not the same bar, because some checks changed. Not done: the fixes the fresh round points to, in the
-   order DECISIONS gives (a check that quoted titles appear in the sources comes first), the newest stored price being a
-   day old after every 5pm run (the nightly task moved to 3pm on 2026-10-15; check `python -m jobs.refresh --status`
-   after a run), the content of advice-adjacent answers, and a new set of held-out cases to measure the fixes fairly.
+   Two held-out rounds, each written in new wording and run once before any tuning: the first (36 cases) scored 78 of 108
+   (72%), the second (35 cases, after five fixes from the first) **68 of 105 (65%)**, which is the honest number (DECISIONS:
+   "Held-out round" and "Second held-out round"). The five fixes from the first round are merged: quoted titles must be
+   in the sources (`invented_titles`, a warning, it does not prevent the invention), more price wordings, more ratios
+   declined and a caution on a false "no price" claim (`false_price_claim`), market-value, sentiment and advice wordings,
+   the earlier year's real date in the growth label, and a placeholder headline rule. The second round shows the wording
+   rules are not general: new everyday phrasings miss in the same places (a period in a price question, "earn" and
+   "sales", "Now do X" follow-ups, a few advice phrasings, a non-company question answered from a filing), and some
+   passing answers use the wrong period without saying so. The set is 157 cases; all are tuning material now, and the full
+   run scored 356 of 366 before the second round. Also failing: "shares: buy back (quarter total)" on purpose (a real
+   wrong answer: one month's row, not the Total; rebuilding rows was tried and dropped, see DECISIONS, so don't retry it),
+   and flaky cases ("news and stock", "press coverage", "sentiment", "how is X doing") that swing between runs on the same
+   code. Scores from different steps are not the same bar, because some checks changed. Not done: the fixes the second
+   round points to, in the order DECISIONS gives (price questions with a period first), whether to weigh a model-based
+   routing step against more keyword rules, the newest stored price being a day old after every run (the nightly task
+   moved to 3pm on 2026-10-15; check `python -m jobs.refresh --status` after a run), the content of advice-adjacent
+   answers, and a new set of held-out cases, written after those fixes, to measure them fairly.
 
 ## Working with the owner
 
