@@ -5,6 +5,7 @@ Run:  python -m api          (serves http://127.0.0.1:8000, docs at /docs)
 No login yet and it only listens on this computer. Don't expose it to a network as it is.
 """
 import logging
+from datetime import date
 import re
 from typing import Annotated, Literal, Optional
 
@@ -199,11 +200,12 @@ def news_feed(
 def changes(
     conn: Conn, model: SentimentModel,
     days: Annotated[int, Query(ge=1, le=queries.CHANGES_MAX_DAYS, description="Trading days to look back")] = 1,
+    since: Annotated[Optional[date], Query(description="Instead of `days`: the stored trading days after this date (the newest 30 at most). For \"since I last looked\"")] = None,
 ):
     """New filings, unusually big daily moves, and notable headlines over the last few trading days, worked out
     from stored data. A big move is measured against the company's own usual daily move; headlines beside a move are
     timing only and never a cause."""
-    return queries.changes(conn, model, days)
+    return queries.changes(conn, model, days, None, since)
 
 
 @app.get("/api/stocks/{symbol}/filings", response_model=list[schemas.FilingOut], tags=["filings"])

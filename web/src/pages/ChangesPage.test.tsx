@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -178,5 +179,91 @@ describe("ChangesPage", () => {
     expect(section.parentElement).toHaveAttribute("aria-busy", "true");
     release();
     await waitFor(() => expect(section.parentElement).toHaveAttribute("aria-busy", "false"));
+  });
+});
+
+describe("ChangesPage: since last visit", () => {
+  const KEY = "stockmarket.changes.lastVisit.v1";
+  const queries = (fetchMock: ReturnType<typeof mockApi>) =>
+    fetchMock.mock.calls.map(([u]) => new URL(String(u), "http://x").searchParams);
+
+  it("offers nothing on a first visit, and remembers the newest trading day it showed", async () => {
+    mockApi(routes());
+    render(page());
+    await screen.findByText(/Latest trading day/);
+    expect(screen.queryByRole("button", { name: /Since last visit/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(window.localStorage.getItem(KEY)).toBe("2026-10-14"));
+  });
+
+  it("offers the earlier visit's date and asks for what came after it", async () => {
+    window.localStorage.setItem(KEY, "2026-10-10");
+    const fetchMock = mockApi({
+      ...defaultRoutes(),
+      "GET /api/changes": (url: URL) =>
+        url.searchParams.get("since") ? { ...changesData, days: 2, since: "2026-10-10", window_start: "2026-10-13" } : changesData,
+    });
+    render(page());
+    await screen.findByText(/Latest trading day/);
+    const button = screen.getByRole("button", { name: "Since last visit (Oct 10, 2026)" });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(button);
+    expect(await screen.findByText("Since your last visit (Oct 10, 2026): 2 trading days, Oct 13, 2026 to Oct 14, 2026.")).toBeInTheDocument();
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    const last = queries(fetchMock).at(-1)!;
+    expect(last.get("since")).toBe("2026-10-10");
+    expect(last.get("days")).toBeNull();
+  });
+
+  it("keeps offering the date it read when the page opened, even though this visit saves a newer one", async () => {
+    window.localStorage.setItem(KEY, "2026-10-10");
+    mockApi(routes());
+    render(page());
+    await waitFor(() => expect(window.localStorage.getItem(KEY)).toBe("2026-10-14"));
+    expect(screen.getByRole("button", { name: "Since last visit (Oct 10, 2026)" })).toBeInTheDocument();
+  });
+
+  it("says plainly when no trading day has been stored since", async () => {
+    window.localStorage.setItem(KEY, "2026-10-14");
+    mockApi({
+      ...defaultRoutes(),
+      "GET /api/changes": (url: URL) =>
+        url.searchParams.get("since")
+          ? { ...changesData, days: 0, since: "2026-10-14", window_start: null, moves: [], market_days: [], headlines: [] }
+          : changesData,
+    });
+    render(page());
+    await userEvent.click(await screen.findByRole("button", { name: /Since last visit/ }));
+    expect(await screen.findByText(/No new trading days since Oct 14, 2026/)).toBeInTheDocument();
+    expect(screen.getByText("No unusually big moves in this window.")).toBeInTheDocument();
+  });
+
+  it("never moves the saved date backwards", async () => {
+    window.localStorage.setItem(KEY, "2026-10-20");
+    mockApi(routes());
+    render(page());
+    await screen.findByText(/Latest trading day/);
+    expect(window.localStorage.getItem(KEY)).toBe("2026-10-20");
+  });
+
+  it("ignores a saved value that is not a date", async () => {
+    window.localStorage.setItem(KEY, "yesterday");
+    mockApi(routes());
+    render(page());
+    await screen.findByText(/Latest trading day/);
+    expect(screen.queryByRole("button", { name: /Since last visit/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(window.localStorage.getItem(KEY)).toBe("2026-10-14"));
+  });
+
+  it("still works when the browser blocks storage", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    mockApi(routes());
+    render(page());
+    expect(await screen.findByText(/Latest trading day: Oct 14, 2026/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Since last visit/ })).not.toBeInTheDocument();
   });
 });

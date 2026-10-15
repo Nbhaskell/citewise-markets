@@ -84,7 +84,11 @@ export const api = {
     opts.sentiment?.forEach((label) => params.append("sentiment", label));
     return request<NewsFeedItem[]>(`/api/news?${params}`, { signal });
   },
-  changes: (days: number, signal?: AbortSignal) => request<ChangesOut>(`/api/changes?days=${days}`, { signal }),
+  changes: (window: { days: number } | { since: string }, signal?: AbortSignal) =>
+    request<ChangesOut>(
+      `/api/changes?${"since" in window ? `since=${encodeURIComponent(window.since)}` : `days=${window.days}`}`,
+      { signal },
+    ),
   addLookup: (ticker: string, signal?: AbortSignal) =>
     request<AddLookupOut>(`/api/add-company/lookup?ticker=${encodeURIComponent(ticker)}`, { signal }),
   startAdd: (ticker: string, signal?: AbortSignal) =>

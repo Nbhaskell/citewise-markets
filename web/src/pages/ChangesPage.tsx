@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { ChangesFilings } from "../components/ChangesFilings";
@@ -7,6 +7,7 @@ import { ChangesMoves } from "../components/ChangesMoves";
 import { FreshnessBar } from "../components/FreshnessBar";
 import { useApi } from "../hooks/useApi";
 import { formatShortDate } from "../lib/format";
+import { readLastVisit, writeLastVisit } from "../lib/lastVisit";
 
 const WINDOWS = [
   { days: 1, label: "Latest day" },
@@ -14,11 +15,28 @@ const WINDOWS = [
   { days: 7, label: "7 days" },
 ];
 
+type Window = { kind: "days"; days: number } | { kind: "since" };
+
 /** What changed lately: new filings, unusually big moves, notable headlines. All worked out from stored data. */
 export function ChangesPage() {
-  const [days, setDays] = useState(1);
-  const changes = useApi((signal) => api.changes(days, signal), [days]);
+  const [view, setView] = useState<Window>({ kind: "days", days: 1 });
+  // The date of the newest trading day seen on an earlier visit, read once when the page opens (this visit then
+  // saves a newer one, which would otherwise make the option disappear while it is being used).
+  const [lastVisit] = useState(readLastVisit);
+  const since = view.kind === "since" ? lastVisit : null;
+  const changes = useApi(
+    (signal) => api.changes(since ? { since } : { days: view.kind === "days" ? view.days : 1 }, signal),
+    [view, since],
+  );
   const data = changes.data;
+
+  const saved = useRef(false);
+  useEffect(() => {
+    if (data?.as_of && !saved.current) {
+      saved.current = true;
+      writeLastVisit(data.as_of);
+    }
+  }, [data]);
 
   useEffect(() => {
     document.title = "What changed · stockMarket";
@@ -37,17 +55,30 @@ export function ChangesPage() {
               What changed
             </h1>
             <div className="ranges" role="group" aria-label="Look back">
-              {WINDOWS.map((w) => (
+              {WINDOWS.map((w) => {
+                const on = view.kind === "days" && view.days === w.days;
+                return (
+                  <button
+                    key={w.days}
+                    type="button"
+                    aria-pressed={on}
+                    className={on ? "range on" : "range"}
+                    onClick={() => setView({ kind: "days", days: w.days })}
+                  >
+                    {w.label}
+                  </button>
+                );
+              })}
+              {lastVisit && (
                 <button
-                  key={w.days}
                   type="button"
-                  aria-pressed={w.days === days}
-                  className={w.days === days ? "range on" : "range"}
-                  onClick={() => setDays(w.days)}
+                  aria-pressed={view.kind === "since"}
+                  className={view.kind === "since" ? "range on" : "range"}
+                  onClick={() => setView({ kind: "since" })}
                 >
-                  {w.label}
+                  Since last visit ({formatShortDate(lastVisit)})
                 </button>
-              ))}
+              )}
             </div>
           </div>
           <p className="muted small">
@@ -65,9 +96,13 @@ export function ChangesPage() {
           )}
           {data && data.as_of != null && (
             <p className="small" role="status">
-              {data.days === 1
-                ? `Latest trading day: ${formatShortDate(data.as_of)}.`
-                : `The last ${data.days} trading days: ${formatShortDate(data.window_start)} to ${formatShortDate(data.as_of)}.`}
+              {data.since
+                ? data.days === 0
+                  ? `No new trading days since ${formatShortDate(data.since)}. Filings and headlines are those from after that date.`
+                  : `Since your last visit (${formatShortDate(data.since)}): ${data.days} trading ${data.days === 1 ? "day" : "days"}, ${formatShortDate(data.window_start)} to ${formatShortDate(data.as_of)}.`
+                : data.days === 1
+                  ? `Latest trading day: ${formatShortDate(data.as_of)}.`
+                  : `The last ${data.days} trading days: ${formatShortDate(data.window_start)} to ${formatShortDate(data.as_of)}.`}
             </p>
           )}
           {data && data.stale.length > 0 && (

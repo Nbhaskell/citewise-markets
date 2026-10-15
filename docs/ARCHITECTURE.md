@@ -180,7 +180,7 @@ Everything is read-only except one exception the owner approved: the "Add compan
   (migration 008: the ticker, the current step, a heartbeat, and the per-company report). The status is worked out
   when read: `queued`, `running`, `interrupted` (the process died or stopped reporting), `success`, `partial`
   (added with gaps) or `failed`. Nothing removes a company yet.
-- **What changed:** `GET /api/changes?days=` (1 to 30 trading days, default 1) returns new filings, big moves, market-wide
+- **What changed:** `GET /api/changes?days=` (1 to 30 trading days, default 1; or `since=YYYY-MM-DD`, which wins over `days` and means the stored trading dates after that date, newest 30 at most, with `days` in the reply then the real count, 0 if none) returns new filings, big moves, market-wide
   days, notable headlines, and mood shifts, built by `data/changes.py` (all rules are named constants at the top of that
   file) with `api/queries.changes` passing in `label_counts` for the mood comparison. Read-only; nothing is stored, it is
   computed on read. The window is the last N trading dates that appear in the stored prices, not calendar days. Filings
@@ -198,6 +198,7 @@ React 19 and TypeScript, built with Vite. It only talks to the API; it never tou
 Dashboard page (/)
   FreshnessBar   <- /api/status, /health        data age, failed refreshes, AI model offline
   Watchlist      <- /api/stocks, /prices        price, change, 1-month sparkline, news mood
+  ChangesTeaser  <- /api/changes?days=1         counts and the three biggest moves for the latest day, link to /changes
   NewsPanel      <- /api/news                   latest positive/negative headlines (toggle for all)
   CopilotBox     -> POST /api/copilot           cited answer, clickable sources, warnings
 
@@ -209,7 +210,7 @@ Copilot page (/copilot)
 
 What changed page (/changes)
   FreshnessBar       <- /api/status, /health       data age, failed refreshes
-  window picker      latest day, 3, or 7 trading days
+  window picker      latest day, 3, or 7 trading days, or since the last visit (lib/lastVisit.ts, localStorage)
   ChangesFilings     <- /api/changes               filings filed in the window, or the newest stored one
   ChangesMoves       <- /api/changes               big moves, market-wide labels, that day's headlines (timing only)
   ChangesHeadlines   <- /api/changes               positive and negative headlines per company, and mood shifts

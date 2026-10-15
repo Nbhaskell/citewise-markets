@@ -91,6 +91,7 @@ export const defaultRoutes = (): Record<string, Handler> => ({
   "GET /api/stocks/NVDA/prices": prices("NVDA", [110, 100, 90]),
   "GET /api/stocks/TSLA/prices": prices("TSLA", []),
   "GET /api/news": newsItems,
+  "GET /api/changes": changesData,
   "GET /api/status": okStatus,
   "GET /health": okHealth,
   "POST /api/copilot": copilotAnswer(),
@@ -159,6 +160,7 @@ export const fundamentalsRoutes = (over: Partial<Fundamentals> = {}): Record<str
 
 export const changesData: ChangesOut = {
   days: 1,
+  since: null,
   as_of: "2026-10-14",
   window_start: "2026-10-14",
   stale: [],

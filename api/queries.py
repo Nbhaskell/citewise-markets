@@ -1,4 +1,5 @@
 """SQL behind the API endpoints. Each function takes a connection and returns plain Python data."""
+from datetime import date
 from typing import Optional
 
 import psycopg
@@ -145,9 +146,11 @@ def filing_rows(conn: psycopg.Connection, symbol: str) -> list[dict]:
     return [dict(zip(keys, r)) for r in rows]
 
 
-def changes(conn: psycopg.Connection, model: str, days: int, symbols: Optional[list[str]] = None) -> dict:
+def changes(
+    conn: psycopg.Connection, model: str, days: int, symbols: Optional[list[str]] = None, since: Optional[date] = None
+) -> dict:
     """The "what changed" page: new filings, big moves, notable headlines (see data/changes.py for the rules)."""
-    return build_changes(conn, model, days, lambda n: label_counts(conn, model, n), symbols)
+    return build_changes(conn, model, days, lambda n: label_counts(conn, model, n), symbols, since)
 
 
 def tracked_symbols(conn: psycopg.Connection) -> set[str]:

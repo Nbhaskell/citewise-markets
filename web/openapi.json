@@ -418,7 +418,7 @@
             "title": "As Of"
           },
           "days": {
-            "description": "Trading days in the window",
+            "description": "Trading days in the window (with `since`, how many stored days came after it: 0 if none)",
             "title": "Days",
             "type": "integer"
           },
@@ -471,6 +471,19 @@
           },
           "rules": {
             "$ref": "#/components/schemas/ChangeRules"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The `since` date that was asked for, if any",
+            "title": "Since"
           },
           "stale": {
             "description": "Companies with no price for the newest date, so the window may be missing their latest days",
@@ -2176,6 +2189,25 @@
               "minimum": 1,
               "title": "Days",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Instead of `days`: the stored trading days after this date (the newest 30 at most). For \"since I last looked\"",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Instead of `days`: the stored trading days after this date (the newest 30 at most). For \"since I last looked\"",
+              "title": "Since"
             }
           }
         ],
