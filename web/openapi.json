@@ -1,6 +1,140 @@
 {
   "components": {
     "schemas": {
+      "AddJobIn": {
+        "properties": {
+          "ticker": {
+            "description": "US ticker, e.g. TSLA or BRK.B",
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker"
+        ],
+        "title": "AddJobIn",
+        "type": "object"
+      },
+      "AddJobOut": {
+        "properties": {
+          "companies": {
+            "items": {
+              "$ref": "#/components/schemas/ReportCompany"
+            },
+            "title": "Companies",
+            "type": "array"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "integer"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plain-language note for the page",
+            "title": "Message"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "success",
+              "partial",
+              "failed",
+              "interrupted"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The step now running, while status is running",
+            "title": "Step"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "symbol",
+          "status",
+          "started_at",
+          "finished_at",
+          "companies"
+        ],
+        "title": "AddJobOut",
+        "type": "object"
+      },
+      "AddLookupOut": {
+        "properties": {
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "tracked": {
+            "description": "Already tracked. Adding it again brings its data up to date",
+            "title": "Tracked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "exchange",
+          "tracked"
+        ],
+        "title": "AddLookupOut",
+        "type": "object"
+      },
       "CopilotRequest": {
         "properties": {
           "history": {
@@ -804,6 +938,69 @@
         "title": "PriceSeries",
         "type": "object"
       },
+      "ReportCompany": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReportLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "verdict": {
+            "description": "ADDED, ADDED, WITH GAPS, UPDATED, or NOT ADDED (with WITH GAPS when something is missing)",
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "verdict",
+          "lines"
+        ],
+        "title": "ReportCompany",
+        "type": "object"
+      },
+      "ReportLine": {
+        "properties": {
+          "status": {
+            "description": "OK, NONE, SKIPPED, FAILED, or -- (not tried)",
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "status",
+          "text"
+        ],
+        "title": "ReportLine",
+        "type": "object"
+      },
       "RunOut": {
         "properties": {
           "finished_at": {
@@ -1435,6 +1632,135 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/add-company/jobs": {
+      "post": {
+        "operationId": "start_add_company_api_add_company_jobs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddJobIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddJobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Add Company",
+        "tags": [
+          "add company"
+        ]
+      }
+    },
+    "/api/add-company/jobs/{job_id}": {
+      "get": {
+        "operationId": "add_company_job_api_add_company_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Job Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddJobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Company Job",
+        "tags": [
+          "add company"
+        ]
+      }
+    },
+    "/api/add-company/lookup": {
+      "get": {
+        "description": "Read-only: looks up the company name so the page can ask \"Add X?\" before anything is written.",
+        "operationId": "add_company_lookup_api_add_company_lookup_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "maxLength": 12,
+              "minLength": 1,
+              "title": "Ticker",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddLookupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Company Lookup",
+        "tags": [
+          "add company"
+        ]
+      }
+    },
     "/api/copilot": {
       "post": {
         "description": "Answer a question from stored filings, prices, and headlines, with numbered citations. Can take several seconds.",

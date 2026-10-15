@@ -1,4 +1,6 @@
 import type {
+  AddJobOut,
+  AddLookupOut,
   CopilotRequest,
   CopilotResponse,
   FilingOut,
@@ -81,6 +83,16 @@ export const api = {
     opts.sentiment?.forEach((label) => params.append("sentiment", label));
     return request<NewsFeedItem[]>(`/api/news?${params}`, { signal });
   },
+  addLookup: (ticker: string, signal?: AbortSignal) =>
+    request<AddLookupOut>(`/api/add-company/lookup?ticker=${encodeURIComponent(ticker)}`, { signal }),
+  startAdd: (ticker: string, signal?: AbortSignal) =>
+    request<AddJobOut>("/api/add-company/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker }),
+      signal,
+    }),
+  addJob: (jobId: number, signal?: AbortSignal) => request<AddJobOut>(`/api/add-company/jobs/${jobId}`, { signal }),
   copilot: (body: CopilotRequest, signal?: AbortSignal) =>
     request<CopilotResponse>("/api/copilot", {
       method: "POST",

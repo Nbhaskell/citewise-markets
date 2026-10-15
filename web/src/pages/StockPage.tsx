@@ -53,7 +53,7 @@ function StockDetailView({ symbol }: { symbol: string }) {
     return (
       <Missing
         title={`${symbol} isn't a tracked company`}
-        hint={`Add it with: python -m data.ingest ${symbol}. The nightly refresh keeps it current after that.`}
+        hint={`Add it from the dashboard's "Add a company" box, or with: python -m jobs.add_company ${symbol}. The nightly refresh keeps it current after that.`}
       />
     );
   }

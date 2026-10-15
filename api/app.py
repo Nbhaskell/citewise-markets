@@ -4,11 +4,12 @@ Run:  python -m api          (serves http://127.0.0.1:8000, docs at /docs)
 
 No login yet and it only listens on this computer. Don't expose it to a network as it is.
 """
+import logging
 import re
 from typing import Annotated, Literal, Optional
 
 import psycopg
-from fastapi import Depends, FastAPI, HTTPException, Path, Query
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from ai.copilot import Turn, answer_question
@@ -16,15 +17,29 @@ from ai.embeddings import DEFAULT_MODEL, Embedder
 from ai.llm import LLM
 from ai.market import MarketEvidence
 from ai.search import SearchResult, search_filings
+from jobs.add_company import normalize_ticker
 from jobs.status import freshness, recent_runs
 
-from . import queries, schemas
-from .deps import cors_origins, get_chat_model, get_conn, get_embedder, get_sentiment_model
+from . import adding, queries, schemas
+from .adding import Launcher
+from .deps import (
+    cors_origins,
+    get_chat_model,
+    get_conn,
+    get_embedder,
+    get_instrument_source,
+    get_job_launcher,
+    get_sentiment_model,
+)
+from data.sources.base import PriceSource
 
+log = logging.getLogger("api")
 SYMBOL_RE = re.compile(r"^[A-Za-z][A-Za-z0-9.\-]{0,9}$")
 Symbol = Annotated[str, Path(description="Ticker, e.g. AAPL", pattern=SYMBOL_RE.pattern)]
 Conn = Annotated[psycopg.Connection, Depends(get_conn)]
 SentimentModel = Annotated[str, Depends(get_sentiment_model)]
+Source = Annotated[PriceSource, Depends(get_instrument_source)]
+Launcher_ = Annotated[Launcher, Depends(get_job_launcher)]
 
 app = FastAPI(
     title="stockMarket API",
@@ -42,6 +57,15 @@ app.add_middleware(
 )
 
 
+def _local_write_check(request: Request) -> None:
+    """The one write endpoint. A web page open in the browser can send a request to 127.0.0.1, so require the local
+    web app's origin and a JSON body. CORS alone only stops the page reading the reply, not the request arriving."""
+    if request.headers.get("origin") not in cors_origins():
+        raise HTTPException(403, "Adding a company is only allowed from the local web app.")
+    if not request.headers.get("content-type", "").lower().startswith("application/json"):
+        raise HTTPException(415, "Send the request as JSON.")
+
+
 def _require_company(conn: psycopg.Connection, symbol: str) -> str:
     symbol = symbol.upper()
     if symbol not in queries.tracked_symbols(conn):
@@ -55,6 +79,48 @@ def health(conn: Conn, llm: Annotated[LLM, Depends(get_chat_model)]):
     check = getattr(llm, "available", None)
     available = bool(check()) if callable(check) else True
     return {"status": "ok", "database": True, "ai_model": llm.name, "ai_model_available": available}
+
+
+@app.get("/api/add-company/lookup", response_model=schemas.AddLookupOut, tags=["add company"])
+def add_company_lookup(conn: Conn, source: Source, ticker: Annotated[str, Query(min_length=1, max_length=12)]):
+    """Read-only: looks up the company name so the page can ask "Add X?" before anything is written."""
+    try:
+        symbol = normalize_ticker(ticker)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    tracked = symbol in queries.tracked_symbols(conn)
+    try:
+        instrument = source.get_instrument(symbol)
+    except Exception as exc:  # the message is fixed text: the source's own error can be long or noisy
+        log.warning("lookup of %s failed: %s", symbol, type(exc).__name__)
+        raise HTTPException(502, f"Couldn't look up {symbol} right now. Yahoo Finance may be slow or rate-limiting; try again in a few minutes.") from exc
+    if not instrument.name:
+        raise HTTPException(404, f"No US-listed company found for {symbol}. Check the spelling.")
+    return {"symbol": symbol, "name": instrument.name, "exchange": instrument.exchange, "tracked": tracked}
+
+
+@app.post("/api/add-company/jobs", response_model=schemas.AddJobOut, status_code=202, tags=["add company"],
+          dependencies=[Depends(_local_write_check)])
+def start_add_company(body: schemas.AddJobIn, conn: Conn, launch: Launcher_):
+    try:
+        symbol = normalize_ticker(body.ticker)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if not adding.lock_is_free(conn):
+        raise HTTPException(409, adding.BUSY_MESSAGE)
+    try:
+        job_id = adding.start_add(conn, symbol, launch)
+    except OSError as exc:
+        raise HTTPException(500, "The add process could not be started. Check logs/add_company.log, then try again.") from exc
+    return adding.job_out(conn, job_id)
+
+
+@app.get("/api/add-company/jobs/{job_id}", response_model=schemas.AddJobOut, tags=["add company"])
+def add_company_job(job_id: Annotated[int, Path(ge=1)], conn: Conn):
+    out = adding.job_out(conn, job_id)
+    if out is None:
+        raise HTTPException(404, "No such add job")
+    return out
 
 
 @app.get("/api/status", response_model=schemas.StatusOut, tags=["system"])

@@ -74,7 +74,7 @@ describe("StockPage", () => {
     });
     renderPage("/stocks/ZZZ");
     expect(await screen.findByRole("heading", { name: "ZZZ isn't a tracked company" })).toBeInTheDocument();
-    expect(screen.getByText(/python -m data\.ingest ZZZ/)).toBeInTheDocument();
+    expect(screen.getByText(/python -m jobs\.add_company ZZZ/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to the dashboard" })).toHaveAttribute("href", "/");
     expect(screen.queryByRole("heading", { name: "Key stats" })).not.toBeInTheDocument();
   });

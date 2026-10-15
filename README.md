@@ -1,7 +1,7 @@
 # stockMarket
 
 An AI stock market app, built bottom-up and used privately on one PC for company research. The **data layer**, the
-**AI layer**, a nightly refresh job, a read-only API, and a web app (dashboard, stock detail, copilot) all exist.
+**AI layer**, a nightly refresh job, an API, and a web app (dashboard, stock detail, copilot) all exist.
 
 What works today:
 
@@ -14,7 +14,7 @@ What works today:
   price moved, predict prices, or give advice
 - News headline sentiment (positive / negative / neutral / irrelevant) per company
 - A nightly refresh job that keeps all of the above up to date (you register it once, see below)
-- A read-only HTTP API (FastAPI) over all of it, for the web screens to use (see "The API" below)
+- An HTTP API (FastAPI) over all of it, for the web screens to use (see "The API" below). Its only write is starting an add from the dashboard's "Add a company" box
 - A web app (React): a dashboard, a stock detail page (price chart, stats, fundamentals, news, filings, a copilot for
   that company), and a full-page copilot with saved history (see "The web app" below)
 
@@ -308,14 +308,14 @@ docker-compose.yml   The database container
 
 ## What is not built yet
 
-- Adding a company from the app (today it is one command, `python -m jobs.add_company`; see "Keeping data fresh")
 - Filings for foreign companies that file a 20-F (only 10-K and 10-Q are stored)
 - Fundamentals for foreign filers (TSM, ASML): they report under another accounting standard, so they have no stored
   figures, and the copilot says so. Also not stored: dividends, debt, cash, price-to-book, and analyst targets
 - Index data (S&P 500 level), so the copilot can answer those instead of refusing
 - Backups on a second disk or off this PC (they go to `BACKUP_DIR`; you have to point it somewhere safe), and an alert
   when no backup has happened for days (a PC that is off sends none)
-- Accounts and login, portfolios, and alerts (the API so far is read-only)
+- Accounts and login, portfolios, and alerts (the API has no login yet)
+- Removing a company from the app (there is no remove command; a mistyped ticker has to be removed by hand)
 - A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
 - More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, and copilot exist.
 - Conversation history that follows a user between devices (it's saved per browser; there are no accounts)

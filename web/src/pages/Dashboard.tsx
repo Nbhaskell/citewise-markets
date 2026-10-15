@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { AddCompanyBox } from "../components/AddCompanyBox";
 import { CopilotBox } from "../components/CopilotBox";
 import { FreshnessBar } from "../components/FreshnessBar";
 import { NewsPanel } from "../components/NewsPanel";
@@ -11,6 +12,7 @@ export function Dashboard() {
       <div className="dashboard-grid">
         <div className="col">
           <Watchlist />
+          <AddCompanyBox />
           <CopilotBox />
           <p className="muted small">
             <Link to="/copilot">Open the full-page copilot, with history and a company filter →</Link>

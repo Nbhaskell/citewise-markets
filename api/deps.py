@@ -8,6 +8,10 @@ from fastapi import HTTPException
 from ai.embeddings import Embedder, FastEmbedder
 from ai.llm import LLM, get_llm
 from data.db import connect, get_setting
+from data.sources.base import PriceSource
+from data.sources.yfinance_source import YFinanceSource
+
+from .adding import Launcher, launch_add_process
 
 DEFAULT_CORS_ORIGINS = (
     "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
@@ -42,3 +46,13 @@ def get_sentiment_model() -> str:
 
 def cors_origins() -> list[str]:
     return [o.strip() for o in (get_setting("CORS_ORIGINS") or DEFAULT_CORS_ORIGINS).split(",") if o.strip()]
+
+
+def get_instrument_source() -> PriceSource:
+    """Where the add box looks up a ticker's company name. The same source the add stores, so the confirm step shows what gets saved."""
+    return YFinanceSource()
+
+
+def get_job_launcher() -> Launcher:
+    """Starts an add in its own process. Tests replace it with a fake so nothing real starts."""
+    return launch_add_process

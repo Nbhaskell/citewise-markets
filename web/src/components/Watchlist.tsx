@@ -51,7 +51,7 @@ export function Watchlist() {
         </p>
       )}
       {stocks.data && stocks.data.length === 0 && (
-        <p className="muted">No companies yet. Add one with: python -m data.ingest TICKER</p>
+        <p className="muted">No companies yet. Add one with the "Add a company" box below, or with: python -m jobs.add_company TICKER</p>
       )}
       {stocks.data && stocks.data.length > 0 && (
         <div className="table-wrap">

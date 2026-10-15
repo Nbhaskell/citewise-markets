@@ -194,3 +194,21 @@ details summary { cursor: pointer; color: var(--muted); }
 .recipe p, .recipe ul { margin: 4px 0; }
 .recipe ul { padding-left: 18px; }
 .card > .flag { display: block; margin: 8px 0; }
+
+/* Add company box */
+.add-company .add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.add-company .add-form input {
+  min-width: 8rem;
+}
+.add-report h4 {
+  margin: 0.75rem 0 0.25rem;
+}
+.add-report ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}

@@ -6,7 +6,7 @@ history see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md]
 ## What this is
 
 An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
-refresh job (`jobs/`, scheduled in Windows Task Scheduler for 3pm Pacific), a read-only FastAPI backend (`api/`), and a
+refresh job (`jobs/`, scheduled in Windows Task Scheduler for 3pm Pacific), a FastAPI backend (`api/`) that is read-only except for starting an add, and a
 React web app (`web/`) with three screens: dashboard, stock detail, and a full-page copilot that understands follow-ups
 and answers from filings, daily prices, and news headlines. Not built: accounts and
 login, portfolios, a screener, fundamentals for foreign (20-F) filers, adding a company from the app, backups
@@ -19,10 +19,11 @@ The owner uses this privately, on their own PC, for **daily research on companie
 accounts, login, portfolios, holdings, and putting it online; none of that is wanted now. Roughly in the order to do
 them (the owner hasn't confirmed the order):
 
-1. **Easier adding of companies.** Done as a command: `python -m jobs.add_company TICKER` (all six steps, then a
-   per-step report). Later: an "Add company" box in the web app, which needs the first write endpoint and a
-   background job. That is a deliberate exception to the read-only API rule: confirm it with the owner first and keep
-   it bound to `127.0.0.1`. Checked on a real foreign filer (TSM): the SEC has 20-F for it and no 10-K or 10-Q, so it
+1. **Easier adding of companies.** Done as a command (`python -m jobs.add_company TICKER`) and as an "Add a company"
+   box on the dashboard (lookup, confirm, then a background add with progress). The box's start endpoint is the one
+   approved write exception to the read-only API rule (owner approved 2026-10-15); it is bound to `127.0.0.1`, accepts
+   only the local web app's origin and JSON, and is refused while another update holds the lock. Removing a company is
+   not built. Checked on a real foreign filer (TSM): the SEC has 20-F for it and no 10-K or 10-Q, so it
    is added with no filings and the report says so. Whether to also store 20-F is an open decision for the owner.
 2. **Database backups.** Built as `python -m jobs.backup` (backup, list, verify, restore); the restore was tested into
    a brand-new empty Postgres. Scheduled daily at 6pm in Windows Task Scheduler (`StockMarketBackup`, registered
@@ -132,7 +133,7 @@ The owner is building this step by step and is not a professional developer, so 
 - **Nightly job (`jobs/refresh.py`):** keep each (step, company) isolated so one failure never stops the run, keep
   the advisory lock, and keep missing prerequisites as skipped-and-`partial`, never silent successes. Tests for it
   inject fakes through `Deps` and set the job name to `test_refresh` so they never touch real run history.
-- **API (`api/`):** keep it read-only and bound to `127.0.0.1` until accounts exist. Don't add write endpoints, widen
+- **API (`api/`):** keep it read-only and bound to `127.0.0.1` until accounts exist. The only write is the add-company start endpoint (approved). Don't add more write endpoints, widen
   CORS, or bind to `0.0.0.0` without being asked. Keep response shapes in `schemas.py` stable, since the screens
   depend on them, and keep copilot answers passing through the `unverified_numbers` field. Tests override the
   embedder, chat model, and sentiment model via `app.dependency_overrides`; don't load real models in tests.

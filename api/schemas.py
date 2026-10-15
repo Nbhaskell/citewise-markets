@@ -213,3 +213,38 @@ class FundamentalsOut(BaseModel):
     pe: Optional[float] = Field(None, description="Latest close divided by diluted EPS for the last twelve months; null when earnings are zero or negative")
     pe_note: Optional[str] = Field(None, description="Why P/E is missing, when it is")
     cautions: list[str]
+
+
+class AddLookupOut(BaseModel):
+    symbol: str
+    name: str
+    exchange: Optional[str]
+    tracked: bool = Field(description="Already tracked. Adding it again brings its data up to date")
+
+
+class AddJobIn(BaseModel):
+    ticker: str = Field(min_length=1, max_length=12, description="US ticker, e.g. TSLA or BRK.B")
+
+
+class ReportLine(BaseModel):
+    step: str
+    status: str = Field(description="OK, NONE, SKIPPED, FAILED, or -- (not tried)")
+    text: str
+
+
+class ReportCompany(BaseModel):
+    symbol: str
+    name: Optional[str]
+    verdict: str = Field(description="ADDED, ADDED, WITH GAPS, UPDATED, or NOT ADDED (with WITH GAPS when something is missing)")
+    lines: list[ReportLine]
+
+
+class AddJobOut(BaseModel):
+    job_id: int
+    symbol: str
+    status: Literal["queued", "running", "success", "partial", "failed", "interrupted"]
+    step: Optional[str] = Field(None, description="The step now running, while status is running")
+    started_at: datetime
+    finished_at: Optional[datetime]
+    companies: list[ReportCompany]
+    message: Optional[str] = Field(None, description="Plain-language note for the page")
