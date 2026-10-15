@@ -248,3 +248,75 @@ class AddJobOut(BaseModel):
     finished_at: Optional[datetime]
     companies: list[ReportCompany]
     message: Optional[str] = Field(None, description="Plain-language note for the page")
+
+
+class ChangeFiling(BaseModel):
+    symbol: str
+    form: str
+    filed_at: date
+    period_of_report: Optional[date]
+    url: str
+    accession_number: str
+
+
+class ChangeMove(BaseModel):
+    symbol: str
+    name: Optional[str]
+    date: date
+    previous_date: date = Field(description="The earlier stored close this move is measured against (usually the day before)")
+    close: float
+    previous_close: float
+    change_pct: float
+    typical_pct: Optional[float] = Field(None, description="The company's median daily move (absolute) over the days before the window; null without enough history")
+    threshold_pct: float = Field(description="The size a move had to reach to be listed for this company")
+    market_wide: bool = Field(description="Most tracked companies moved the same way that day, so this may not be about the company")
+    headlines: list[NewsItemOut] = Field(description="Stories published that day (UTC). Timing only: headlines can't show why a price moved")
+
+
+class ChangeMarketDay(BaseModel):
+    date: date
+    direction: Literal["up", "down"]
+    moved_that_way: int
+    companies: int
+
+
+class ChangeCompanyNews(BaseModel):
+    symbol: str
+    positive: int = Field(description="Positive stories in the window, each counted once")
+    negative: int
+    items: list[NewsItemOut] = Field(description="The newest few, positive and negative only")
+
+
+class ChangeMoodShift(BaseModel):
+    symbol: str
+    score_now: float = Field(description="News score over the last 7 days, -1 to +1")
+    stories_now: int
+    score_before: float = Field(description="The same score for the 7 days before that")
+    stories_before: int
+
+
+class StaleSymbol(BaseModel):
+    symbol: str
+    as_of: Optional[date] = Field(None, description="Date of this company's newest stored price, null if it has none")
+
+
+class ChangeRules(BaseModel):
+    min_move_pct: float
+    typical_multiple: float
+    baseline_days: int
+    headlines_per_company: int
+    mood_days: int
+
+
+class ChangesOut(BaseModel):
+    days: int = Field(description="Trading days in the window")
+    as_of: Optional[date] = Field(None, description="Newest stored price date across the companies; null if there are no prices")
+    window_start: Optional[date] = Field(None, description="First trading day in the window")
+    stale: list[StaleSymbol] = Field(description="Companies with no price for the newest date, so the window may be missing their latest days")
+    filings: list[ChangeFiling] = Field(description="Filed on or after the window's first day, newest first")
+    newest_filing: Optional[ChangeFiling] = Field(None, description="The newest stored filing of any company, shown when `filings` is empty")
+    moves: list[ChangeMove]
+    market_days: list[ChangeMarketDay]
+    headlines: list[ChangeCompanyNews]
+    mood_shifts: list[ChangeMoodShift]
+    rules: ChangeRules

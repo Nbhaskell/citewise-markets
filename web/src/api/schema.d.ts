@@ -58,6 +58,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Changes
+         * @description New filings, unusually big daily moves, and notable headlines over the last few trading days, worked out
+         *     from stored data. A big move is measured against the company's own usual daily move; headlines beside a move are
+         *     timing only and never a cause.
+         */
+        get: operations["changes_api_changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/copilot": {
         parameters: {
             query?: never;
@@ -320,6 +342,173 @@ export interface components {
              * @description Already tracked. Adding it again brings its data up to date
              */
             tracked: boolean;
+        };
+        /** ChangeCompanyNews */
+        ChangeCompanyNews: {
+            /**
+             * Items
+             * @description The newest few, positive and negative only
+             */
+            items: components["schemas"]["NewsItemOut"][];
+            /** Negative */
+            negative: number;
+            /**
+             * Positive
+             * @description Positive stories in the window, each counted once
+             */
+            positive: number;
+            /** Symbol */
+            symbol: string;
+        };
+        /** ChangeFiling */
+        ChangeFiling: {
+            /** Accession Number */
+            accession_number: string;
+            /**
+             * Filed At
+             * Format: date
+             */
+            filed_at: string;
+            /** Form */
+            form: string;
+            /** Period Of Report */
+            period_of_report: string | null;
+            /** Symbol */
+            symbol: string;
+            /** Url */
+            url: string;
+        };
+        /** ChangeMarketDay */
+        ChangeMarketDay: {
+            /** Companies */
+            companies: number;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "up" | "down";
+            /** Moved That Way */
+            moved_that_way: number;
+        };
+        /** ChangeMoodShift */
+        ChangeMoodShift: {
+            /**
+             * Score Before
+             * @description The same score for the 7 days before that
+             */
+            score_before: number;
+            /**
+             * Score Now
+             * @description News score over the last 7 days, -1 to +1
+             */
+            score_now: number;
+            /** Stories Before */
+            stories_before: number;
+            /** Stories Now */
+            stories_now: number;
+            /** Symbol */
+            symbol: string;
+        };
+        /** ChangeMove */
+        ChangeMove: {
+            /** Change Pct */
+            change_pct: number;
+            /** Close */
+            close: number;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Headlines
+             * @description Stories published that day (UTC). Timing only: headlines can't show why a price moved
+             */
+            headlines: components["schemas"]["NewsItemOut"][];
+            /**
+             * Market Wide
+             * @description Most tracked companies moved the same way that day, so this may not be about the company
+             */
+            market_wide: boolean;
+            /** Name */
+            name: string | null;
+            /** Previous Close */
+            previous_close: number;
+            /**
+             * Previous Date
+             * Format: date
+             * @description The earlier stored close this move is measured against (usually the day before)
+             */
+            previous_date: string;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Threshold Pct
+             * @description The size a move had to reach to be listed for this company
+             */
+            threshold_pct: number;
+            /**
+             * Typical Pct
+             * @description The company's median daily move (absolute) over the days before the window; null without enough history
+             */
+            typical_pct?: number | null;
+        };
+        /** ChangeRules */
+        ChangeRules: {
+            /** Baseline Days */
+            baseline_days: number;
+            /** Headlines Per Company */
+            headlines_per_company: number;
+            /** Min Move Pct */
+            min_move_pct: number;
+            /** Mood Days */
+            mood_days: number;
+            /** Typical Multiple */
+            typical_multiple: number;
+        };
+        /** ChangesOut */
+        ChangesOut: {
+            /**
+             * As Of
+             * @description Newest stored price date across the companies; null if there are no prices
+             */
+            as_of?: string | null;
+            /**
+             * Days
+             * @description Trading days in the window
+             */
+            days: number;
+            /**
+             * Filings
+             * @description Filed on or after the window's first day, newest first
+             */
+            filings: components["schemas"]["ChangeFiling"][];
+            /** Headlines */
+            headlines: components["schemas"]["ChangeCompanyNews"][];
+            /** Market Days */
+            market_days: components["schemas"]["ChangeMarketDay"][];
+            /** Mood Shifts */
+            mood_shifts: components["schemas"]["ChangeMoodShift"][];
+            /** Moves */
+            moves: components["schemas"]["ChangeMove"][];
+            /** @description The newest stored filing of any company, shown when `filings` is empty */
+            newest_filing?: components["schemas"]["ChangeFiling"] | null;
+            rules: components["schemas"]["ChangeRules"];
+            /**
+             * Stale
+             * @description Companies with no price for the newest date, so the window may be missing their latest days
+             */
+            stale: components["schemas"]["StaleSymbol"][];
+            /**
+             * Window Start
+             * @description First trading day in the window
+             */
+            window_start?: string | null;
         };
         /** CopilotRequest */
         CopilotRequest: {
@@ -779,6 +968,16 @@ export interface components {
              */
             url?: string | null;
         };
+        /** StaleSymbol */
+        StaleSymbol: {
+            /**
+             * As Of
+             * @description Date of this company's newest stored price, null if it has none
+             */
+            as_of?: string | null;
+            /** Symbol */
+            symbol: string;
+        };
         /** StatusOut */
         StatusOut: {
             /** Companies */
@@ -946,6 +1145,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AddLookupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    changes_api_changes_get: {
+        parameters: {
+            query?: {
+                /** @description Trading days to look back */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangesOut"];
                 };
             };
             /** @description Validation Error */

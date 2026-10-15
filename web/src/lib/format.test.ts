@@ -1,5 +1,5 @@
 import {
-  directionOf, formatBigMoney, formatChangePct, formatFraction, formatShareCount, formatLongDate, formatPrice, formatShortDate, formatVolume, isStale, moodFor,
+  directionOf, formatBigMoney, formatChangePct, formatFraction, formatShareCount, formatLongDate, formatPrice, formatShortDate, formatVolume, isStale, moodFor, moodForScore, formatScore,
   positionInRange, relativeTime, safeHttpUrl,
 } from "./format";
 
@@ -118,5 +118,20 @@ describe("company-sized numbers", () => {
     expect(formatShareCount(14_594_180_000)).toBe("14.59 billion");
     expect(formatShareCount(250_000_000)).toBe("250.0 million");
     expect(formatShareCount(undefined)).toBe("n/a");
+  });
+});
+
+describe("news score words", () => {
+  it("reads a bare score the same way as a summary", () => {
+    expect(moodForScore(0.15)).toEqual({ label: "Positive", tone: "up" });
+    expect(moodForScore(-0.3333)).toEqual({ label: "Negative", tone: "down" });
+    expect(moodForScore(0)).toEqual({ label: "Neutral", tone: "flat" });
+    expect(moodForScore(null)).toEqual({ label: "No news", tone: "none" });
+  });
+
+  it("writes a score with its sign", () => {
+    expect(formatScore(0.6)).toBe("+0.60");
+    expect(formatScore(-0.3333)).toBe("-0.33");
+    expect(formatScore(0)).toBe("0.00");
   });
 });

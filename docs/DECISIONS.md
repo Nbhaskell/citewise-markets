@@ -64,6 +64,7 @@ benchmarks.
 | P/E, market value, EPS, and share count always go to the figures; "revenue", "profit", and "margin" go to the filings when the question names a filing, a quarter, a segment, or asks why | The figures are twelve-month totals and can't explain anything. "What does the 10-K say about revenue?" and "Why is revenue growing?" keep their old (filings) route; "What was revenue last quarter?" goes to the 10-Q, which has the quarter |
 | The rules for using the figures are a separate prompt block, added only when a figures source is present | Adding them to the shared prompt moved other questions (see the gotchas): "news and stock" went from 10 of 10 to 0 of 10 and "should I sell" from 16 of 20 to 4 of 20. Questions that don't use the figures now get byte-for-byte the prompt they were evaluated with |
 | Growth is written as "measured on the 6 months to X vs the same 6 months a year earlier only (not the growth of the 12-month total)" | The model wrote "revenue for the last 12 months was $303.0 billion, an increase of 95.8%" when 95.8% compared only the latest six months. With the plain wording that happened in 6 of 6 runs of the premise question; with this wording, 0 of 18 |
+| "What changed" is computed on read from stored data, with no model and no stored results (2026-10-15) | A daily view is only worth having if every line can be traced to a stored row. Python picks the filings, moves, and headlines with named rules; a model summary would add the invented-fact risk the copilot checks exist to contain, and the dashboard already leaves out an "AI daily brief" for that reason. Nothing is stored, so there is no migration and nothing for the nightly job to maintain |
 
 ## Gotchas we hit
 
@@ -790,6 +791,51 @@ benchmarks.
   more general approach (a routing step that asks the model to classify the question, checked in code) is worth weighing
   against more keyword rules, which keep needing new patches. Not decided; it would be a change to how every question is
   routed and would need its own evaluation.
+- **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
+  `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
+  **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
+  "filed in the last day" list is empty on almost every day, and `fetched_at` can't mean "new" (24 of 28 filings show
+  the day the app first downloaded them, 10-12). The list therefore uses `filed_at` and the page names the newest stored
+  filing when the list is empty. Daily moves differ a lot by company (median absolute move about 0.9% for Apple, 2.4% for
+  AMD; the top tenth of days start near 4%), and on 10-14 all seven companies fell together. **The rules:** (1) The
+  window is the last N *stored trading dates* (1, 3 or 7 on the page, up to 30 in the API), so a weekend never shortens
+  it. (2) A move is listed when it is at least 3% and at least twice the company's own median daily move over the 60
+  moves before the window (the window is left out of its own baseline); with fewer than 20 earlier moves only the 3%
+  floor applies and the row says the usual move is unknown. (3) A day on which at least 70% of the companies (and at
+  least 4) moved the same way by more than 1% is labeled market-wide, and a move on such a day in the same direction
+  carries the label. (4) Notable headlines are positive or negative labels only, each story once per company, quote and
+  data-page templates left out (the broad set, as the sentiment totals use), newest three per company, with the full
+  counts. (5) Headlines beside a move are those published on that date (UTC), positive and negative first, labeled
+  "timing only", never a cause (the copilot's rule). (6) A mood shift is the 7-day score against the 7 days before it,
+  shown when the two differ by at least 0.15 and each has at least 10 stories; the earlier week is `label_counts` over
+  14 days minus over 7, so there is still one counting function. **Changed from the plan:** mood is a fixed 7-day
+  comparison, not "this window against the one before it", because a one-day window has a handful of stories and the
+  score would mean nothing. **On the real data (as of 10-15):** the latest day lists no moves; 7 days lists AMD -5.73%
+  (usual day 2.37%, bar 4.74%) and NVIDIA -3.16% (bar 3.15%) on 10-14, both labeled market-wide, and Amazon +3.29% on
+  10-09; 30 days lists 12 moves and five market-wide days; no company has a mood shift, because only about a week of
+  headlines is stored. **Tests:** 32 new Python tests (`tests/test_changes.py`: the rules on built series, the same
+  from the database with `ZZCH*` tickers, and the endpoint) and 19 new web tests (16 for the page, 2 for formatting, 1 for navigation); 765
+  Python and 232 web tests pass. Fourteen deliberate breakages of the Python rules and eight of the page were each
+  caught; two Python ones were first missed (a baseline that included the window, and a window counted in calendar
+  days) because the tests could not tell the difference (a median ignores three outliers; the test dates had no
+  weekend), and two tests were added. One web breakage was first "missed" because my edit hit a comment, not the code.
+  **Found in the browser, not by the tests:** a falling move was written "closed $570.82, up from $605.53". The
+  component test had the same wrong wording in its expected text, so it passed; both now say "against". **In a real
+  browser** (live data, servers stopped afterwards): the latest day and 7 days at desktop width, 375 px (no horizontal
+  overflow), light mode (automated contrast check: none of 137 text elements below 4.5:1), and the API stopped (the
+  standard "Can't reach the API" message with a retry). **Not checked on real data:** a window that contains a filing
+  (none was filed in any window; tests cover it), a mood shift, a company with a stale latest price. **Weak spots:**
+  (1) The thresholds (3%, twice the usual move, 1% and 70% for market-wide, 0.15 for mood) were chosen from these seven
+  companies and one look at their history; nothing measures whether they flag the days an owner cares about, and a
+  tighter or looser setting is one constant. (2) "Notable" is only "labeled positive or negative" by a small local
+  model that leans neutral and is wrong about one headline in eight or so, so the list can contain routine items and
+  miss important ones; the newest three per company are shown, so on a busy day they are all from the same hours. (3)
+  A headline paraphrased by another outlet shows twice (only identical titles are merged, as elsewhere). (4) The move
+  is measured between two stored closes; if a bar is missing the move spans more than a day (the row shows both
+  dates). The last bar can be a partial day while the market is open. (5) The headlines beside a move are chosen by UTC
+  date, so an after-hours story can sit on the next trading day's move. (6) Only about a week of headlines is stored, so
+  older moves show "no stored headlines" and a mood shift cannot appear yet. (7) There is no dashboard summary, no
+  "since your last visit", and the copilot cannot answer "what changed today" from this view.
 - **The chart shows daily closes only.** No volume bars, indicators, comparison between companies, or pinch-zoom.
   The latest day can be partial while the market is open.
 - **Stock detail was checked in a real browser** (live NVIDIA and Tesla data, hover checks against database values,

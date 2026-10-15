@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import type {
+  ChangesOut,
   CopilotResponse,
   Fundamentals,
   Health,
@@ -155,3 +156,38 @@ export const fundamentalsData: Fundamentals = {
 export const fundamentalsRoutes = (over: Partial<Fundamentals> = {}): Record<string, Handler> => ({
   "GET /api/stocks/AAPL/fundamentals": { ...fundamentalsData, ...over },
 });
+
+export const changesData: ChangesOut = {
+  days: 1,
+  as_of: "2026-10-14",
+  window_start: "2026-10-14",
+  stale: [],
+  filings: [],
+  newest_filing: { symbol: "NVDA", form: "10-Q", filed_at: "2026-08-26", period_of_report: "2026-07-26", url: "https://www.sec.gov/n", accession_number: "0-9" },
+  moves: [
+    {
+      symbol: "AMD", name: "Advanced Micro Devices", date: "2026-10-14", previous_date: "2026-10-13", close: 480.5, previous_close: 509.7,
+      change_pct: -5.73, typical_pct: 2.37, threshold_pct: 4.74, market_wide: true,
+      headlines: [
+        { id: "h1", title: "AMD slides with chip stocks", publisher: "Wire", url: "https://example.com/amd", sentiment: "negative",
+          published_at: new Date(Date.now() - 3 * 3600_000).toISOString() },
+        { id: "h2", title: "Unsafe link headline", publisher: null, url: "javascript:alert(1)", sentiment: null,
+          published_at: new Date(Date.now() - 4 * 3600_000).toISOString() },
+      ],
+    },
+    {
+      symbol: "TSLA", name: "Tesla, Inc.", date: "2026-10-14", previous_date: "2026-10-13", close: 400, previous_close: 380,
+      change_pct: 5.26, typical_pct: null, threshold_pct: 3, market_wide: false, headlines: [],
+    },
+  ],
+  market_days: [{ date: "2026-10-14", direction: "down", moved_that_way: 6, companies: 7 }],
+  headlines: [
+    {
+      symbol: "NVDA", positive: 5, negative: 2,
+      items: [{ id: "n1", title: "Nvidia wins a contract", publisher: "Wire", url: "https://example.com/n", sentiment: "positive",
+        published_at: new Date(Date.now() - 2 * 3600_000).toISOString() }],
+    },
+  ],
+  mood_shifts: [{ symbol: "NVDA", score_now: 0.6, stories_now: 20, score_before: -0.3333, stories_before: 30 }],
+  rules: { min_move_pct: 3, typical_multiple: 2, baseline_days: 60, headlines_per_company: 3, mood_days: 7 },
+};

@@ -135,6 +135,378 @@
         "title": "AddLookupOut",
         "type": "object"
       },
+      "ChangeCompanyNews": {
+        "properties": {
+          "items": {
+            "description": "The newest few, positive and negative only",
+            "items": {
+              "$ref": "#/components/schemas/NewsItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "negative": {
+            "title": "Negative",
+            "type": "integer"
+          },
+          "positive": {
+            "description": "Positive stories in the window, each counted once",
+            "title": "Positive",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "positive",
+          "negative",
+          "items"
+        ],
+        "title": "ChangeCompanyNews",
+        "type": "object"
+      },
+      "ChangeFiling": {
+        "properties": {
+          "accession_number": {
+            "title": "Accession Number",
+            "type": "string"
+          },
+          "filed_at": {
+            "format": "date",
+            "title": "Filed At",
+            "type": "string"
+          },
+          "form": {
+            "title": "Form",
+            "type": "string"
+          },
+          "period_of_report": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Of Report"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "form",
+          "filed_at",
+          "period_of_report",
+          "url",
+          "accession_number"
+        ],
+        "title": "ChangeFiling",
+        "type": "object"
+      },
+      "ChangeMarketDay": {
+        "properties": {
+          "companies": {
+            "title": "Companies",
+            "type": "integer"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "moved_that_way": {
+            "title": "Moved That Way",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "direction",
+          "moved_that_way",
+          "companies"
+        ],
+        "title": "ChangeMarketDay",
+        "type": "object"
+      },
+      "ChangeMoodShift": {
+        "properties": {
+          "score_before": {
+            "description": "The same score for the 7 days before that",
+            "title": "Score Before",
+            "type": "number"
+          },
+          "score_now": {
+            "description": "News score over the last 7 days, -1 to +1",
+            "title": "Score Now",
+            "type": "number"
+          },
+          "stories_before": {
+            "title": "Stories Before",
+            "type": "integer"
+          },
+          "stories_now": {
+            "title": "Stories Now",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "score_now",
+          "stories_now",
+          "score_before",
+          "stories_before"
+        ],
+        "title": "ChangeMoodShift",
+        "type": "object"
+      },
+      "ChangeMove": {
+        "properties": {
+          "change_pct": {
+            "title": "Change Pct",
+            "type": "number"
+          },
+          "close": {
+            "title": "Close",
+            "type": "number"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "headlines": {
+            "description": "Stories published that day (UTC). Timing only: headlines can't show why a price moved",
+            "items": {
+              "$ref": "#/components/schemas/NewsItemOut"
+            },
+            "title": "Headlines",
+            "type": "array"
+          },
+          "market_wide": {
+            "description": "Most tracked companies moved the same way that day, so this may not be about the company",
+            "title": "Market Wide",
+            "type": "boolean"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "previous_close": {
+            "title": "Previous Close",
+            "type": "number"
+          },
+          "previous_date": {
+            "description": "The earlier stored close this move is measured against (usually the day before)",
+            "format": "date",
+            "title": "Previous Date",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "threshold_pct": {
+            "description": "The size a move had to reach to be listed for this company",
+            "title": "Threshold Pct",
+            "type": "number"
+          },
+          "typical_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The company's median daily move (absolute) over the days before the window; null without enough history",
+            "title": "Typical Pct"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "date",
+          "previous_date",
+          "close",
+          "previous_close",
+          "change_pct",
+          "threshold_pct",
+          "market_wide",
+          "headlines"
+        ],
+        "title": "ChangeMove",
+        "type": "object"
+      },
+      "ChangeRules": {
+        "properties": {
+          "baseline_days": {
+            "title": "Baseline Days",
+            "type": "integer"
+          },
+          "headlines_per_company": {
+            "title": "Headlines Per Company",
+            "type": "integer"
+          },
+          "min_move_pct": {
+            "title": "Min Move Pct",
+            "type": "number"
+          },
+          "mood_days": {
+            "title": "Mood Days",
+            "type": "integer"
+          },
+          "typical_multiple": {
+            "title": "Typical Multiple",
+            "type": "number"
+          }
+        },
+        "required": [
+          "min_move_pct",
+          "typical_multiple",
+          "baseline_days",
+          "headlines_per_company",
+          "mood_days"
+        ],
+        "title": "ChangeRules",
+        "type": "object"
+      },
+      "ChangesOut": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Newest stored price date across the companies; null if there are no prices",
+            "title": "As Of"
+          },
+          "days": {
+            "description": "Trading days in the window",
+            "title": "Days",
+            "type": "integer"
+          },
+          "filings": {
+            "description": "Filed on or after the window's first day, newest first",
+            "items": {
+              "$ref": "#/components/schemas/ChangeFiling"
+            },
+            "title": "Filings",
+            "type": "array"
+          },
+          "headlines": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeCompanyNews"
+            },
+            "title": "Headlines",
+            "type": "array"
+          },
+          "market_days": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeMarketDay"
+            },
+            "title": "Market Days",
+            "type": "array"
+          },
+          "mood_shifts": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeMoodShift"
+            },
+            "title": "Mood Shifts",
+            "type": "array"
+          },
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeMove"
+            },
+            "title": "Moves",
+            "type": "array"
+          },
+          "newest_filing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeFiling"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The newest stored filing of any company, shown when `filings` is empty"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/ChangeRules"
+          },
+          "stale": {
+            "description": "Companies with no price for the newest date, so the window may be missing their latest days",
+            "items": {
+              "$ref": "#/components/schemas/StaleSymbol"
+            },
+            "title": "Stale",
+            "type": "array"
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "First trading day in the window",
+            "title": "Window Start"
+          }
+        },
+        "required": [
+          "days",
+          "stale",
+          "filings",
+          "moves",
+          "market_days",
+          "headlines",
+          "mood_shifts",
+          "rules"
+        ],
+        "title": "ChangesOut",
+        "type": "object"
+      },
       "CopilotRequest": {
         "properties": {
           "history": {
@@ -1302,6 +1674,32 @@
         "title": "Source",
         "type": "object"
       },
+      "StaleSymbol": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Date of this company's newest stored price, null if it has none",
+            "title": "As Of"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol"
+        ],
+        "title": "StaleSymbol",
+        "type": "object"
+      },
       "StatusOut": {
         "properties": {
           "companies": {
@@ -1758,6 +2156,54 @@
         "summary": "Add Company Lookup",
         "tags": [
           "add company"
+        ]
+      }
+    },
+    "/api/changes": {
+      "get": {
+        "description": "New filings, unusually big daily moves, and notable headlines over the last few trading days, worked out\nfrom stored data. A big move is measured against the company's own usual daily move; headlines beside a move are\ntiming only and never a cause.",
+        "operationId": "changes_api_changes_get",
+        "parameters": [
+          {
+            "description": "Trading days to look back",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Trading days to look back",
+              "maximum": 30,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Changes",
+        "tags": [
+          "changes"
         ]
       }
     },

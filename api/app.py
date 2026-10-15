@@ -195,6 +195,17 @@ def news_feed(
     return queries.news_feed(conn, model, days, limit, include_irrelevant, symbols, sentiment)
 
 
+@app.get("/api/changes", response_model=schemas.ChangesOut, tags=["changes"])
+def changes(
+    conn: Conn, model: SentimentModel,
+    days: Annotated[int, Query(ge=1, le=queries.CHANGES_MAX_DAYS, description="Trading days to look back")] = 1,
+):
+    """New filings, unusually big daily moves, and notable headlines over the last few trading days, worked out
+    from stored data. A big move is measured against the company's own usual daily move; headlines beside a move are
+    timing only and never a cause."""
+    return queries.changes(conn, model, days)
+
+
 @app.get("/api/stocks/{symbol}/filings", response_model=list[schemas.FilingOut], tags=["filings"])
 def stock_filings(symbol: Symbol, conn: Conn):
     symbol = _require_company(conn, symbol)

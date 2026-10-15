@@ -37,7 +37,10 @@ them (the owner hasn't confirmed the order):
    EPS, revenue, profit, and margin questions from the figures as a numbered source of kind `fundamentals`
    (`ai/market.py`), and attaches the relevant cautions to the answer in code. US-GAAP filers only; foreign filers show "not available".
    Python computes every ratio and the model only quotes it as a numbered source. A screener can't exist without these.
-4. **A daily "what changed" view** (new filings, big moves, notable headlines) from data already stored.
+4. **A daily "what changed" view** (new filings, big moves, notable headlines) from data already stored. Built on
+   `feature/whats-changed` (`/changes`, `GET /api/changes`, `data/changes.py`; see DECISIONS "What changed"). No AI
+   summary, computed on read, nothing stored. Not built: a "since your last visit" mode, a dashboard teaser, and copilot
+   questions about it.
 5. **Copilot trust.** In progress; the history is in DECISIONS.md ("Copilot trust, steps 1 to 6"). Built, all in code and
    not in the prompt: a follow-up that only names another company keeps the earlier topic (`carry_topic`); ratios the app
    doesn't compute are declined (`unstored_figures`); "Tesla's stock" with nothing else is a price question
@@ -199,6 +202,12 @@ The owner is building this step by step and is not a professional developer, so 
   "Revenue" and "profit" words go to the filings instead when the question names a filing, a quarter, a segment, or asks
   why; P/E, market value, and EPS always go to the figures. Same eval rules as the market data above: new cases in
   different wording before changing routing or the prompt, and read the answers.
+- **What changed (`data/changes.py`, `api/queries.changes`):** every rule is a named constant at the top of `data/changes.py`;
+  keep the calculation in Python and the endpoint read-only, with no model call. A big move is measured against the
+  company's own usual day (baseline excludes the window), a market-wide day is labeled, filings use `filed_at` and never
+  `fetched_at`, and headlines beside a move are timing only, never a cause. Mood comes from `label_counts` (don't add
+  another counting query). `build_changes` takes the mood counts as a function so `data/` doesn't import `ai/`. Tests:
+  `tests/test_changes.py` (`ZZCH*` tickers) and `web/src/pages/ChangesPage.test.tsx`.
 - **Scheduling is the user's call:** don't run `scripts/register_nightly_task.ps1` or `scripts/register_backup_task.ps1`
   (they change Windows Task Scheduler) without being asked.
 

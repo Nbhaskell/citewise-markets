@@ -21,6 +21,10 @@ export type Health = S["Health"];
 export type AddLookupOut = S["AddLookupOut"];
 export type AddJobOut = S["AddJobOut"];
 export type ReportCompany = S["ReportCompany"];
+export type ChangesOut = S["ChangesOut"];
+export type ChangeMove = S["ChangeMove"];
+export type ChangeFiling = S["ChangeFiling"];
+export type ChangeCompanyNews = S["ChangeCompanyNews"];
 
 export type PriceRange = "1M" | "3M" | "6M" | "1Y" | "5Y" | "MAX";
 export type NewsLabel = "positive" | "negative" | "neutral";

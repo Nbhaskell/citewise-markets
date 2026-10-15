@@ -1,4 +1,5 @@
 import { Link, NavLink, Route, Routes } from "react-router-dom";
+import { ChangesPage } from "./pages/ChangesPage";
 import { CopilotPage } from "./pages/CopilotPage";
 import { Dashboard } from "./pages/Dashboard";
 import { StockPage } from "./pages/StockPage";
@@ -25,6 +26,7 @@ export function App() {
           <NavLink to="/" end>
             Dashboard
           </NavLink>
+          <NavLink to="/changes">What changed</NavLink>
           <NavLink to="/copilot">Copilot</NavLink>
         </nav>
         <span className="muted small">Research from public filings, prices, and headlines. Not financial advice.</span>
@@ -33,6 +35,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/stocks/:symbol" element={<StockPage />} />
+          <Route path="/changes" element={<ChangesPage />} />
           <Route path="/copilot" element={<CopilotPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
