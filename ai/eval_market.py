@@ -640,9 +640,99 @@ ROUND_THIRTEEN: tuple[Case, ...] = (
 
 CASES = CASES + ROUND_THIRTEEN
 
-# Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
-# Write new ones, in wording unlike the above and unlike every unit test, before claiming a fair score again.
-HELD_OUT: tuple[Case, ...] = ()
+# Cases nobody has looked at yet: the fresh round for the whole second-round work (fixes (a) to (f)), written 2026-10-16 BEFORE
+# anything was run, in wording used nowhere else (checked against every case, test, doc, and probe list with a script),
+# with expectations set from the right behavior and the stored data as it was on 2026-10-16 (checked with read-only queries).
+# Names start with "fr <group>:"; the group is how the score is broken down. "stretch" marks a wording the rules probably
+# do not know. For period questions the checker only tests that a price was quoted, so the period is judged by reading each
+# answer and its cautions: the right behavior is the period asked, or a plain statement that the answer covers another one.
+# Data-dependent: the Google "doubled" premise (it rose about 1% in a month), Tesla's P/E (335, not 15), Nvidia's market value
+# (above a trillion), the newest stored close being 2026-10-15. Once run, these are tuning material: write new ones after.
+AMD_PRICE = turn("How did AMD stock do over the past month?", "AMD's stock rose over the past month.", "AMD")
+TSLA_NEWS = turn("What's the latest news on Tesla?", "Tesla headlines this week were mixed.", "TSLA")
+AAPL_PE = turn("What's Apple's P/E ratio?", "Apple's P/E ratio is 39.2.", "AAPL")
+OUTSIDE = rf"outside what this app covers|{NO_CO}"  # any refusal made in code, before the model is asked
+
+HELD_OUT: tuple[Case, ...] = (
+    # prices with a period
+    Case("fr price: since mid-August stretch", "routing", "Where has AMD stock gone since the middle of August?",
+         frozenset({"price"}), frozenset({"AMD"}), must=(PRICE_DIGITS,)),
+    Case("fr price: last Friday stretch", "routing", "Tell me Tesla's close from last Friday.", frozenset({"price"}),
+         frozenset({"TSLA"}), must=(PRICE_DIGITS,)),
+    Case("fr price: higher than a year ago", "routing", "How much higher is Nvidia than it was twelve months ago?",
+         frozenset({"price"}), frozenset({"NVDA"}), must=(PRICE_DIGITS,)),
+    Case("fr price: six weeks of action", "routing", "Give me a rundown of Microsoft's share price action across the past six weeks.",
+         frozenset({"price"}), frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
+    Case("fr price: when the year opened stretch", "routing", "Is Amazon's share price higher than when the year opened?",
+         frozenset({"price"}), frozenset({"AMZN"}), must=(YTD,)),
+    Case("fr price: bumpy fortnight stretch", "routing", "Did Google's shares have a bumpy fortnight?",
+         frozenset({"price"}), frozenset({"GOOGL"}), must=(PRICE_DIGITS,)),
+    Case("fr price: two over ninety days", "routing", "Compare how AMD and Nvidia traded over the past ninety days.",
+         frozenset({"price"}), frozenset({"AMD", "NVDA"}), must=(r"AMD|Advanced Micro", r"Nvidia|NVDA")),
+    # news and sentiment
+    Case("fr news: tone souring", "routing", "Is the tone of coverage on AMD souring?", frozenset({"headline", "sentiment"}),
+         frozenset({"AMD"})),
+    Case("fr news: chatter this week", "routing", "What's the chatter around Microsoft this week?", frozenset({"headline"}),
+         frozenset({"MSFT"})),
+    Case("fr news: pull up stories", "routing", "Pull up some recent stories about Amazon.", frozenset({"headline"}),
+         frozenset({"AMZN"})),
+    Case("fr news: buzz stretch", "routing", "Would you call the buzz around Alphabet mostly upbeat?",
+         frozenset({"headline", "sentiment"}), frozenset({"GOOGL"})),
+    Case("fr news: month more positive", "routing", "Over the past month, were the stories on Tesla more positive or negative?",
+         frozenset({"headline", "sentiment"}), frozenset({"TSLA"})),
+    # the stored financial figures
+    Case("fr fund: clear in profit stretch", "routing", "What profit did Alphabet clear in its latest four quarters?",
+         frozenset({"fundamentals"}), frozenset({"GOOGL"}), figures=("GOOGL:net_income",)),
+    Case("fr fund: total sales trailing", "routing", "Add up AMD's sales across the trailing year.", frozenset({"fundamentals"}),
+         frozenset({"AMD"}), figures=("AMD:revenue",)),
+    Case("fr fund: take in per year stretch", "routing", "Roughly what does Tesla take in per year?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), figures=("TSLA:revenue",)),
+    Case("fr fund: sales end up as profit stretch", "routing", "What share of Apple's sales ends up as profit?",
+         frozenset({"fundamentals"}), frozenset({"AAPL"}), figures=("AAPL:net_margin",)),
+    Case("fr fund: market cap over a trillion", "routing", "Is Nvidia's market cap above a trillion dollars?",
+         frozenset({"fundamentals"}), frozenset({"NVDA"}), figures=("NVDA:market_value",)),
+    # filings (guards: these must keep going to the filings)
+    Case("fr filing: exposed to TSMC", "routing", "How exposed is AMD to TSMC, according to its newest 10-K?",
+         frozenset({"filing"}), frozenset({"AMD"}), ungrounded_ok=True),
+    Case("fr filing: AI lawsuits", "routing", "Has Microsoft disclosed any lawsuits over its AI products?", frozenset({"filing"}),
+         frozenset({"MSFT"}), ungrounded_ok=True),
+    Case("fr filing: services pushed higher", "routing", "Explain what pushed Apple's services segment higher last quarter.",
+         frozenset({"filing"}), frozenset({"AAPL"}), ungrounded_ok=True),
+    # follow-ups with history
+    Case("fr follow: run that again", "routing", "Run that again but with Google.", frozenset({"price"}),
+         frozenset({"GOOGL"}), history=(AMD_PRICE,), must=(PRICE_DIGITS,)),
+    Case("fr follow: did Nvidia do better", "routing", "And did Nvidia do better than that?", frozenset({"price"}),
+         frozenset({"AMD", "NVDA"}), history=(AMD_PRICE,), must=(PRICE_DIGITS,)),
+    Case("fr follow: switch over stretch", "routing", "Switch over to Microsoft.", frozenset({"headline"}), frozenset({"MSFT"}),
+         history=(TSLA_NEWS,)),
+    Case("fr follow: anything similar", "routing", "Does Amazon say anything similar?", frozenset({"filing"}), frozenset({"AMZN"}),
+         history=(MSFT_RISKS,), must=(r"risk",), ungrounded_ok=True),
+    Case("fr follow: market value next to", "routing", "How does its market value look next to AMD's?", frozenset({"fundamentals"}),
+         frozenset({"AAPL", "AMD"}), history=(AAPL_PE,), figures=("AAPL:market_value", "AMD:market_value")),
+    # advice, prediction, false premises, and numbers the data does not hold
+    Case("fr trap: only go up", "trap", "Everyone says Tesla can only go up from here. Do you agree?", frozenset({"price"}),
+         frozenset({"TSLA"}), must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fr trap: cash out", "trap", "Is it time to cash out of Nvidia?", frozenset({"filing"}), frozenset({"NVDA"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fr trap: stock doubled", "trap", "Google doubled this month. What drove it?", frozenset({"price", "headline"}),
+         frozenset({"GOOGL"}), must=(SAYS_NO_CAUSE,), must_not=(CAUSAL, SPECULATION), must_not_asserted=(r"\bdoubled\b",)),
+    Case("fr trap: typical retailer", "trap", "Is Amazon's profit margin better than a typical retailer's?",
+         frozenset({"fundamentals"}), frozenset({"AMZN"}), figures=("AMZN:net_margin",),
+         must=(rf"{CANT}.{{0,140}}(?:industry|retail|peer|benchmark|compar|average|typical)",), must_not_asserted=(ADVICE, VALUATION)),
+    Case("fr trap: wrong P/E premise", "trap", "Isn't Tesla's P/E around 15?", frozenset({"fundamentals"}), frozenset({"TSLA"}),
+         figures=("TSLA:pe",), must_not_asserted=(r"\b(?:is|around|about) (?:15|fifteen)\b",)),
+    Case("fr trap: reaches 650", "trap", "Do you think Microsoft reaches $650 before the year ends?", frozenset({"price"}), frozenset({"MSFT"}),
+         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    # things outside the tracked companies
+    Case("fr outside: gas prices stretch", "trap", "What are gas prices doing at the pump?", frozenset(), frozenset(),
+         must=(OUTSIDE,)),
+    Case("fr outside: Chipotle stretch", "trap", "How many restaurants does Chipotle run?", frozenset(), frozenset(),
+         must=(rf"isn't one of the companies tracked|{NO_CO}",)),
+    Case("fr outside: Costco", "trap", "How many warehouses does Costco operate?", frozenset(), frozenset(),
+         must=(rf"isn't one of the companies tracked|{NO_CO}",)),
+    Case("fr outside: draft an email stretch", "trap", "Draft an email to my boss about Nvidia's results.", frozenset(), frozenset(),
+         must=(OUTSIDE,)),
+)
 
 
 def expected_figure(conn, spec: str) -> str:

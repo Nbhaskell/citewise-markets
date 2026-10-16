@@ -73,12 +73,13 @@ CASES: tuple[Case, ...] = (
 )
 
 
-# Written AFTER the prompt and safeguards above were tuned, in different wording, and never used to adjust them.
-# Run with --held-out for a fairer score than the tuned set gives. If you tune against these, write new ones.
+# Written AFTER the prompt and safeguards above were tuned, in different wording. They were once the held-out set; they have
+# since been run and used to adjust the rules, so (as of 2026-10-16) they are folded into CASES below and `HELD_OUT` is
+# for fresh cases only.
 MSFT_REV = turn("How much did Microsoft's revenue grow in its latest annual report?", "Revenue grew 18%.", "MSFT")
 GOOGL_LEGAL = turn("What legal proceedings is Alphabet involved in?", "Alphabet faces many regulatory and legal matters.", "GOOGL")
 
-HELD_OUT: tuple[Case, ...] = (
+PREVIOUS_HELD_OUT: tuple[Case, ...] = (
     Case("how about <company>", "follow-up", (MSFT_REV,), "How about Amazon?", frozenset({"AMZN"}), "revenue"),
     Case("they + new subtopic", "follow-up", (GOOGL_LEGAL,), "Are they involved in any antitrust matters?", frozenset({"GOOGL"}), "antitrust"),
     Case("the company", "follow-up", (NVDA_RISK, TSLA_EMP), "Does the company mention any recalls?", frozenset({"TSLA"}), "recall"),
@@ -115,7 +116,26 @@ STEP_C: tuple[Case, ...] = (
     Case("c: standalone, starts with do", "standalone", (TSLA_EMP,), "Do Microsoft and Amazon both mention litigation?",
          frozenset({"MSFT", "AMZN"}), "litigation"),
 )
-HELD_OUT = HELD_OUT + STEP_C
+CASES = CASES + PREVIOUS_HELD_OUT + STEP_C
+
+# Fresh cases for the whole second-round work, written 2026-10-16 BEFORE anything was run, in wording used nowhere else
+# (checked against every case, test, and doc with a script). "stretch" marks a wording the rules probably do not know.
+# Once run, they are tuning material: write new ones after.
+HELD_OUT: tuple[Case, ...] = (
+    Case("fr resolve: same again for", "follow-up", (TSLA_RISK,), "Same again for AMD, please.", frozenset({"AMD"}), "risk"),
+    Case("fr resolve: longer list stretch", "follow-up", (NVDA_RISK,), "Is Tesla's list longer than that?",
+         frozenset({"NVDA", "TSLA"}), "risk"),
+    Case("fr resolve: number for too", "follow-up", (MSFT_REV,), "Give me the number for Apple too.", frozenset({"AAPL"}), "revenue"),
+    Case("fr resolve: more people than", "follow-up", (AAPL_EMP,), "Does Amazon employ more people than that?",
+         frozenset({"AAPL", "AMZN"}), "employees"),
+    Case("fr resolve: skip to stretch", "follow-up", (GOOGL_LEGAL,), "Skip to Nvidia.", frozenset({"NVDA"}), "legal"),
+    Case("fr resolve: which of the two", "follow-up", (APPLE_TESLA_DEBT,), "Which of the two spends more on research?",
+         frozenset({"AAPL", "TSLA"}), "research"),
+    Case("fr resolve: standalone comparison", "standalone", (TSLA_EMP,), "Does Amazon use more contractors than Nvidia?",
+         frozenset({"AMZN", "NVDA"}), "contractors"),
+    Case("fr resolve: standalone, all companies", "standalone", (NVDA_RISK,), "Summarize what the companies say about tariffs.",
+         frozenset(), "tariffs"),
+)
 
 
 @dataclass
@@ -140,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--held-out", action="store_true", help="run only the cases that were never used to tune the prompt")
     args = parser.parse_args(argv)
     cases = HELD_OUT if args.held_out else CASES
+    if not cases:
+        sys.exit("There are no held-out cases yet: every case has been looked at. Write new ones first (see HELD_OUT).")
 
     llm = get_llm()
     available = getattr(llm, "available", None)
