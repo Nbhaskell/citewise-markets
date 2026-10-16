@@ -67,13 +67,15 @@ them (the owner hasn't confirmed the order):
    fairly. (The newest-stored-price-a-day-old problem looks fixed by moving the nightly task to 3pm: the 2026-10-15 run
    left every price on the same day. It is one run, so keep checking `python -m jobs.refresh --status`.)
 
-   **Next up (as of 2026-10-15): this step.** Order from DECISIONS ("Second held-out round"): (a) price questions that name
-   a period or compare with the start of the year ("over the last three months", "since July", "above where it started
-   2026"), one phrase at a time because routing changes move other cases; (b) honor the period the question names, or say
-   in code that the window used is not the one asked (`parse_window` knows no month names or dates); (c) follow-up
-   carrying ("Now do X", "better or worse than X" keeping both companies); (d) "earn" and "sales" wording; (e) advice and
-   sentiment wording again; (f) non-company questions. Before starting, agree with the owner whether to weigh a
-   model-based routing step against more keyword rules. Write each phrasing as a test first, then fresh held-out cases.
+   **Next up (as of 2026-10-15): this step.** Order from DECISIONS ("Second held-out round"). Done, on branch
+   `feature/copilot-price-periods` (not merged yet): (a) price questions that name a period or compare with the start of
+   the year, and (b) reading more periods (numbers, "a few weeks", "since July") and saying in code, as a caution, when
+   the period asked cannot be matched or "today" has no close (DECISIONS: "Price questions that name a period"; 422 of 471
+   before, 434 after, tuning material, not a fair score). Still to do: (c) follow-up carrying ("Now do X", "better or worse
+   than X" keeping both companies); (d) "earn" and "sales" wording; (e) advice and sentiment wording again; (f) non-company
+   questions. Agreed with the owner (2026-10-15): keep keyword rules for now, write fresh held-out cases after (a) and (b)
+   and (c) to (f), and only then weigh a model-based routing step (a "model may only add a route" prototype on its own
+   branch, measured on those cases). Write each phrasing as a test first, then fresh held-out cases.
 
 ## Working with the owner
 
@@ -109,7 +111,8 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-15 (after PR #31): 771 Python tests, 253 web tests, all passing. Tracked companies: AAPL, AMD,
+- Baseline as of 2026-10-15 (after PR #31): 771 Python tests, 253 web tests, all passing (844 Python on the
+  `feature/copilot-price-periods` branch, which adds the period tests). Tracked companies: AAPL, AMD,
   AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly refresh ran at 3pm that day (success, 0 problems).
 
 ## Rules

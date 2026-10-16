@@ -21,6 +21,7 @@ from .market import (
     gather_market_evidence,
     join_names,
     parse_window,
+    period_cautions,
     relevant_cautions,
 )
 from .search import SearchResult, search_filings
@@ -632,8 +633,9 @@ def answer_question(
     if intent.market and not symbols:
         return refuse(NO_COMPANY)
     market: list[MarketEvidence] = []
+    window = parse_window(search_question, today)
     if intent.market:
-        market = gather_market_evidence(conn, symbols, intent, parse_window(search_question), getattr(llm, "name", ""), today)
+        market = gather_market_evidence(conn, symbols, intent, window, getattr(llm, "name", ""), today)
 
     passages: list[SearchResult] = []
     queries: list[str] = []
@@ -658,6 +660,7 @@ def answer_question(
         ([CAUSE_CAUTION] if causes else []) + ([invented_titles_caution(titles)] if titles else [])
         + ([c] if (c := false_price_claim(conn, text, symbols, evidence)) else [])
         + ([ADVICE_CAUTION] if intent.advice else [])
+        + period_cautions(window, market, today)
         + relevant_cautions(evidence, intent.fundamentals, text)
         + ([not_calculated_note(intent.unstored)] if intent.unstored else [])
     )

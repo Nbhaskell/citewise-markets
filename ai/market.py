@@ -9,7 +9,8 @@ Usage: python -m ai.market AAPL "How has Apple stock done this year?"   (print t
 import argparse
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import lru_cache
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -78,6 +79,33 @@ BARE_STOCK_RE = re.compile(
     r"(?:[\s,]+(?:now|currently|right now|today|please|then|too|again|as well|at the moment|lately))*\W*$",
     re.IGNORECASE,
 )
+# "Show me how Alphabet has moved over the last three months": a company, a movement verb, and (checked separately, with
+# parse_window) a named period. No "stock" or "shares" is needed. The subject must be one bare name, so "Apple's headcount
+# moved" is not caught, and the verb must not take an object ("move its supply chain", "move into cloud").
+PERIOD_MOVE_RE = re.compile(
+    r"\bhow\s+(?:(?:has|have|had|did|does|do)\s+)?"
+    r"(?!(?:the|its|their|this|that|these|those|a|an|my|your|our|much|many)\b)[\w.&-]+\s+(?:(?:has|have|had)\s+)?"
+    r"(?:moved?|trended|fared|swung|swing)\b(?!\s+(?:its|their|the|a|an|to|into|from|out|on|up\s+to|toward\w*)\b)"
+    r"|\bwhere\s+(?:has|have|had|did)\s+(?!(?:the|its|their|this|that)\b)[\w.&-]+\s+(?:moved?|trended|fared|swung)\b"
+    r"(?!\s+(?:its|their|the|a|an|to|into|from|out|on)\b)",
+    re.IGNORECASE,
+)
+@lru_cache(maxsize=4)
+def _year_start_re(year: int) -> re.Pattern:
+    """"Is Amazon above where it started 2026?": a comparison with where the stock stood at the start of THIS year. Only the
+    current year (or "the year", "last year"'s close) is accepted, because the year-to-date window is wrong for any other."""
+    return re.compile(
+        r"\bwhere\s+(?:it|they|the\s+stock|the\s+shares)\s+(?:"
+        rf"(?:started|began|opened|stood|was|were|sat)\s+(?:the\s+year|(?:in\s+)?{year}|at\s+the\s+(?:start|beginning)\s+of\s+(?:the\s+year|{year}))|"
+        r"(?:finished|ended|closed)\s+last\s+year)\b",  # not "was last year": that can be anything, such as revenue
+        re.IGNORECASE,
+    )
+
+
+def year_start_comparison(question: str, today: Optional[date] = None) -> bool:
+    return bool(_year_start_re((today or date.today()).year).search(question))
+
+
 GENERAL_RE = re.compile(r"\bhow(?:'s|\s+is|\s+are|\s+has|\s+have)\s+.{1,40}?\s+(?:doing|done|going|performing|performed)\b", re.IGNORECASE)
 STOCK_WORD_RE = re.compile(r"\b(?:stocks?|shares?|prices?)\b", re.IGNORECASE)
 # No index data is stored, and a filing's "total return" chart (scaled from $100) reads like an index level to a model.
@@ -302,6 +330,8 @@ def detect_intent(question: str) -> Intent:
     prices = (
         bool(PRICE_RE.search(price_text)) or bool(INDEX_RE.search(question)) or bool(BARE_STOCK_RE.search(question))
         or (bool(STOCK_NOUN_RE.search(question)) and parse_window(question).explicit)
+        or (bool(PERIOD_MOVE_RE.search(question)) and parse_window(question).explicit)
+        or year_start_comparison(question)
     )
     sentiment = bool(SENTIMENT_RE.search(question))
     general = bool(GENERAL_RE.search(question)) and not STOCK_WORD_RE.search(question)  # "How's Nvidia doing?" wants both
@@ -325,6 +355,9 @@ class Window:
     label: str
     days: Optional[int]  # calendar days back from the latest stored price; None means since the start of the year
     explicit: bool = False  # False when the question named no period and the default was used
+    since: Optional[date] = None  # "since July": the first day of the window, which wins over `days` when pricing it
+    unmet: Optional[str] = None  # a period the question named that no window here can match ("the end of last week")
+    asked_day: Optional[str] = None  # "today" or "yesterday": checked against the newest stored close
 
 
 DEFAULT_WINDOW = Window("past month", 31)
@@ -343,18 +376,135 @@ _WINDOWS = [  # checked in order, so the specific forms win
 ]
 
 
-def parse_window(question: str) -> Window:
+_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "fifteen": 15, "twenty": 20, "thirty": 30,
+}
+_ROUGH_AMOUNTS = {"few": 3, "couple": 2, "several": 4}  # "the last few weeks": a guess, and the label says so
+_MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
+_MONTH_RE = r"(?:" + "|".join(_MONTHS) + r"|sept)"
+_NUMBERED_PERIOD_RE = re.compile(
+    r"\b(?:last|past|previous)\s+(?:(\d{1,3}|" + "|".join(_NUMBER_WORDS) + r")|(few|couple(?:\s+of)?|several))\s+(day|week|month|year)s?\b",
+    re.IGNORECASE,
+)
+# The lengths the app has always used for these, so a number written out in words keeps its old label and length.
+_CANONICAL = {
+    (1, "day"): Window("past day", 1, True), (7, "day"): Window("past week", 7, True),
+    (14, "day"): Window("past 2 weeks", 14, True), (30, "day"): Window("past month", 31, True),
+    (90, "day"): Window("past 3 months", 92, True),
+    (1, "week"): Window("past week", 7, True), (2, "week"): Window("past 2 weeks", 14, True),
+    (1, "month"): Window("past month", 31, True), (3, "month"): Window("past 3 months", 92, True),
+    (6, "month"): Window("past 6 months", 183, True), (12, "month"): Window("past year", 366, True),
+    (1, "year"): Window("past year", 366, True), (5, "year"): Window("past 5 years", 1830, True),
+}
+_UNIT_DAYS = {"day": 1.0, "week": 7.0, "month": 30.5, "year": 366.0}
+MAX_NUMBERED_DAYS = 3660
+
+
+def _numbered_period(question: str) -> Optional[Window]:
+    """"the last four weeks", "past 10 days", "the last few weeks". None when the number is out of range."""
+    m = _NUMBERED_PERIOD_RE.search(question)
+    if not m:
+        return None
+    unit = m.group(3).lower()
+    if m.group(2):  # few / couple / several
+        word = re.sub(r"\s+of$", "", m.group(2).lower())
+        n, note = _ROUGH_AMOUNTS[word], f" (reading '{word}' as {_ROUGH_AMOUNTS[word]})"
+    else:
+        raw = m.group(1).lower()
+        n, note = int(raw) if raw.isdigit() else _NUMBER_WORDS[raw], ""
+    if n < 1 or n * _UNIT_DAYS[unit] > MAX_NUMBERED_DAYS:
+        return None
+    if not note and (n, unit) in _CANONICAL:
+        return _CANONICAL[(n, unit)]
+    return Window(f"past {n} {unit}{'' if n == 1 else 's'}{note}", int(round(n * _UNIT_DAYS[unit])), True)
+
+
+_SINCE_MONTH_RE = re.compile(rf"\bsince\s+(?:the\s+(?:start|beginning)\s+of\s+)?({_MONTH_RE})\b", re.IGNORECASE)
+
+
+def _since_month(question: str, today: date) -> Optional[Window]:
+    """"since July": from the first of that month, this year, or last year when the month has not come yet. January is
+    left to the year-to-date window, which is the same thing."""
+    m = _SINCE_MONTH_RE.search(question)
+    if not m:
+        return None
+    name = m.group(1).lower()
+    month = 9 if name == "sept" else _MONTHS.index(name) + 1
+    if month == 1:
+        return None
+    since = date(today.year if month <= today.month else today.year - 1, month, 1)
+    return Window(f"since {_MONTHS[month - 1].capitalize()} 1", (today - since).days, True, since=since)
+
+
+# Periods the stored daily closes cannot isolate: a day or a calendar stretch. The window used is the nearest one, and
+# the answer is told (and the reader warned) that it is not the period asked. "last month" and "this week" are not here:
+# people use them loosely for "the past month" and "the past week", and a warning on every one would be noise.
+_UNMET_PATTERNS = [
+    r"\b(?:the\s+)?end\s+of\s+(?:last|this|the)\s+(?:week|month|quarter|year)\b",
+    r"\b(?:on|last)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
+    rf"\b(?:on\s+)?{_MONTH_RE}\s+\d{{1,2}}(?:st|nd|rd|th)?\b",
+    rf"\b(?:in|during)\s+{_MONTH_RE}\b",
+    r"\bq[1-4]\b|\b(?:first|second|third|fourth)\s+quarter\b",
+    r"\b(?:in|during|for)\s+20\d\d\b",
+]
+
+
+def _unmet_period(question: str) -> Optional[str]:
+    for pattern in _UNMET_PATTERNS:
+        if m := re.search(pattern, question, re.IGNORECASE):
+            return m.group(0)
+    return None
+
+
+def parse_window(question: str, today: Optional[date] = None) -> Window:
+    today = today or date.today()
+    window = _read_window(question, today)
+    unmet = _unmet_period(question)
+    asked = "today" if re.search(r"\btoday\b", question, re.IGNORECASE) else (
+        "yesterday" if re.search(r"\byesterday\b", question, re.IGNORECASE) else None)
+    if unmet or asked:
+        window = replace(window, unmet=unmet, asked_day=asked)
+    return window
+
+
+def _read_window(question: str, today: date) -> Window:
+    if year_start_comparison(question, today):
+        return _WINDOWS[0][1]  # year to date
+    if (w := _since_month(question, today)) or (w := _numbered_period(question)):
+        return w
     for pattern, window in _WINDOWS:
         if re.search(pattern, question, re.IGNORECASE):
             return window
     return DEFAULT_WINDOW
 
 
+def period_cautions(window: Window, evidence: list, today: Optional[date] = None) -> list[str]:
+    """Warnings, attached in code, for a period the question named that the price source does not cover. Only when a price
+    source was given: with none, there is no wrong period to warn about."""
+    today = today or date.today()
+    newest = [e.as_of for e in evidence if e.kind == "price"]
+    if not newest:
+        return []
+    oldest = min(newest)
+    out = []
+    if window.unmet:
+        out.append(
+            f"You asked about “{window.unmet}”, which the stored daily prices can't isolate. The answer uses the "
+            f"{window.label}, up to the close on {oldest}, so it may not be the period you meant."
+        )
+    if window.asked_day == "today" and oldest != today:
+        out.append(f"You asked about today, but the newest stored close is from {oldest}, so the answer is not about today.")
+    elif window.asked_day == "yesterday" and oldest != today - timedelta(days=1):
+        out.append(f"You asked about yesterday, but the newest stored close is from {oldest}, so the answer may not be about yesterday.")
+    return out
+
+
 def news_days(window: Window) -> int:
     """Headlines default to the last week; a named period is honored up to 90 days."""
     if not window.explicit:
         return 7
-    return min(window.days or 90, 90)
+    return min(window.days or 90, 90)  # a "since July" window has its own length in `days`
 
 
 # ---- the evidence ----
@@ -377,12 +527,17 @@ def price_evidence(conn: psycopg.Connection, symbol: str, window: Window, today:
     if latest is None:
         return None
     reach = max(window.days or 366, 366) + 10
+    if window.since:
+        reach = max(reach, (latest - window.since).days + 10)
     rows = conn.execute(
         "SELECT ts, close FROM prices_daily WHERE symbol = %s AND ts >= %s ORDER BY ts",
         (symbol, latest - timedelta(days=reach)),
     ).fetchall()
     last_ts, last_close = rows[-1]
-    start = date(last_ts.year - 1, 12, 31) if window.days is None else last_ts - timedelta(days=window.days)
+    if window.since:
+        start = window.since
+    else:
+        start = date(last_ts.year - 1, 12, 31) if window.days is None else last_ts - timedelta(days=window.days)
     before = [r for r in rows if r[0] <= start]
     base_ts, base_close = before[-1] if before else rows[0]
     in_window = [r for r in rows if r[0] >= base_ts]
@@ -407,6 +562,15 @@ def price_evidence(conn: psycopg.Connection, symbol: str, window: Window, today:
         lines.append(f"Note: stored prices end on {last_ts}; newer prices have not been loaded.")
     elif last_ts == today:
         lines.append("Note: the latest day may be a partial trading day.")
+    if window.asked_day == "today" and last_ts != today:
+        lines.append(f"Note: the question asked about today ({today}), but the newest stored close is from {last_ts}; no close for today is stored.")
+    elif window.asked_day == "yesterday" and last_ts != today - timedelta(days=1):
+        lines.append(f"Note: the question asked about yesterday, but the newest stored close is from {last_ts}.")
+    if window.unmet:
+        lines.append(
+            f"Note: the question asked about “{window.unmet}”, which these daily closes do not isolate; the figures above "
+            f"are for the {window.label}, from {base_ts} to {last_ts}."
+        )
     header = f"{symbol} price data (stored daily closes), as of {last_ts}"
     return MarketEvidence("price", symbol, header, "\n".join(lines), None, last_ts, change=change, change_pct=pct)
 

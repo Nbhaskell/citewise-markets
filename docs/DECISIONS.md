@@ -794,6 +794,43 @@ benchmarks.
   more general approach (a routing step that asks the model to classify the question, checked in code) is worth weighing
   against more keyword rules, which keep needing new patches. Not decided; it would be a change to how every question is
   routed and would need its own evaluation.
+- **Price questions that name a period: fixes (a) and (b) of the second held-out round, 2026-10-15** (branch
+  `feature/copilot-price-periods`). Each change was run alone through the full `eval_market`, 3 repeats, 157 cases, in this
+  order: **baseline on `main` 422 of 471 (90%; 140 of 157 on one pass)**, after the "moved over a period" rule 427, after the
+  "where it started the year" rule 429, after the period parsing and cautions (with the "stock market been kind to" wording
+  following from it) **434 of 471 (92%; 145 of 157)**. No case that passed before was lost; the other differences were cases
+  that swing between runs ("why did it move", "payout ratio"). **Not a fair score**: the cases are tuning material, and the
+  wordings in the unit tests were new but the evaluation cases they were meant to fix were known. **Built (all in code, no
+  prompt change):** (1) `PERIOD_MOVE_RE`: "how has/did X moved/trended/fared/swung" plus a named period is a price question,
+  with no "stock" needed; X must be one bare name, so "Apple's headcount moved" and "move its supply chain / into cloud" are
+  not caught. (2) `year_start_comparison`: "above where it started/opened/began 2026", "stood at the start of the year",
+  "finished last year" is a price question with the year-to-date window. Only the current year is accepted, because
+  year to date is wrong for any other; "where it was last year" is deliberately not caught (it can be about anything).
+  (3) `parse_window` reads "the last/past N days, weeks, months, years" (digits or words; the old labels and lengths are kept
+  for the forms that were already right), "a few / a couple of / several" (read as 3, 2, 4; the label says "reading 'few'
+  as 3"), and "since <month>" (from the 1st, this year, or last year if the month has not come; "since January" stays year to
+  date). It takes `today` for tests. (4) A period no window can match ("the end of last week", "on Monday", "on October
+  3rd", "during July", "Q2", "in 2025") is kept as `Window.unmet`; "today" and "yesterday" as `Window.asked_day`. The price
+  source then says so, and `period_cautions` attaches a caution to the answer **in code** (copilot `cautions`), naming the
+  window actually used and the newest close; with "today" it also checks whether the newest stored close is today's. No
+  caution without a price source. **Checked:** 844 Python and 253 web tests pass (73 new Python tests in
+  `test_price_periods.py`, `test_price_windows.py`, `test_copilot_price_period.py`). Ten deliberate breakages (three on the
+  routing rules, seven on the windows and cautions) were each caught. The cautions are **not printed by `eval_market`**, so
+  the wiring is covered by the end-to-end unit test and one real run: "What was Microsoft's closing price at the end of last
+  week?" printed the answer (the 10-15 close) and the warning naming the past week up to 2026-10-15. **Weak spots:**
+  (1) That answer is still not about the end of last week; the warning says so, but nothing fetches the Friday close.
+  (2) "Last month", "this week" and "last quarter" are read as the past month, week and 3 months without a warning, a
+  judgment that people use them loosely. (3) "A few" as 3 is a guess. (4) "Since July" starts at July 1 and uses the last close
+  on or before it. (5) `PERIOD_MOVE_RE` misses "How has the company moved over the last year?" (the subject is a bare name
+  only), and "in May" can match the modal "may" in the unmet list. (6) A stock noun plus a now-understood period is a price
+  question, so "Which Nvidia shares did insiders sell over the last two weeks?" would be too (not tested). (7) Existing, not
+  caused by this: the word "rise" is a price word, so "Did Apple's stock-based compensation rise over the last six months?"
+  goes to prices on `main` too. **Still failing after this (12 of 157 on one pass):** sentiment ("kind or harsh"),
+  "earn" and "dollars of sales" wording, "multiple of earnings" (the expectation is too strict), "sure thing" and "cheap right
+  now" (advice), "bitcoin" (a non-company question), "what caused the drop", "better or worse than" (a follow-up that drops
+  a company), "buy back (quarter total)" (on purpose), and the flaky "press coverage" and "why up". These are items (c) to
+  (f) of the second held-out round and are the next steps. The model-based routing question was discussed and left open:
+  the owner agreed to do (a) and (b) with keyword rules first, then write fresh held-out cases and decide.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
