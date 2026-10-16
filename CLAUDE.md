@@ -74,8 +74,9 @@ them (the owner hasn't confirmed the order):
    before, 434 after, tuning material, not a fair score). Done (PR #33, merged 2026-10-16): (c) follow-up carrying ("Now
    do X", "better or worse than X" keeping both companies; DECISIONS: "Follow-up carrying"; 436 of 471 on the market
    evaluation; 11 fresh follow-up cases went 3 of 11 on `main` to 7 of 11, 9 of 11 after adding the words they missed, now
-   tuning material). Still to do: (d) "earn" and "sales" wording; (e) advice and
-   sentiment wording again; (f) non-company questions. Agreed with the owner (2026-10-15): keep keyword rules for now,
+   tuning material). (d) "earn" and "sales" wording is built on branch `feature/copilot-figure-wording` (not merged yet;
+   DECISIONS: "'Earn' and 'sales' wording"; 437 of 471 before, 446 after; 11 fresh cases 8 of 11, 9 of 11 after one fix, now
+   tuning material). Still to do: (e) advice and sentiment wording again; (f) non-company questions. Agreed with the owner (2026-10-15): keep keyword rules for now,
    write fresh held-out cases after (c) to (f), and only then weigh a model-based routing step (a "model may only add a
    route" prototype on its own branch, measured on those cases). Write each phrasing as a test first, then fresh held-out
    cases.

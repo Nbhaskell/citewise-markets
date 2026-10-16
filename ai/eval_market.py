@@ -479,8 +479,10 @@ ROUND_TEN: tuple[Case, ...] = (
          frozenset({"TSLA"}), figures=("TSLA:net_margin",)),
     Case("fo fund: how much did earn", "routing", "How much did Amazon earn over the past twelve months?",
          frozenset({"fundamentals"}), frozenset({"AMZN"}), figures=("AMZN:net_income",)),
+    # Expectation corrected 2026-10-16: "trading at" asks about a price-based ratio, so the price source arriving with the
+    # figures is right (the P/E answer itself was already correct); it used to demand the figures alone.
     Case("fo fund: multiple of earnings", "routing", "What multiple of earnings is Alphabet trading at?",
-         frozenset({"fundamentals"}), frozenset({"GOOGL"}), figures=("GOOGL:pe",)),
+         frozenset({"fundamentals", "price"}), frozenset({"GOOGL"}), figures=("GOOGL:pe",)),
     Case("fo fund: top line", "routing", "Tell me Apple's top line for the last year.", frozenset({"fundamentals"}),
          frozenset({"AAPL"}), figures=("AAPL:revenue",)),
     Case("fo fund: dollars of sales", "routing", "How many dollars of sales did Nvidia bring in over the last four quarters?",
@@ -534,6 +536,39 @@ ROUND_TEN: tuple[Case, ...] = (
 )
 
 CASES = CASES + ROUND_TEN
+
+# Written 2026-10-16 for fix (d) (the "earn" and "sales" wording), in wording unlike the unit tests and probes, before any
+# was run. "Stretch" cases use wording the rules do not know ("make", "sales figures"): they show where the rules end. THE FAIR
+# SCORE, from the one run before any tuning: 8 of 11 ("iPhone sales over the past year" went to company revenue; found by a
+# routing check, fixed by dropping the "sales over the last ..." form, then 9 of 11). The two left are an expectation that was
+# wrong ("annual sales" goes to the 10-K by design, and the answer is right for the fiscal year) and the stretch ("make in a
+# year", answered correctly from the filings). All 11 are tuning material now.
+ROUND_ELEVEN: tuple[Case, ...] = (
+    Case("hh fund: profit, four quarters", "routing", "How much profit did Nvidia make over the last four quarters?",
+         frozenset({"fundamentals"}), frozenset({"NVDA"}), figures=("NVDA:net_income",)),
+    Case("hh fund: annual sales", "routing", "What were Alphabet's annual sales?", frozenset({"fundamentals"}),
+         frozenset({"GOOGL"}), figures=("GOOGL:revenue",)),
+    Case("hh fund: earned, trailing", "routing", "How much has Microsoft earned over the trailing twelve months?",
+         frozenset({"fundamentals"}), frozenset({"MSFT"}), figures=("MSFT:net_income",)),
+    Case("hh fund: earn per share", "routing", "What did Amazon earn per share over the last four quarters?",
+         frozenset({"fundamentals"}), frozenset({"AMZN"}), figures=("AMZN:eps",)),
+    Case("hh fund stretch: make in a year", "routing", "How much money does Amazon make in a year?",
+         frozenset({"fundamentals"}), frozenset({"AMZN"})),
+    Case("hh fund stretch: sales figures", "routing", "Give me Apple's sales figures for the past year.",
+         frozenset({"fundamentals"}), frozenset({"AAPL"}), figures=("AAPL:revenue",)),
+    Case("hh filings: workers earn", "routing", "How much do Amazon warehouse workers earn?", frozenset({"filing"}),
+         frozenset({"AMZN"}), ungrounded_ok=True),
+    Case("hh filings: iPhone sales", "routing", "What were Apple's iPhone sales over the past year?", frozenset({"filing"}),
+         frozenset({"AAPL"}), ungrounded_ok=True),
+    Case("hh filings: dividends paid", "routing", "How much did Apple pay out in dividends over the past year?",
+         frozenset({"filing"}), frozenset({"AAPL"}), ungrounded_ok=True),
+    Case("hh filings: sales team", "routing", "How big is Tesla's sales team?", frozenset({"filing"}), frozenset({"TSLA"}),
+         ungrounded_ok=True),
+    Case("hh price: gain this week", "routing", "How much did Nvidia stock gain this week?", frozenset({"price"}),
+         frozenset({"NVDA"}), must=(PRICE_DIGITS,)),
+)
+
+CASES = CASES + ROUND_ELEVEN
 
 # Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
 # Write new ones, in wording unlike the above and unlike every unit test, before claiming a fair score again.
