@@ -20,6 +20,7 @@ from .market import (
     detect_intent,
     gather_market_evidence,
     join_names,
+    outside_scope,
     parse_window,
     period_cautions,
     relevant_cautions,
@@ -40,6 +41,27 @@ NO_COMPANY = (
     "Tell me which company you mean (a name or ticker) and I can look at its stored prices, headlines, and financial figures. "
     "I only have data for the companies tracked here, and nothing for the market as a whole."
 )
+
+
+def outside_scope_message(kind: str, name: str, tracked: list[str]) -> str:
+    """The whole answer for a question about something this app does not hold. Said in code, before the model is asked: with
+    only unrelated filings in front of it the model answered "Bitcoin" questions from Tesla's other income."""
+    held = (
+        "It has stored filings, prices, financial figures, and headlines only for the companies it tracks"
+        + (f" ({', '.join(tracked)})" if tracked else "")
+        + "."
+    )
+    if kind == "company":
+        return (
+            f"{name} isn't one of the companies tracked here, so I have no filings, prices, figures, or headlines for it. "
+            f"{held} To look at {name}, use the \"Add a company\" box on the dashboard, then ask again."
+        )
+    if kind == "chat":
+        return f"That's outside what this app covers: it answers questions about companies from stored data. {held}"
+    return (
+        f"That's outside what this app covers. {held} It has nothing on crypto, commodities, interest rates, or the wider "
+        "economy. Name a tracked company and a topic, or ask which companies mention it in their filings."
+    )
 
 
 def not_calculated(names) -> str:
@@ -705,6 +727,9 @@ def answer_question(
 
     if intent.unstored_only:
         return refuse(not_calculated(intent.unstored))
+    if not symbols and (outside := outside_scope(search_question)):  # before the generic refusal: it says what is missing
+        tracked = [r[0] for r in conn.execute("SELECT symbol FROM instruments WHERE active ORDER BY symbol")]
+        return refuse(outside_scope_message(outside[0], outside[1], tracked))
     if intent.market and not symbols:
         return refuse(NO_COMPANY)
     market: list[MarketEvidence] = []

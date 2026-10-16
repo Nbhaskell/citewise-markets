@@ -362,6 +362,68 @@ def asks_for_advice(question: str) -> bool:
     )
 
 
+# ---- questions about something this app does not hold ----
+
+# Assets and topics with no data here. Listed by name because a question about one of them with no company in it used to be
+# answered from whichever filing mentions it ("What did Bitcoin do this month?" from Tesla's Bitcoin note).
+OUTSIDE_ASSET_RE = re.compile(
+    r"\b(?:bitcoin|btc|ethereum|ether|crypto(?:currenc\w+)?|dogecoin|solana|nfts?|gold|silver|platinum|crude(?:\s+oil)?|oil|brent|"
+    r"natural\s+gas|copper|wheat|treasur(?:y|ies)|bond\s+yields?|mortgage\s+rates?|interest\s+rates?|inflation|cpi|gdp|recession|"
+    r"unemployment|jobs\s+report|the\s+fed|federal\s+reserve|fomc|exchange\s+rates?|forex|the\s+(?:dollar|euro|yen|pound)|"
+    r"housing\s+market|central\s+banks?|ecb|bank\s+of\s+(?:england|japan)|rate\s+(?:hikes?|cuts?))\b",
+    re.IGNORECASE,
+)
+# A question that is about what the stored filings say, or compares the tracked companies, is a research question even when
+# it mentions Bitcoin or interest rates ("Which of the companies mention interest rate risk?"): never declined.
+FILINGS_CUE_RE = re.compile(
+    r"\b(?:companies|company|which|mention\w*|disclos\w*|discuss\w*|filings?|10-?[kq]s?|annual\s+reports?|quarterly\s+reports?|"
+    r"risk\s+factors?|according\s+to|exposure|exposed|each|every|any\s+of|all\s+of|across)\b",
+    re.IGNORECASE,
+)
+# Well-known public companies this app is not tracking. A list, because telling "Intel" from an ordinary capitalised word is
+# not something a rule can do; it goes stale, and a company missing from it is simply answered as before (from the filings,
+# which say they do not contain it). Ambiguous words (Target, Visa, Ford, Shell, Block, Square) are left out on purpose.
+UNTRACKED_COMPANIES = (
+    "Meta Platforms", "Facebook", "Netflix", "Intel", "Walmart", "Disney", "Coca-Cola", "PepsiCo", "Nike", "Boeing", "Exxon",
+    "ExxonMobil", "Chevron", "JPMorgan", "Goldman Sachs", "Bank of America", "Wells Fargo", "Citigroup", "Mastercard", "Oracle",
+    "Salesforce", "Adobe", "IBM", "Cisco", "Qualcomm", "Broadcom", "Uber", "Lyft", "Airbnb", "PayPal", "Starbucks",
+    "McDonald's", "Costco", "Home Depot", "Lowe's", "Pfizer", "Moderna", "Johnson & Johnson", "UnitedHealth",
+    "Berkshire Hathaway", "Procter & Gamble", "Verizon", "AT&T", "Comcast", "Spotify", "Pinterest", "Shopify", "Palantir",
+    "Snowflake", "CrowdStrike", "ServiceNow", "Micron", "Texas Instruments", "Lockheed Martin", "Caterpillar", "Toyota",
+    "Honda", "Ferrari", "Rivian", "Lucid", "GameStop", "Robinhood", "Coinbase", "Samsung", "Sony", "Alibaba", "Tencent",
+    "Baidu", "ASML", "Zoom",
+)
+CAPITALISED_ONLY = {"Intel", "Oracle", "Lucid", "Snowflake", "Uber", "Micron", "Cisco", "Sony", "Zoom"}  # also ordinary words: need the capital
+UNTRACKED_COMPANY_RE = re.compile(
+    r"(?<![\w&])(" + "|".join(re.escape(n) for n in sorted(UNTRACKED_COMPANIES, key=len, reverse=True)) + r")(?![\w&])",
+    re.IGNORECASE,
+)
+# Not a research question at all: writing, jokes, recipes, the weather, sports scores.
+NOT_RESEARCH_RE = re.compile(
+    r"^\W*(?:please\s+)?(?:write|compose|draft|create|generate)\s+(?:me\s+|us\s+)?(?:a|an|some|the)\s+(?:[\w-]+\s+){0,2}"
+    r"(?:poem|song|story|joke|essay|haiku|limerick|rap|speech|tweet)\b|"
+    r"\btell\s+me\s+(?:a\s+)?(?:joke|story)\b|\b(?:recipes?|weather|who\s+won|final\s+score|horoscope|lyrics)\b",
+    re.IGNORECASE,
+)
+
+
+def outside_scope(question: str) -> tuple[str, str] | None:
+    """("asset" | "company" | "chat", name) when the question is about something this app does not hold, else None. The
+    caller must only use it for a question that names no tracked company: this looks at the words alone."""
+    if NOT_RESEARCH_RE.search(question):
+        return "chat", ""
+    if FILINGS_CUE_RE.search(question):
+        return None
+    for m in UNTRACKED_COMPANY_RE.finditer(question):
+        name = next(n for n in UNTRACKED_COMPANIES if n.lower() == m.group(1).lower())
+        if name in CAPITALISED_ONLY and m.group(1) != name:
+            continue  # "any intel on the market", "a lucid argument": the word, not the company
+        return "company", name
+    if OUTSIDE_ASSET_RE.search(question):
+        return "asset", ""
+    return None
+
+
 def join_names(names) -> str:
     names = list(names)
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
