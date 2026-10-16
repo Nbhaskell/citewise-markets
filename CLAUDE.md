@@ -89,13 +89,12 @@ them (the owner hasn't confirmed the order):
    figures 3 of 5, filings 3 of 3, traps, advice, and outside topics 3 of 10, follow-ups 2 of 5; follow-up resolution 3 of 8.
    The worst failures are confident wrong answers, not refusals: a false "no price data" or "no news" (the code-side caution
    fired for some and not others), a wrong period stated as the one asked ("when the year opened", "ninety days"), a missed
-   advice notice ("cash out"), and a false premise accepted ("Google doubled"). **The cases now in `HELD_OUT` have been run, so
-   they are tuning material from now on.** **Fix (1) is built on the same branch (2026-10-16, not committed or merged yet;
+   advice notice ("cash out"), and a false premise accepted ("Google doubled"). **Those 35 cases have been run, so
+   they are tuning material from now on (they are in `CASES`).** **Fix (1) is merged (PR #37, 2026-10-16;
    DECISIONS: "Fix (1) of the fresh round"):** the since-mid-month, "N units ago", "close", "higher than it was ... ago",
    "chatter" and "stories" wordings now route, and a false "no news" claim carries a caution like the price one; the 189 older
    cases went 549 to 548 of 567 (a flaky case), the fresh round's 35 went 48 to 65 of 105, and 10 fresh cases went 2 to 6 of 10.
-   **Fix (2) is built on branch `feature/copilot-unread-periods` (2026-10-16, not committed or merged yet; DECISIONS: "Fix (2) of
-   the fresh round"):** "ninety days", quarters, trading days, "since 2024", "since Monday", "a year and a half" and "when the year
+   **Fix (2) is merged (PR #38, 2026-10-16; DECISIONS: "Fix (2) of the fresh round"):** "ninety days", quarters, trading days, "since 2024", "since Monday", "a year and a half" and "when the year
    opened" are read exactly, and every other named period that is not read is flagged by a caution (prices and headlines) instead
    of defaulting silently; a window past the first stored close says so. A clean old-against-new run on 234 cases went 631 to 636
    of 702; 12 fresh cases went 1 to 5.
@@ -137,9 +136,9 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-16 (after PR #37): 1162 Python tests, 253 web tests, all passing (run on the branch before
+- Baseline as of 2026-10-16 (after PR #38): 1247 Python tests, 253 web tests, all passing (run on the branch before
   the merge; the merge added nothing else). Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
-  refresh ran at 3pm on 2026-10-15 (success, 0 problems).
+  refresh ran at 3pm on 2026-10-16 (success, 0 problems).
 
 ## Rules
 
@@ -205,7 +204,8 @@ The owner is building this step by step and is not a professional developer, so 
   direction, minus-sign, and cause checks, the "no company named" and index refusals, and the rule that headlines never
   explain a price move. Before changing the prompt, `detect_intent`, or `parse_window`, run `python -m ai.eval_market
   --repeat 3 --show` (needs Ollama) and read the answers, not just the totals; checks that are too loose give false
-  passes. `HELD_OUT` in that file holds the 35 cases of the 2026-10-16 round, already run once (48 of 105): they are tuning
+  passes. `HELD_OUT` in that file holds the 12 cases written for fix (2) on 2026-10-16, already run once (5 of 12 on the new
+  code); the 35 of the fresh round and the 10 of fix (1) are in `CASES` (234 with the older ones). All of them are tuning
   material from now on, so write fresh cases in different wording before claiming a fair score, and don't tune against
   held-out cases once run. Before the fundamentals step, three runs scored about 121 to 123 of 129;
   after it, 153 to 155 of 165 on the same 43 cases plus 12 new ones (the 14 held-out cases that were then run, 13 passing,
