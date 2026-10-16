@@ -108,6 +108,15 @@ def year_start_comparison(question: str, today: Optional[date] = None) -> bool:
 
 GENERAL_RE = re.compile(r"\bhow(?:'s|\s+is|\s+are|\s+has|\s+have)\s+.{1,40}?\s+(?:doing|done|going|performing|performed)\b", re.IGNORECASE)
 STOCK_WORD_RE = re.compile(r"\b(?:stocks?|shares?|prices?)\b", re.IGNORECASE)
+# "How much did Apple earn / pay in dividends / bring in?" begins like a price question ("how much did") but asks what the
+# company did with money. Cut out only when the same question has a money verb or noun after it and no stock word anywhere
+# (the caller checks that), so "How much did Apple stock lose?" is still a price question.
+HOW_MUCH_MONEY_RE = re.compile(
+    r"\bhow\s+much\s+(?:money\s+|cash\s+)?(?:did|does|is|has|have)\b(?=[^?.]{0,80}\b(?:earn\w*|mak(?:e|es|ing)|made|net(?:ted)?|"
+    r"pa(?:y|id|ys)|spen[dt]\w*|sell\w*|sold|bring\w*|brought|rais(?:e|es|ed|ing)|generat\w*|report\w*|borrow\w*|owe\w*|profit\w*|"
+    r"revenues?|sales|income|dividends?|cash)\b)",
+    re.IGNORECASE,
+)
 # No index data is stored, and a filing's "total return" chart (scaled from $100) reads like an index level to a model.
 INDEX_RE = re.compile(r"\b(?:s&p(?:\s*500)?|dow(?:\s+jones)?|nasdaq(?:\s+composite)?|russell\s*\d+)\b", re.IGNORECASE)
 STOCK_NOUN_RE = re.compile(r"\b(?:stocks?(?!-based)|shares)\b", re.IGNORECASE)  # not "stock-based compensation"
@@ -154,10 +163,25 @@ _SPECIFIC_TOPICS = (
 )
 # Everyday words that a filing can also answer. Left to the filings when the question names a filing, a quarter, a
 # segment, or asks why (the figures are twelve-month totals and can't explain anything).
+_NOT_SALES_SIDE = (  # words after "sales" that make it a department, a tax, or a cost, not the company's revenue
+    r"(?!\s+(?:tax|taxes|team|teams|force|staff|office|offices|people|reps?|channels?|practices|cycle|organi[sz]ation|"
+    r"pipeline|commissions?|and\s+marketing|general|costs?|expenses?)\b)"
+)
 _BROAD_TOPICS = (
-    ("profit", r"\bnet\s+income\b|\bprofit(?:s|ability|able)?\b|\bearnings\b|\boperating\s+income\b|\bbottom\s+line\b"),
+    # "earn" counts only as the company's own: "How much did Amazon earn", "What did Microsoft earn" (one bare name as the
+    # subject), so "How much do Apple engineers earn?" is left alone
+    ("profit", r"\bnet\s+income\b|\bprofit(?:s|ability|able)?\b|\bearnings\b|\boperating\s+income\b|\bbottom\s+line\b|"
+               r"\b(?:what|how\s+much(?:\s+money)?)\s+(?:did|does|do|has|have|had|will|would)\s+"
+               r"(?!(?:the|its|their|this|that|these|those|a|an|my|your|our)\b)[\w.&-]+\s+earn(?:ed)?\b"),
     ("margin", r"\bmargins?\b"),
-    ("revenue", r"\brevenues?\b|\btop\s+line\b"),
+    # "sales" counts as the company's revenue only in the forms that cannot mean a product or a department: "Nvidia's sales",
+    # "total / net sales", "dollars of sales". Not "iPhone sales (over the past year)", "retail sales", "sales tax" or "the
+    # sales team" (a "sales over the last ..." form was tried and dropped: it caught "iPhone sales over the past year").
+    # Money coming in ("how much money did Tesla bring in") is revenue too.
+    ("revenue", r"\brevenues?\b|\btop\s+line\b|"
+                rf"\b(?:total|net|overall|combined|annual|yearly|its|their|[\w.&-]+['’]s)\s+sales\b{_NOT_SALES_SIDE}|"
+                r"\b(?:dollars|amount|value)\s+of\s+sales\b|"
+                r"\bhow\s+(?:much|many)\s+(?:money|cash|dollars)\b[^?.]{0,50}?\b(?:bring|brought|brings|take|took|pull|pulled)\s+in\b"),
     ("general", r"\bfinancials?\b|\bfundamentals?\b|\bvaluation\b|\bfinancial\s+(?:figures|results|health|position|summary)\b"),
 )
 FILING_FORM_RE = re.compile(
@@ -165,6 +189,9 @@ FILING_FORM_RE = re.compile(
     r"by\s+(?:product|region|geograph\w+|business|division))\b",
     re.IGNORECASE,
 )
+# "The last four quarters" is the twelve months the stored figures cover, not a request for one quarter's filing; "last
+# quarter" and "the second quarter" still are.
+TWELVE_MONTHS_AS_QUARTERS_RE = re.compile(r"\b(?:last|past|previous|trailing|prior)\s+(?:4|four)\s+quarters\b", re.IGNORECASE)
 WHY_RE = re.compile(
     r"\b(?:why|reasons?|because|explain\w*|what\s+(?:happened|drove|drives|caused|causes)|driv(?:e|es|ing|en|ers?)|"
     r"caus(?:e|es|ed|ing)|what(?:'s|\s+is|\s+was)\s+behind)\b",
@@ -205,7 +232,7 @@ def question_topics(question: str) -> tuple[frozenset[str], str]:
     to the filings). Everyday words are left to the filings when the question is plainly about a filing or asks why."""
     specific, rest = _topics(question, _SPECIFIC_TOPICS)
     broad, rest_without_broad = _topics(rest, _BROAD_TOPICS)
-    if broad and (FILING_FORM_RE.search(question) or WHY_RE.search(question)):
+    if broad and (FILING_FORM_RE.search(TWELVE_MONTHS_AS_QUARTERS_RE.sub(" ", question)) or WHY_RE.search(question)):
         return frozenset(specific), rest  # the everyday words stay in the question, for the filings rules to see
     return frozenset(specific | broad), rest_without_broad
 
@@ -327,6 +354,8 @@ def detect_intent(question: str) -> Intent:
     question = HOW_MANY_SHARES_RE.sub(" ", question)  # "shares does" is not a price verb, so cut the phrase out first
     # "stock" plus a named period ("Apple stock or Microsoft stock, this month?") is a price question even without a verb
     price_text = re.sub(MARKET_VALUE_PATTERN, " ", question, flags=re.IGNORECASE)  # "How much is Apple worth?" is not "how much is" a price
+    if not STOCK_WORD_RE.search(question):  # "How much did Apple earn / pay in dividends?" asks about money, not the stock price
+        price_text = HOW_MUCH_MONEY_RE.sub(" ", price_text)
     prices = (
         bool(PRICE_RE.search(price_text)) or bool(INDEX_RE.search(question)) or bool(BARE_STOCK_RE.search(question))
         or (bool(STOCK_NOUN_RE.search(question)) and parse_window(question).explicit)

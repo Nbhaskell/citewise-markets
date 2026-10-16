@@ -876,6 +876,49 @@ benchmarks.
   the topic, which is wrong when the user wanted a general overview. (5) Not checked in a real browser: the new
   "(comparing ...)" ending of "Understood as" is covered by tests, not by looking at the page. (6) Still open from the
   same round: (d) "earn" and "sales" wording, (e) advice and sentiment wording, (f) non-company questions.
+- **"Earn" and "sales" wording: fix (d) of the second held-out round, 2026-10-16** (branch
+  `feature/copilot-figure-wording`). **Three separate causes** (found by probing a dozen wordings with `detect_intent`, which
+  needs no model): (1) "how much did/does/is" is a price phrase, so "How much did Amazon earn" went to the price data, and
+  so did "how much did Apple pay in dividends" and "how much did Apple's sales grow"; (2) "earn" and "sales" were not
+  figure words; (3) any "quarters" counted as a filing marker, so "the last four quarters" (exactly the twelve months the
+  stored figures hold) was sent to the filings. **Built, in code only** (`ai/market.py`), in two stages evaluated separately.
+  *Stage 1:* `HOW_MUCH_MONEY_RE` cuts "how much did/does/is/has" out of the price check when a money verb or noun follows
+  (earn, make, net, pay, spend, sell, bring, raise, generate, report, borrow, owe, profit, revenue, sales, income, dividends,
+  cash) **and the question has no stock, share or price word**, so "How much did Apple stock sell for" stays a price question;
+  and "earn" counts as profit only as "what / how much (money) did-does-has X earn(ed)" with one bare name as the subject, so
+  "How much do Apple engineers earn?" does not. *Stage 2:* "sales" counts as revenue only as "X's sales", "total / net /
+  overall / combined / annual / yearly / its / their sales", or "dollars / amount / value of sales", and not before tax, team,
+  force, staff, office, people, reps, channels, practices, cycle, pipeline, commission, "and marketing", costs or expenses;
+  "how much money / cash / dollars ... bring / take / pull in" is revenue; and `TWELVE_MONTHS_AS_QUARTERS_RE` stops "the
+  last/past/previous/trailing/prior four quarters" from counting as a filing marker ("last quarter", "the second quarter" and
+  "the last two quarters" still do). **Numbers** (`eval_market`, 3 repeats, 157 cases, same day, the data moving only by the
+  day's headlines): **437 of 471 baseline on `main`, 438 after stage 1, 443 after stage 2, 446 after the final code**
+  (149 of 157 on one pass). "How much did earn" went from 0 of 3 to passing with Amazon's net income of $135.3 billion (the
+  stored figure); "dollars of sales" from 0 of 3 to passing with Nvidia's $303.0 billion. Not a fair score: the cases were
+  known. No case that passed at baseline was lost (the swings were the flaky cases listed above). **Routing check:** of the
+  168 evaluation questions, exactly 8 change route between `main` and the branch (the two targets, five fresh held-out cases,
+  and "how much did Apple pay out in dividends", now filings); "Why is Tesla tanking?" routes identically, so its 0 of 3 in one
+  run is the day's headline ("...Prediction Markets Say It's Likely", quoted, tripping the speculation check), not this change.
+  **Fresh cases** (`ROUND_ELEVEN`, 11, written before any run, several deliberate stretches): **8 of 11 on the first
+  check**, because "What were Apple's iPhone sales over the past year?" went to company revenue (my "sales over the last
+  ..." form matched it). That form was dropped, the case added as a unit test, and the run scored **9 of 11**. The two left:
+  "What were Alphabet's annual sales?" goes to the 10-K by design ("annual" is a filing marker) and is right for the fiscal
+  year ($402.8 billion, against $445.9 billion for the twelve months to the latest quarter), so my expectation was wrong; and
+  "How much money does Amazon make in a year?" (the stretch: "make" is not a known word) was answered correctly from the
+  filings. These 11 are tuning material now. **Evaluation checker changed:** "fo fund: multiple of earnings" demanded the
+  figures source alone, but "trading at" asks about a price-based ratio, so the price source arriving too is right (the
+  P/E answer itself was already correct); it passes since. **Tests:** 38 new in `tests/test_figure_wording.py`; 926 Python and
+  253 web tests pass. Eleven deliberate breakages (five on stage 1, six on stage 2) were each caught in the end; three were
+  first missed because no test depended on the code (the stock-word guard, "dollars of sales" which another form also
+  matched, and any-number-of-quarters), and a test was added for each. **Weak spots:** (1) "Make" and "made" are not
+  recognized ("How much did Tesla make last year" goes to the filings, which answer it, but not from the stored figures).
+  (2) The "earn" rule needs one bare name as the subject, so "How much did Alphabet Inc. earn?" is missed. (3) "Sales" has to
+  be possessive, total / net and the like, so "Amazon sales over the last year" is missed (safe: it goes to the filings).
+  (4) "Annual sales" gives the fiscal year from the 10-K, not the twelve-month figure; both are right, and they differ.
+  (5) Existing and not changed: "Do you think I should get out of Tesla before earnings?" routes to the profit figures because
+  of the word "earnings". (6) The money-verb list is a finite guess: a question with a stock word and a money verb stays a
+  price question even when it is about something else. Still open from the same round: (e) advice and sentiment wording,
+  (f) non-company questions.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
