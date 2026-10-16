@@ -77,14 +77,24 @@ them (the owner hasn't confirmed the order):
    tuning material). Done (PR #34, merged 2026-10-16): (d) "earn" and "sales" wording (DECISIONS: "'Earn' and 'sales'
    wording"; 437 of 471 before, 446 after; 11 fresh cases 8 of 11, 9 of 11 after one fix, now tuning material). Done (PR #35,
    merged 2026-10-16): (e) advice and sentiment wording (DECISIONS: "Advice and sentiment wording"; 474 of 504 before, 485 after; 11 fresh cases 5 of 11, then all 11 after adding their wordings, now
-   tuning material). (f) questions about things outside the tracked companies is built on branch
-   `feature/copilot-outside-topics` (not merged yet; DECISIONS: "Questions about things outside the tracked companies"; 515
-   of 537 before, 519 after; 10 fresh cases 6 of 10 once the checker read refusal text, now tuning material). **That
-   closes items (a) to (f).** Still to do: the content of advice-adjacent answers is unchanged (only the notice is attached
-   in code). Agreed with the owner (2026-10-15): keep keyword rules for now, **write a new set of fresh held-out cases for
-   the whole round now**, and only then weigh a model-based routing step (a "model may only add a route" prototype on its
-   own branch, measured on those cases); the advice numbers (21 of 24 unflagged before fix (e)) make a "model may only
-   add the notice" check the first candidate. Write each phrasing as a test first, then fresh held-out cases.
+   tuning material). Done (PR #36, merged 2026-10-16): (f) questions about things outside the tracked companies
+   (DECISIONS: "Questions about things outside the tracked companies"; 515 of 537 before, 519 after; 10 fresh cases 6 of 10
+   once the checker read refusal text, now tuning material). **That closes items (a) to (f).**
+
+   **Next phase: a fresh held-out round for the whole second-round work (agreed with the owner 2026-10-15; not started).**
+   Purpose: measure fairly whether fixes (a) to (f) generalized, since every case in `CASES` (189) is now tuning material and
+   `HELD_OUT` is empty. How: (1) write about 35 new cases in wording used nowhere else (not in `CASES`, not in any unit test,
+   not in the probe lists in DECISIONS), spread over the same groups as the second round: prices with a period, news and
+   sentiment, financial figures ("earn", "sales", "bring in"), filings, follow-ups ("Now do X", "better or worse than X",
+   comparisons), advice and trap wordings, and questions outside the tracked companies, with a few deliberate stretches;
+   (2) set each expectation from the right behavior, not from what the code does, and write them into `HELD_OUT` in
+   `ai/eval_market.py` (and a few follow-ups into `HELD_OUT` in `ai/eval_followups.py`) **before running anything**; (3) run
+   once (`python -m ai.eval_market --held-out --show`, 3 repeats if time allows), read every answer, passing ones too, and
+   report the score with the by-group breakdown next to the second round's 68 of 105 (65%); (4) only then tune, move the
+   cases into `CASES`, and record it in DECISIONS. The content of advice-adjacent answers is unchanged (only the notice is
+   attached in code), and the advice numbers (21 of 24 unflagged before fix (e)) make a "model may only add the notice" check
+   the first candidate for the model-based experiment; decide on that experiment after the round's numbers, on its own
+   branch. Keep keyword rules until then. Write each phrasing as a test first.
 
 ## Working with the owner
 
@@ -120,7 +130,7 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-16 (after PR #35): 1017 Python tests, 253 web tests, all passing (run on the branch before
+- Baseline as of 2026-10-16 (after PR #36): 1074 Python tests, 253 web tests, all passing (run on the branch before
   the merge; the merge added nothing else). Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
   refresh ran at 3pm on 2026-10-15 (success, 0 problems).
 
