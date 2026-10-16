@@ -526,7 +526,9 @@ def _generate_checked(
 
 
 SWITCH_FILLER_RE = re.compile(
-    r"\b(?:what|how|about|and|or|then|also|so|ok|okay|now|next|instead|regarding|with|for|on|the|as|well|too|s)\b", re.IGNORECASE
+    r"\b(?:what|how|about|and|or|then|also|so|ok|okay|now|next|instead|regarding|with|for|on|the|as|well|too|s|"
+    r"do|try|check|run|go|ahead|see|please|again|let|lets|me|show|give|same|pull|up)\b",  # "Now do Alphabet.", "Try Microsoft.", "Same for X"
+    re.IGNORECASE,
 )
 PRONOUN_RE = re.compile(r"\b(its|their)\b|\b(it|they)\b", re.IGNORECASE)
 
@@ -543,6 +545,69 @@ def _swap_company(text: str, old: list[re.Match], new: str) -> str:
     for match in sorted(old, key=lambda m: m.start(), reverse=True):
         text = text[: match.start()] + new + text[match.end():]
     return text
+
+
+COMPARE_RE = re.compile(
+    r"\b(?:than|versus|vs|against|compare[sd]?\s+(?:to|with)|compare|stack(?:s|ed)?\s+up|relative\s+to|beats?|"
+    r"outperform(?:s|ed)?|measures?\s+up)\b",
+    re.IGNORECASE,
+)
+# Words a comparison can have around its two companies and still say nothing about WHAT is compared ("Is that better or
+# worse than Amazon?"). Anything else ("its revenue", "the risks") is a topic of its own. Comparative adjectives are a
+# closed list on purpose: an unknown one just means the topic is not carried, and the companies still are.
+COMPARE_FILLER_RE = re.compile(
+    r"\b(?:is|are|was|were|how|does|do|did|than|that|this|it|its|those|these|they|them|their|the|same|or|and|to|with|"
+    r"versus|vs|against|compare|compared|compares|stack|stacks|up|down|then|now|too|also|any|s|like|look|looks|as|so|about|what|"
+    r"better|worse|stronger|weaker|higher|lower|bigger|larger|smaller|cheaper|faster|slower|safer|riskier|more|less|fewer|"
+    r"greater|similar|different|good|bad|well|much|many|big|large|small|high|low|strong|weak|cheap|expensive|fast|slow|"
+    r"risky|safe|ahead|behind|beat|beats|outperform|outperforms|measure|measures)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_bare_comparison(text: str, mentions: dict[str, list[re.Match]]) -> bool:
+    """Only company names, comparison words and filler: nothing says what is being compared."""
+    rest = text
+    for match in sorted((m for ms in mentions.values() for m in ms), key=lambda m: m.start(), reverse=True):
+        rest = rest[: match.start()] + " " + rest[match.end():]
+    return not re.sub(r"[\W_]+", "", COMPARE_FILLER_RE.sub(" ", rest))
+
+
+def comparison_companies(conn: psycopg.Connection, question: str, history: list[Turn]) -> list[str] | None:
+    """"Is that better or worse than Amazon?" after a question about Nvidia compares Nvidia (what "that" is) with Amazon.
+    The rewriting step is meant to name both and sometimes names only the new one, so only Amazon was searched. Returns the
+    companies of the last turn followed by the newly named ones, or None when this is not that kind of question: no
+    comparison word, no reference back ("that", "it"), a reference to something older ("the other one"), no earlier
+    company, or a question that already names the earlier company (then it says what it means)."""
+    if not history or not COMPARE_RE.search(question) or not REFERENCE_RE.search(question) or BACKREF_RE.search(question):
+        return None
+    named = company_mentions(conn, question)
+    recent = [c.upper() for c in history[-1].companies]
+    if not named or not recent or set(named) & set(recent):
+        return None
+    return recent + sorted(named, key=lambda symbol: named[symbol][0].start())
+
+
+def carry_comparison(conn: psycopg.Connection, question: str, history: list[Turn], companies: list[str]) -> str | None:
+    """A bare comparison asked again about the earlier topic: "Is that better or worse than Amazon?" after "How has Nvidia
+    stock done this month?" becomes "How has Nvidia stock done this month, compared with Amazon?". Only the earlier
+    *question* is reused, never its answer. None when the question has a topic of its own or the earlier topic does not
+    clearly belong to the company "that" stands for."""
+    named = company_mentions(conn, question)
+    recent = [c.upper() for c in history[-1].companies]
+    if not _is_bare_comparison(question, named):
+        return None
+    typed = " and ".join(m.group(0) for m in sorted((ms[0] for ms in named.values()), key=lambda m: m.start()))
+    for earlier in reversed(history):
+        before = company_mentions(conn, earlier.question)
+        if before and _is_bare_switch(earlier.question, before):
+            continue  # a bare "What about Tesla?" has no topic; the question before it does
+        base = earlier.question
+        if len(before) == 1 and len(recent) == 1 and set(before) != set(recent):
+            base = _swap_company(base, next(iter(before.values())), recent[0])  # the topic, about the company "that" is
+        composed = f"{base.rstrip(' ?.!')}, compared with {typed}?"
+        return composed if set(detect_symbols(conn, composed)) == set(companies) else None
+    return None
 
 
 def carry_topic(conn: psycopg.Connection, question: str, history: list[Turn]) -> str | None:
@@ -578,6 +643,7 @@ def resolve_question(
     """Work out what is really being asked: (standalone question, companies to search, how a follow-up was
     understood or None). Chosen companies always win; otherwise they come from the standalone question."""
     history = history or []
+    compare = None if symbols else comparison_companies(conn, question, history)
     search_question = condense_question(llm, question, history) if history else question
     if history and not symbols and " ".join(search_question.lower().split()) == " ".join(question.lower().split()):
         search_question = carry_topic(conn, question, history) or search_question
@@ -596,14 +662,23 @@ def resolve_question(
         named = detect_symbols(conn, search_question)
         if recent and named and not set(named) & set(recent):
             return question, recent, f"{question} (assuming {', '.join(recent)})"
+    note = None
+    if compare and not set(compare) <= set(detect_symbols(conn, search_question)):
+        # The rewrite lost the company "that" stands for. Rebuild the question from the earlier one when the comparison
+        # has no topic of its own; otherwise keep the model's wording and say which companies were compared.
+        rebuilt = carry_comparison(conn, question, history, compare)
+        if rebuilt:
+            search_question = rebuilt
+        else:
+            note = f"{search_question} (comparing {' and '.join(compare)})"
     if symbols:
         found = [s.upper() for s in symbols]
     else:
-        found = detect_symbols(conn, search_question) or detect_symbols(conn, question)
+        found = compare or detect_symbols(conn, search_question) or detect_symbols(conn, question)
         if not found and history and REFERENCE_RE.search(question):
             found = list(history[-1].companies)  # "its risks": the rewrite didn't name it, so carry the last company
     same = " ".join(search_question.lower().split()) == " ".join(question.lower().split())
-    return search_question, found, None if same else search_question
+    return search_question, found, note or (None if same else search_question)
 
 
 def answer_question(

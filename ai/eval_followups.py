@@ -95,6 +95,28 @@ HELD_OUT: tuple[Case, ...] = (
     Case("follow-up on the answer's detail", "follow-up", (NVDA_RISK,), "Which of those risks is the biggest one?", frozenset({"NVDA"}), "risk"),
 )
 
+# Written 2026-10-16 for step (c) (follow-ups that keep both companies, "Now do X" switches), in wording unlike the fixes'
+# unit tests and probes, before any was run. Several are deliberate stretches (a comparison word or filler the rules do not
+# know: "beat", "measure up", "ahead", "see"), so the score will show where the rules end. Once run, they are tuning material.
+TSLA_RISK = turn("What are Tesla's biggest risks?", "Tesla cites supply chain and regulation.", "TSLA")
+APPLE_TESLA_DEBT = turn("Compare Apple's and Tesla's debt.", "Apple has more debt than Tesla.", "AAPL", "TSLA")
+
+STEP_C: tuple[Case, ...] = (
+    Case("c: any riskier than", "follow-up", (TSLA_RISK,), "Does that look any riskier than Apple's?", frozenset({"TSLA", "AAPL"}), "risk"),
+    Case("c: did that beat", "follow-up", (AAPL_EMP,), "Did that beat Microsoft?", frozenset({"AAPL", "MSFT"}), "employees"),
+    Case("c: measure up", "follow-up", (TSLA_EMP,), "How does it measure up to Microsoft?", frozenset({"TSLA", "MSFT"}), "employees"),
+    Case("c: okay, do next", "follow-up", (NVDA_RISK,), "Okay, do Tesla next.", frozenset({"TSLA"}), "risk"),
+    Case("c: go ahead and do", "follow-up", (NVDA_RISK,), "Go ahead and do Amazon.", frozenset({"AMZN"}), "risk"),
+    Case("c: run the same for", "follow-up", (AAPL_EMP,), "Run the same for Tesla.", frozenset({"TSLA"}), "employees"),
+    Case("c: let's see instead", "follow-up", (AAPL_EMP,), "Let's see Amazon instead.", frozenset({"AMZN"}), "employees"),
+    Case("c: more than a third", "follow-up", (APPLE_TESLA_DEBT,), "Is that more than Microsoft?", frozenset({"AAPL", "TSLA", "MSFT"}), "debt"),
+    Case("c: comparison with its own topic", "follow-up", (AAPL_EMP,), "How do its margins compare to Amazon's?", frozenset({"AAPL", "AMZN"}), "margin"),
+    Case("c: standalone comparison", "standalone", (NVDA_RISK,), "Is Apple bigger than Microsoft?", frozenset({"AAPL", "MSFT"}), "bigger"),
+    Case("c: standalone, starts with do", "standalone", (TSLA_EMP,), "Do Microsoft and Amazon both mention litigation?",
+         frozenset({"MSFT", "AMZN"}), "litigation"),
+)
+HELD_OUT = HELD_OUT + STEP_C
+
 
 @dataclass
 class Result:
