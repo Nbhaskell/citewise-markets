@@ -134,7 +134,7 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-16 (after PR #36): 1074 Python tests, 253 web tests, all passing (run on the branch before
+- Baseline as of 2026-10-16 (after PR #37): 1162 Python tests, 253 web tests, all passing (run on the branch before
   the merge; the merge added nothing else). Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
   refresh ran at 3pm on 2026-10-15 (success, 0 problems).
 
