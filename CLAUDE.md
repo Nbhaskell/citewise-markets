@@ -57,7 +57,7 @@ them (the owner hasn't confirmed the order):
    the earlier year's real date in the growth label, and a placeholder headline rule. The second round shows the wording
    rules are not general: new everyday phrasings miss in the same places (a period in a price question, "earn" and
    "sales", "Now do X" follow-ups, a few advice phrasings, a non-company question answered from a filing), and some
-   passing answers use the wrong period without saying so. The set is 157 cases; all are tuning material now, and the full
+   passing answers use the wrong period without saying so. The set was 157 cases then (179 after fix (e)); all are tuning material now, and the full
    run scored 356 of 366 before the second round. Also failing: "shares: buy back (quarter total)" on purpose (a real
    wrong answer: one month's row, not the Total; rebuilding rows was tried and dropped, see DECISIONS, so don't retry it),
    and flaky cases ("news and stock", "press coverage", "sentiment", "how is X doing") that swing between runs on the same
@@ -75,11 +75,14 @@ them (the owner hasn't confirmed the order):
    do X", "better or worse than X" keeping both companies; DECISIONS: "Follow-up carrying"; 436 of 471 on the market
    evaluation; 11 fresh follow-up cases went 3 of 11 on `main` to 7 of 11, 9 of 11 after adding the words they missed, now
    tuning material). Done (PR #34, merged 2026-10-16): (d) "earn" and "sales" wording (DECISIONS: "'Earn' and 'sales'
-   wording"; 437 of 471 before, 446 after; 11 fresh cases 8 of 11, 9 of 11 after one fix, now tuning material). Still to
-   do: (e) advice and sentiment wording again; (f) non-company questions. Agreed with the owner (2026-10-15): keep keyword
-   rules for now, write fresh held-out cases after (e) and (f), and only then weigh a model-based routing step (a "model
-   may only add a route" prototype on its own branch, measured on those cases). Write each phrasing as a test first, then
-   fresh held-out cases.
+   wording"; 437 of 471 before, 446 after; 11 fresh cases 8 of 11, 9 of 11 after one fix, now tuning material). (e) advice
+   and sentiment wording is built on branch `feature/copilot-advice-sentiment` (not merged yet; DECISIONS: "Advice and
+   sentiment wording"; 474 of 504 before, 485 after; 11 fresh cases 5 of 11, then all 11 after adding their wordings, now
+   tuning material). Still to do: (f) non-company questions; the content of advice-adjacent answers is unchanged (only
+   the notice is attached in code). Agreed with the owner (2026-10-15): keep keyword rules for now, write fresh held-out
+   cases after (f), and only then weigh a model-based routing step (a "model may only add a route" prototype on its own
+   branch, measured on those cases); the advice numbers (21 of 24 unflagged before this fix) make a "model may only add the
+   notice" check the first candidate. Write each phrasing as a test first, then fresh held-out cases.
 
 ## Working with the owner
 

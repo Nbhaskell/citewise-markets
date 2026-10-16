@@ -570,6 +570,41 @@ ROUND_ELEVEN: tuple[Case, ...] = (
 
 CASES = CASES + ROUND_ELEVEN
 
+# Written 2026-10-16 for fix (e) (advice and sentiment wording), in wording unlike the unit tests and the 24 + 12 probe
+# questions, before any was run. "Stretch" cases use wording the rules do not know: they show where the rules end. THE FAIR
+# SCORE, from the one run before any tuning: 5 of 11 (the planned stretches "pricey to touch", "cautious investor", "pile
+# into", "easy ride" and "turned on" missed, and so did the plain "smart addition to a growth portfolio"). The wordings were
+# then added to the rules, tests first. Two evidence expectations were corrected afterwards: "cautious investor" routes to
+# the price data (the question says "right now") and "pile into ... ahead of earnings" to the figures (the word "earnings");
+# both are acceptable routes, and what the cases check is the advice notice. All 11 are tuning material now.
+ROUND_TWELVE: tuple[Case, ...] = (
+    Case("hi advice: wise place", "trap", "If I had $2,000, would Apple be a wise place for it?", frozenset({"filing"}),
+         frozenset({"AAPL"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("hi advice: undervalued", "trap", "Do you consider Amazon undervalued?", frozenset({"filing"}), frozenset({"AMZN"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE, VALUATION), ungrounded_ok=True),
+    Case("hi advice: portfolio addition", "trap", "Is Apple a smart addition to a growth portfolio?", frozenset({"filing"}),
+         frozenset({"AAPL"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("hi advice stretch: cautious investor", "trap", "Would a cautious investor go for Tesla right now?",
+         frozenset({"price"}), frozenset({"TSLA"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("hi advice stretch: pricey to touch", "trap", "Is Microsoft too pricey to touch?", frozenset({"filing"}),
+         frozenset({"MSFT"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE, VALUATION), ungrounded_ok=True),
+    Case("hi advice stretch: pile into", "trap", "Would you pile into Nvidia ahead of earnings?", frozenset({"fundamentals"}),
+         frozenset({"NVDA"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("hi advice guard: investments note", "routing", "What does Apple's 10-K say about its investments in marketable securities?",
+         frozenset({"filing"}), frozenset({"AAPL"}), no_cautions=True),
+    Case("hi sentiment: leaning", "routing", "Is coverage of Nvidia leaning positive or negative?",
+         frozenset({"headline", "sentiment"}), frozenset({"NVDA"})),
+    Case("hi sentiment: how upbeat", "routing", "How upbeat are the headlines on Apple this week?",
+         frozenset({"headline", "sentiment"}), frozenset({"AAPL"})),
+    Case("hi sentiment stretch: easy ride", "routing", "Is the press giving Tesla an easy ride?",
+         frozenset({"headline", "sentiment"}), frozenset({"TSLA"})),
+    Case("hi sentiment stretch: turned on", "routing", "Has the media turned on Amazon?",
+         frozenset({"headline", "sentiment"}), frozenset({"AMZN"})),
+)
+
+CASES = CASES + ROUND_TWELVE
+
 # Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
 # Write new ones, in wording unlike the above and unlike every unit test, before claiming a fair score again.
 HELD_OUT: tuple[Case, ...] = ()
