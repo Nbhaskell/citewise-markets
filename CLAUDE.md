@@ -94,8 +94,13 @@ them (the owner hasn't confirmed the order):
    DECISIONS: "Fix (1) of the fresh round"):** the since-mid-month, "N units ago", "close", "higher than it was ... ago",
    "chatter" and "stories" wordings now route, and a false "no news" claim carries a caution like the price one; the 189 older
    cases went 549 to 548 of 567 (a flaky case), the fresh round's 35 went 48 to 65 of 105, and 10 fresh cases went 2 to 6 of 10.
+   **Fix (2) is built on branch `feature/copilot-unread-periods` (2026-10-16, not committed or merged yet; DECISIONS: "Fix (2) of
+   the fresh round"):** "ninety days", quarters, trading days, "since 2024", "since Monday", "a year and a half" and "when the year
+   opened" are read exactly, and every other named period that is not read is flagged by a caution (prices and headlines) instead
+   of defaulting silently; a window past the first stored close says so. A clean old-against-new run on 234 cases went 631 to 636
+   of 702; 12 fresh cases went 1 to 5.
    **Next:** the rest in the order DECISIONS gives
-   (unread periods flagged, not defaulted; the "cash out" notice and
+   (the "cash out" notice and
    a premise check; follow-ups keeping their topic; the outside-topic and writing-request lists; "clear in profit"), each
    phrasing as a test first, then decide on the model-based routing experiment (its own branch, measured against these 35 and a
    new fresh set). Keep keyword rules until then. After tuning, move these cases into `CASES`, write fresh ones, and record the result.
