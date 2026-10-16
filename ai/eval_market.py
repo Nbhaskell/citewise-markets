@@ -741,8 +741,9 @@ CASES = CASES + ROUND_FIFTEEN
 # Written 2026-10-16 for fix (1) of the fresh round (price and news wordings that never routed, and the false "no data" claims),
 # in wording unlike the unit tests and the 35 cases above, before any was run. "Stretch" cases use wording the rules do not know.
 # The last two are guards: a figures question that starts like a price comparison, and a filings question that shares words with
-# the news. Data-dependent: the newest stored close being 2026-10-15; Apple's revenue being stored. Once run: tuning material.
-HELD_OUT: tuple[Case, ...] = (
+# the news. Data-dependent: the newest stored close being 2026-10-15; Apple's revenue being stored. THE FAIR SCORE, from the one
+# run (old code, then new code): 2 of 10, then 6 of 10 (docs/DECISIONS.md, "Fix (1) of the fresh round"). Tuning material now.
+ROUND_SIXTEEN: tuple[Case, ...] = (
     Case("fx price: ahead since mid-September", "routing", "Is Microsoft stock ahead since mid-September?",
          frozenset({"price"}), frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
     Case("fx price: what did close at", "routing", "What did Amazon close at last Tuesday?", frozenset({"price"}), frozenset({"AMZN"}),
@@ -763,6 +764,43 @@ HELD_OUT: tuple[Case, ...] = (
          frozenset({"AAPL"}), figures=("AAPL:net_income",)),
     Case("fx guard: customer stories", "routing", "What customer stories does Alphabet's 10-K highlight for its cloud business?",
          frozenset({"filing"}), frozenset({"GOOGL"}), ungrounded_ok=True),
+)
+
+CASES = CASES + ROUND_SIXTEEN
+
+# Written 2026-10-16 for fix (2) of the fresh round (periods that were silently defaulted to the past month), in wording unlike
+# the unit tests and every case above, before any was run. Each period case also checks the date the answer starts from, which
+# is what the earlier rules (that only checked a price was quoted) missed: "ninety days" once passed on a month's figures.
+# "Stretch" cases use wording the rules do not know. Data-dependent: written on Friday 2026-10-16 with the newest close on
+# 2026-10-15, so "since Monday" starts on 2026-10-12; they assume the evaluation runs the same day (or that the dates are
+# updated). THE FAIR SCORE, from the one run: 1 of 12 on the old code, 5 of 12 on the new. Three date patterns were one day
+# off (the 3pm refresh added the 10-16 close during the session); the answers were right (docs/DECISIONS.md, "Fix (2) of the
+# fresh round"). Once run: tuning material.
+HELD_OUT: tuple[Case, ...] = (
+    Case("fy year: dropped versus when it began", "routing", "Has Alphabet's stock price dropped versus when 2026 began?",
+         frozenset({"price"}), frozenset({"GOOGL"}), must=(YTD,)),
+    Case("fy window: sixty trading days", "routing", "Over the last sixty trading days, what did AMD stock do?",
+         frozenset({"price"}), frozenset({"AMD"}), must=(PRICE_DIGITS, r"2026-07-2[0-3]")),
+    Case("fy window: ninety days", "routing", "What has Nvidia's stock done across the past ninety days?",
+         frozenset({"price"}), frozenset({"NVDA"}), must=(PRICE_DIGITS, r"2026-07-1[3-5]")),
+    Case("fy window: since 2024", "routing", "Has Tesla stock climbed since the beginning of 2024?", frozenset({"price"}), frozenset({"TSLA"}),
+         must=(PRICE_DIGITS, r"2023-12-2[6-9]|2023-12-3[01]|2024-01-0[2-4]")),
+    Case("fy window: since Monday", "routing", "Is Microsoft stock up or down since Monday?", frozenset({"price"}), frozenset({"MSFT"}),
+         must=(PRICE_DIGITS, r"2026-10-12")),
+    Case("fy window: year and a half", "routing", "Has Amazon stock gained over the last year and a half?", frozenset({"price"}),
+         frozenset({"AMZN"}), must=(PRICE_DIGITS, r"2025-04-(?:0[89]|1[0-4])")),
+    Case("fy flagged: since the election", "routing", "Have Apple shares gained anything since the election?", frozenset({"price"}),
+         frozenset({"AAPL"}), must=(PRICE_DIGITS,), cautions_shown=(r"can't isolate",)),
+    Case("fy flagged: between two months", "routing", "Did Microsoft shares rise between April and July?",
+         frozenset({"price"}), frozenset({"MSFT"}), must=(PRICE_DIGITS,), cautions_shown=(r"can't isolate",)),
+    Case("fy flagged: news since the election", "routing", "Show me the headlines about Amazon since the vote.",
+         frozenset({"headline"}), frozenset({"AMZN"}), cautions_shown=(r"headlines can't isolate",)),
+    Case("fy guard: past month, no caution", "routing", "Has Tesla stock gone anywhere in the past month?", frozenset({"price"}),
+         frozenset({"TSLA"}), must=(PRICE_DIGITS,), no_cautions=True),
+    Case("fy stretch: sat when the year opened", "routing", "Is Nvidia above where it sat when the year opened?",
+         frozenset({"price"}), frozenset({"NVDA"}), must=(YTD,)),
+    Case("fy stretch: first half of the year", "routing", "How did AMD do in the first half of the year?", frozenset({"price"}),
+         frozenset({"AMD"}), must=(PRICE_DIGITS,), cautions_shown=(r"can't isolate",)),
 )
 
 

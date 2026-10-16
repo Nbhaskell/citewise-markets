@@ -89,7 +89,7 @@ def test_today_and_yesterday_are_remembered_for_the_freshness_check():
 
 class _Ev:
     def __init__(self, kind, as_of):
-        self.kind, self.as_of = kind, as_of
+        self.kind, self.as_of, self.starts = kind, as_of, None
 
 
 def test_no_caution_for_a_matched_period():
@@ -115,10 +115,16 @@ def test_the_oldest_newest_close_is_the_one_named():
     assert "2026-10-13" in caution
 
 
-def test_no_caution_without_a_price_source():
+def test_no_caution_without_a_price_or_headline_source():
     w = parse_window("What was Microsoft's closing price at the end of last week?", NOW)
-    assert period_cautions(w, [_Ev("headline", NOW)], NOW) == []
     assert period_cautions(w, [], NOW) == []
+
+
+def test_a_headline_source_alone_gets_the_headlines_version_not_the_price_one():
+    # Changed in fix (2): an unmatched period on a news question used to pass without a word (see test_unread_periods.py).
+    w = parse_window("What was Microsoft's closing price at the end of last week?", NOW)
+    [caution] = period_cautions(w, [_Ev("headline", NOW)], NOW)
+    assert "stored headlines" in caution and "daily prices" not in caution
 
 
 def test_a_window_without_the_new_fields_still_builds():

@@ -1119,6 +1119,57 @@ benchmarks.
   test, and diagnostic runs, not by the totals. **Still open from the fresh round:** (2) unread periods flagged, not defaulted
   ("when the year opened" is a year-ago comparison and "ninety days" is a month); (3) the "cash out" notice and a premise check;
   (4) follow-ups keeping their topic; (5) the outside-topic and writing-request lists; (6) "clear in profit".
+- **Fix (2) of the fresh round: periods the parser could not read are read or flagged, never silently defaulted, 2026-10-16**
+  (branch `feature/copilot-unread-periods`; no prompt change). **What a probe of about 50 wordings showed first (no model):**
+  "ninety days" (the number table stopped at thirty), "sixty / forty-five days", "eighteen months", "8 quarters",
+  "10 trading days", "past decade", "since 2024", "since Monday", "since earnings / the election / the IPO", "early / late / the end
+  of August", "between March and June", "over the summer" and "all time" all fell to the past month with no word, and "when the
+  year opened" and "a year and a half" were read wrongly (as a year ago, as one year). **Built, all in `ai/market.py`:**
+  (1) "than / above / below / compared with / versus / relative to ... when the year (or 2026) opened, began, started, kicked off" is a
+  year-to-date comparison, only with the stock or a bare company name as the subject ("Tesla's headcount larger than when the year
+  began" is not). (2) A number reader for words up to 999 ("forty-five", "two hundred", "one hundred and twenty", "a hundred") and
+  digits up to four places, feeding the "last / past N units" and "N units ago" paths; the old labels are kept ("ninety days" is
+  "past 3 months"). (3) New units: quarters (91.5 days each), trading days and sessions (7/5 of a calendar day, and the label says
+  "past 10 trading days (about 14 calendar days)"), and "past decade" (10 years). (4) "A year and a half", "two and a half years",
+  "the past year and a half" are read exactly, with the half in the label. (5) "Since 2024" or "since the start of 2025" begins on
+  January 1 of that year (this year is year to date; a year that has not come is flagged). (6) "Since Monday" begins on the most
+  recent Monday before today (a week ago when today is one), with the date in the label; "since last Friday" stays flagged, since on
+  a Friday it could mean either. (7) A named period that is still not read is flagged in code through the existing `Window.unmet`
+  (the caution on the answer, and a sentence in the price source): "early / late / the end of / the middle of <month>", "between X and
+  Y" and "from X to Y" with months or years, "over / during the summer, winter, spring, fall, holidays", "all-time", "since
+  inception", "the last time", and the net for the rest, "since" and up to four words ("since the election"). It applies only when no
+  window was read, so a read period is never flagged on top, and a question with no period at all stays silent. (8) The same caution
+  now reaches a news question ("the stored headlines can't isolate it; the answer uses the last N days of headlines"); until now
+  it needed a price source. (9) A window that reaches back more than a week before the first stored close (stored prices start on
+  2021-10-13) carries a caution with that date; `MarketEvidence.starts` holds it. **Tests first:** 84 new in
+  `tests/test_unread_periods.py` (all failing or guarded before), 1247 Python and 253 web tests pass; one old test changed on
+  purpose (`test_no_caution_without_a_price_source` asserted that a headline-only answer gets no period caution, which is the gap
+  item 8 closes) and its fake evidence class gained the new field. Twenty-three deliberate breakages of the new rules were each
+  caught. **Evaluation, one clean A/B on one data snapshot:** a first baseline was thrown away because the 3pm refresh landed in the
+  middle of it (prices for 10-16 arrived mid-run); old code and new code were then run back to back over all 234 cases (the 189
+  older, the 35 of the fresh round, the 10 of fix (1)), 3 repeats: **old 631 of 702 (89.9%), new 636 of 702 (90.6%).** Gains: "when the
+  year opened" 0 to 3 of 3 (the target), and three flaky cases that swing between runs ("kind or harsh", "dividends paid", "turned
+  on"). Losses: "tanking premise" 1 to 0 of 3 and "close from last Friday" 1 to 0 of 3; both were A/B'd, 12 runs each, old against new:
+  last Friday 3 of 12 against 1 of 12 and tanking premise 1 of 12 against 0 of 12, too few to tell from the usual swings, and neither
+  touches code changed here ("tanking premise" is the day's headline tripping the speculation check, as recorded before), so I call
+  them flaky, not caused by this; the pass rate on "last Friday" was low on both. **Fresh cases written for this step before it was
+  run (12, `fy`, in wording unlike the tests; each period case also checks the date the answer starts from): 1 of 12 on the old
+  code, 5 of 12 on the new.** I read every answer and checked every close it quoted against the database (they match): "sixty
+  trading days", "ninety days" and "a year and a half" used the right windows and failed only my date patterns, which assumed the
+  newest close was 10-15 and it became 10-16 during the session (so they were wrong by one day, my error, not changed after the
+  run); "since the election" and "between April and July" were honest and carried the caution but quoted no close, which the case
+  required; the news case listed headlines "since the vote" and carried the headlines caution; the two stretches ("above where it
+  sat when the year opened", "how did AMD do in the first half of the year") still go to the filings and give wrong answers
+  (a total-return table, and AMD's half-year revenue) with no caution. **Weak spots:** (1) Some loose reads were left as they were
+  (they are read, not silent, but not exact): "since last year" is read as the past year, "since the beginning of the
+  quarter" as 3 months, "last quarter" as 3 months. (2) "The last trading day" and "last day" are neither read nor flagged.
+  (3) "Between April and July" is flagged but not read, so the model says the sources do not give that period although the prices are
+  stored (the caution says why); reading "from X to Y" spans exactly would fix it. (4) The catch-all "since ..." also catches a
+  non-time "since" ("since Apple is large") and quotes up to four words, but only a price or headline source shows it. (5) Trading
+  days are a 7/5 approximation. (6) News windows are capped at 90 days and the caution does not say so. (7) The evaluation does not
+  print cautions, so they are covered by unit tests, an end-to-end test, and the diagnostic runs above. **Still open from the fresh
+  round:** (3) the "cash out" notice and a premise check; (4) follow-ups keeping their topic; (5) the outside-topic and
+  writing-request lists; (6) "clear in profit".
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
