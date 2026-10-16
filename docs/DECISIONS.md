@@ -967,6 +967,49 @@ benchmarks.
   sentiment ("What mood did Tesla's CEO strike on the earnings call?"), and the word "earnings" in "pile into Nvidia ahead of
   earnings" sends the question to the profit figures. Still open from the same round: (f) non-company questions ("What did
   Bitcoin do this month?" is answered from Tesla's Bitcoin note), and the content of advice-adjacent answers.
+- **Questions about things outside the tracked companies: fix (f) of the second held-out round, 2026-10-16** (branch
+  `feature/copilot-outside-topics`). **What the real copilot did with 20 probe questions that named no tracked company:**
+  "What did Bitcoin do this month?" was answered from Tesla's Bitcoin note (its other income); oil, mortgage rates, the Fed,
+  inflation and a recession got answers about risk language in the filings; "What are Intel's biggest risks?" was answered
+  from filings that name Intel as a competitor; "Write me a poem about stocks" got a poem that cites no source. Ethereum,
+  gold and the dollar were refused, but only by accident, through price wording (the generic "tell me which company"
+  notice). A cross-company question ("Which companies mention Bitcoin?", "Which of the companies mention interest rate
+  risk?") works and must keep working. **Built in code, no prompt change:** `outside_scope` in `ai/market.py`, used in
+  `answer_question` after the companies are resolved, so it only runs when no tracked company was named and no follow-up
+  carried one. It declines, with a fixed message and before the model is asked, a question that (1) is about an asset or
+  topic the app does not hold (`OUTSIDE_ASSET_RE`: crypto, gold, oil, copper, treasuries, mortgage and interest rates,
+  inflation, GDP, recession, the Fed and other central banks, the dollar and euro, housing market...); (2) names a
+  well-known company that is not tracked (`UNTRACKED_COMPANIES`, about 70 names, a list that goes stale; a few that are
+  also ordinary words, such as Intel, Oracle, Lucid, Uber and Zoom, count only when capitalised; ambiguous words such as
+  Target, Visa, Ford and Shell are left out), in which case the message names the company, lists the tracked ones and points
+  to the dashboard's "Add a company" box; or (3) is not a research question (`NOT_RESEARCH_RE`: write a poem, tell me a joke,
+  recipes, the weather, who won). A **filings cue** (`which`, `companies`, `mention`, `disclose`, `10-K`, `risk factors`,
+  `according to`, `exposure`...) vetoes (1) and (2), so a question about what the filings say is never declined. It runs before
+  the generic "no company named" refusal, because "the price of copper" reads as a price question and that notice does not say
+  what is missing. **Evaluation checker changed:** a refused answer's text was never checked against a case's `must`
+  patterns (only which evidence was shown), so a refusal with the wrong message passed; it is checked now, and no existing
+  case failed because of it. **Numbers** (`eval_market`, 3 repeats, 179 cases, same day): **515 of 537 on `main`, 519 on the
+  branch**; "fo trap: bitcoin" 0 of 3 to passing with the new message. The one new miss, "advice: the better buy" at 2 of 3,
+  is model figure formatting on a question that names Apple and Microsoft, which the rule does not touch (checked). Of the
+  179 questions, exactly one (the Bitcoin target) is declined by the new rule. Not a fair score. **Fresh cases**
+  (`ROUND_THIRTEEN`, 10, written before any run, three of them stretches and two guards): **8 of 10 as the checker then stood,
+  6 of 10 once the checker read the refusal text**: "the price of copper" got the generic refusal (fixed by the ordering
+  above), "Give me a haiku about earnings season" got the generic refusal too ("earnings" sends it there; any refusal made in
+  code is right, so that expectation was widened), and "the central bank" and "Zoom" were not known (added, tests first).
+  All 10 are tuning material now. **Tests:** 57 new in `tests/test_outside_topics.py`; 1074 Python and 253 web tests pass.
+  Thirteen distinct deliberate breakages were each caught; one was first missed (nothing tested that an ordinary word added
+  to the company list is not taken for a company), and tests were added. **Weak spots:** (1) The company list is finite: a
+  company not on it gets the old behavior, an answer from the filings that says they do not contain it, with the risk that
+  a competitor's filing is used instead. (2) The asset list is finite too, and "the economy" is not on it (it still gets
+  the generic refusal through price wording). (3) The filings cue is blunt: "Which is higher, gold or oil?" is not declined and
+  goes to the filings, which is safe but not helpful. (4) The not-a-research-question rule covers writing requests,
+  recipes, weather and scores; "Give me a haiku about spring" is not a pattern it knows and is left to the relevance
+  gate and the model. (5) The refusal's "Add a company" pointer is right for US filers, but a foreign filer is added with no
+  filings. (6) The message was checked in tests and through the evaluation, not in a browser (it uses the existing refusal
+  path, so the page shows it like any other). (7) "Tanking premise" (0 of 3 at baseline, 1 of 3 here) is the day's headline
+  tripping the speculation check, as in the earlier entries, and has nothing to do with this. **This closes the list from
+  the second held-out round, items (a) to (f).** Still open: the content of advice-adjacent answers, and a new set of
+  held-out cases for the whole round, written now, to measure it fairly before deciding on the model-based check.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

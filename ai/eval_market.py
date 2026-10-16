@@ -514,7 +514,7 @@ ROUND_TEN: tuple[Case, ...] = (
          frozenset({"AMZN"}), figures=("AMZN:pe",), must_not_asserted=(ADVICE, VALUATION)),
     Case("fo trap: S&P return", "trap", "Show me the S&P 500 return this year.", frozenset(), frozenset(), must=(NO_CO,)),
     Case("fo trap: bitcoin", "trap", "What did Bitcoin do this month?", frozenset(), frozenset(),
-         must=(rf"{NO_CO}|couldn(?:'|’)t find anything",)),
+         must=(rf"{NO_CO}|couldn(?:'|’)t find anything|outside what this app covers",)),  # the scope rule's message (2026-10-16)
     Case("fo trap: revenue collapsed", "trap", "Is it true that Microsoft's revenue collapsed last year?",
          frozenset({"fundamentals"}), frozenset({"MSFT"}), figures=("MSFT:revenue_growth",),
          must=(r"grew|growth|increase|rose|\+\d",), must_not_asserted=(r"\bcollaps\w+",)),
@@ -607,6 +607,41 @@ CASES = CASES + ROUND_TWELVE
 
 # Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
 # Write new ones, in wording unlike the above and unlike every unit test, before claiming a fair score again.
+# Written 2026-10-16 for fix (f) (questions about things outside the tracked companies), in wording unlike the unit tests and
+# the probe, before any was run. The right behavior for the first group is a refusal before the model is asked (evidence
+# empty); "stretch" cases use wording the rules do not know. The last two are guards: they must keep working. THE FAIR SCORE,
+# from the one run before any tuning: 8 of 10 as the checker then stood, but it never read the text of a refusal; read
+# properly it was 6 of 10 (copper got the generic "tell me which company" refusal, the haiku got it too, and "the central
+# bank" and "Zoom" were not known). The rule was then moved ahead of the generic refusal, the two wordings added, and the
+# haiku expectation widened to any refusal made in code. All 10 are tuning material now.
+ROUND_THIRTEEN: tuple[Case, ...] = (
+    Case("hj outside: crude", "trap", "How did crude do last week?", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("hj outside: copper", "trap", "Has the price of copper been rising?", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("hj outside: solana", "trap", "Is Solana worth anything these days?", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("hj outside: jobs report", "trap", "What does the latest jobs report say?", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("hj untracked: Boeing", "trap", "How big is Boeing's backlog?", frozenset(), frozenset(),
+         must=(r"Boeing isn't one of the companies tracked",)),
+    Case("hj outside stretch: central bank", "trap", "Tell me what the central bank is up to.", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("hj untracked stretch: Zoom", "trap", "What risks does Zoom flag?", frozenset(), frozenset(),
+         must=(r"Zoom isn't one of the companies tracked",)),
+    # Any refusal made in code is right here ("earnings" sends it to the generic one); the first score demanded the new message.
+    Case("hj outside stretch: haiku", "trap", "Give me a haiku about earnings season.", frozenset(), frozenset(),
+         must=(rf"outside what this app covers|{NO_CO}",)),
+    Case("hj guard: names a tracked company", "routing", "Does Nvidia compete with Qualcomm?", frozenset({"filing"}),
+         frozenset({"NVDA"}), ungrounded_ok=True),
+    Case("hj guard: cross-company", "routing", "Which of the companies talk about foreign exchange rates?",
+         frozenset({"filing"}), frozenset(), ungrounded_ok=True),
+)
+
+CASES = CASES + ROUND_THIRTEEN
+
+# Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
+# Write new ones, in wording unlike the above and unlike every unit test, before claiming a fair score again.
 HELD_OUT: tuple[Case, ...] = ()
 
 
@@ -678,6 +713,10 @@ def run_case(conn, embedder, llm, case: Case) -> Result:
         for pattern in case.must_not_asserted + (ADVICE,):
             if m := re.search(pattern, asserted_sentences(ans.text), re.IGNORECASE):
                 problems.append(f"should not say: '{m.group(0)}'")
+    if ans.refused:  # the text of a refusal is written in code, so a case that names what it should say is checked too (2026-10-16)
+        for pattern in case.must:
+            if not re.search(pattern, ans.text, re.IGNORECASE | re.DOTALL):
+                problems.append(f"missing in the refusal: {pattern[:70]}")
     notes = [f"the model's own text did not restate: {p[:50]}" for p in case.restates
              if not ans.refused and not re.search(p, ans.text, re.IGNORECASE)]
     return Result(case, problems, ans, time.time() - started, notes)
