@@ -831,6 +831,51 @@ benchmarks.
   a company), "buy back (quarter total)" (on purpose), and the flaky "press coverage" and "why up". These are items (c) to
   (f) of the second held-out round and are the next steps. The model-based routing question was discussed and left open:
   the owner agreed to do (a) and (b) with keyword rules first, then write fresh held-out cases and decide.
+- **Follow-up carrying: fix (c) of the second held-out round, 2026-10-16** (branch `feature/copilot-follow-ups`). **What
+  went wrong, reproduced on the real model first:** (1) "Now do Alphabet." after a risks question: the rewrite step leaves
+  it alone, and `carry_topic` then gave up because "do" was not a filler word, so the search ran on a company name and the
+  answer was a company summary (the evaluation case still passed, because it checked only the kind of evidence and the
+  company). (2) "Is that better or worse than Amazon?" after a question about Nvidia: the model rewrote it to "...than
+  Amazon's stock performance this month", dropping Nvidia, so only Amazon was searched (0 of 3). When the model left the
+  wording alone ("stronger or weaker than Amazon") the question also lost its price topic. **Fixed in code, no prompt
+  change** (`ai/copilot.py`): (a) `SWITCH_FILLER_RE` also takes do, try, check, run, go, ahead, see, please, again, let, lets,
+  me, show, give, same, pull, up, so "Now do X", "Try X", "Same for X", "Go ahead and do X", "Let's see X instead" carry the
+  earlier topic exactly as "What about X?" does; a question with any other word ("Now do X's employees", "Does X have...")
+  is not a switch. (b) `comparison_companies`: a question with a comparison word (than, versus, against, compare, stack up,
+  beat, outperform, measure up), a reference back ("that", "it", "those"), and a company the last turn did not discuss means
+  the last turn's companies plus the new one. Not used when the question names the earlier company itself, refers to
+  something older ("the other one"), the last turn had no company, or companies were chosen by the user. (c)
+  `carry_comparison`: when the rewrite no longer names every one of those companies and the question has no topic of its own
+  (`_is_bare_comparison`: only company names, comparison words, and a closed list of comparatives), the question is rebuilt
+  from the earlier topic question, "How has Nvidia stock done this month, compared with Amazon?"; the topic comes from the
+  last question that had one (a bare "What about Tesla?" is skipped, and its company is swapped in). Only the earlier
+  question is reused, never its answer (a test checks the answer prompt). When the question has a topic of its own ("Does
+  its revenue look better than Omegaware's?") the model's wording stays, both companies are searched, and "Understood as"
+  ends with "(comparing X and Y)". A rewrite that kept both companies is trusted unchanged. **Numbers:** `eval_followups`
+  17 of 17 and 10 of 10 held-out, identical on `main` and on the branch (3 runs, stable); it has no case of these two kinds.
+  **Eleven fresh follow-up cases** (`STEP_C` in `ai/eval_followups.py`, written before any run, in wording unlike the unit
+  tests and probes, several deliberate stretches), run once: **3 of 11 on `main`, 7 of 11 on the first version of the branch**;
+  the four misses were "did that beat X" (a comparison word the rules lacked), "measure up to" (same), "go ahead and do X"
+  and "let's see X instead" (fillers the rules lacked). Those four words were then added (tests first), giving **9 of 11**.
+  The two left: "Did that beat Microsoft?" is answered correctly ("Apple's employee count") and fails only because the check
+  wants the word "employees"; "How does it measure up to Microsoft?" keeps both companies but the model's rewrite drops the
+  topic, which nothing in code detects. These 11 are tuning material now; the 9 of 11 is not a fair score. **Market
+  evaluation** (`eval_market`, 3 repeats, 157 cases; the data and headlines had moved a day since the last entry):
+  **439 of 471 on the first version, 436 of 471 on the final code**, against 434 for the previous step. "Better or worse than"
+  went from 0 of 3 to passing with a real two-company answer (Nvidia +2.97%, Amazon +0.48%, from the sources); "now do
+  Alphabet" now answers about risks, and its check was tightened to require the word "risk". The 436-versus-439 difference
+  is "press coverage" (swings between 0 and 10 of 10 across runs, as noted above) and "tanking premise" (2 of 3 at baseline,
+  1 of 3 here): neither has an earlier conversation, and the new code does nothing without one. **Tests:** 44 new Python tests
+  (`tests/test_copilot_follow_ups.py`); 888 Python tests pass. Eleven deliberate breakages of the new rules were each caught;
+  one was first missed because no test checked the companies (the same company named again counted as a comparison with
+  itself; a test was added), and one because my breakage removed a comparative no test used (redone on one a test uses). **Weak spots:** (1) A rewrite that names both companies but loses the topic ("measure up to
+  Microsoft") is not detected. (2) The word lists (fillers, comparatives, comparison words) are finite, so a new wording
+  that falls outside them keeps the companies but not the topic (the note then says what was compared). (3) "That" is taken
+  to mean the last turn's companies; a user who means something older without a word like "first" or "other" gets the
+  wrong one, though "Understood as" shows what was assumed. (4) "Show me X" and "give X" after a topic question now carry
+  the topic, which is wrong when the user wanted a general overview. (5) Not checked in a real browser: the new
+  "(comparing ...)" ending of "Understood as" is covered by tests, not by looking at the page. (6) Still open from the
+  same round: (d) "earn" and "sales" wording, (e) advice and sentiment wording, (f) non-company questions.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

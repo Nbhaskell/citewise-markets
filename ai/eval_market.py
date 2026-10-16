@@ -525,8 +525,9 @@ ROUND_TEN: tuple[Case, ...] = (
          frozenset({"NVDA", "AMZN"}), history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
     Case("fo follow: most negative", "routing", "Which of those is the most negative?", frozenset({"headline"}),
          frozenset({"AAPL"}), history=(AAPL_NEWS,)),
+    # Tightened after the first round: it passed on evidence kind while the answer was a company summary, not Alphabet's risks.
     Case("fo follow: now do Alphabet", "routing", "Now do Alphabet.", frozenset({"filing"}), frozenset({"GOOGL"}),
-         history=(RISKS_TURN,)),
+         history=(RISKS_TURN,), must=(r"risk",)),
     Case("fo follow: their revenue then", "routing", "What's their revenue, then?", frozenset({"fundamentals"}),
          frozenset({"TSLA"}), history=(turn("What is Tesla's P/E ratio?", "Tesla's P/E ratio is 350.", "TSLA"),),
          figures=("TSLA:revenue",)),
