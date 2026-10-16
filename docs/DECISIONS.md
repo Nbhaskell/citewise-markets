@@ -919,6 +919,54 @@ benchmarks.
   of the word "earnings". (6) The money-verb list is a finite guess: a question with a stock word and a money verb stays a
   price question even when it is about something else. Still open from the same round: (e) advice and sentiment wording,
   (f) non-company questions.
+- **Advice and sentiment wording: fix (e) of the second held-out round, 2026-10-16** (branch
+  `feature/copilot-advice-sentiment`). **What the probe showed** (no model, `detect_intent` and `asks_for_advice`): of 24
+  everyday advice wordings written for the probe, **21 got no advice notice** ("Is Nvidia undervalued?", "Rate Apple as an
+  investment", "Is it too late to jump into Nvidia?", "I have $5,000. Where should it go?"), none of 8 look-alikes was
+  flagged; and **all 12 news-tone wordings missed the sentiment route** ("kind or harsh", "piling on", "how is the media
+  treating X"). The phrase lists written in the earlier rounds cover their own wordings, as DECISIONS already said, so this
+  fix is written as structure. **Sentiment** (`_NEWS_SOURCE`, `_NEWS_TONE`, `SENTIMENT_RE` in `ai/market.py`): a news word
+  (reporters, journalists, press, media, coverage, headlines, news flow, writers, commentators, pundits, buzz, chatter)
+  within 40 characters of a word about attitude (kind, harsh, friendly, favourable, piling on, treating, upbeat, gloomy,
+  better, worse, souring, "turned on", "easy ride", "hard time", "going easy on"...), either order; "saying nice things
+  about"; "feeling / attitude / take on ... the news". Analysts are deliberately not a news source. **Advice**
+  (`ADVICE_JUDGMENT_RE`, plus more `TRADE_WORD_RE` and `DECISION_CUE_RE` words): a judgment of value (over/undervalued,
+  over/underpriced, fairly valued, a bargain or steal, and "cheap / expensive / pricey" only when the question ends there or
+  goes on with now / today / at this price); an endorsement (a sure thing, can't lose, a safe / solid / good bet, a winner
+  (not "winner-take-all"), a keeper, a no-brainer, a screaming buy, worth owning, would you bet, rate X as an investment,
+  your take on, make me money, am I crazy to, "a good ... investment / hold / pick" with up to two words between); the
+  reader's own money (where should it go, I have $N, a retirement or brokerage account, a smart addition to my portfolio);
+  timing ("too late / early to", the moment or time, reckon, pick up, jump into, pile into, stay in, bail on, get out of);
+  and "too pricey / expensive / cheap to touch / own / buy / hold"; "would a cautious investor go for / buy / pick". The notice
+  itself (`ADVICE_CAUTION`) is unchanged and is attached in code. **Numbers** (`eval_market`, 3 repeats, 168 cases, same
+  day): **474 of 504 baseline on `main`, 476 after the sentiment rule, 483 after the advice rules, 485 after the final
+  code**. "Kind or harsh" 0 of 3 to passing (an answer from the sentiment summary, 31 positive, 119 neutral, 17 negative,
+  +0.08, with the label caution); "sure thing" and "cheap right now" 0 of 3 to passing with the notice. Not a fair score.
+  Nothing that passed at baseline was lost. Of the 168 questions, only the three targets and "Is Tesla overvalued given its
+  P/E ratio?" (now flagged, and it keeps its P/E) change route or flag. **A regression of mine, caught by the existing tests:**
+  the first version flagged "What is Tesla's best selling model?" because "sell" matched the start of "selling"; the noun now
+  needs a word boundary and a test says so. **Fresh cases** (`ROUND_TWELVE`, 11, written before any run, the wordings unlike
+  the probe and the unit tests, several planned stretches): **5 of 11**, the fair score. Missed: "Is Apple a smart addition to
+  a growth portfolio?" (a plain wording), and the stretches "too pricey to touch", "would a cautious investor go for Tesla",
+  "would you pile into Nvidia", "press giving Tesla an easy ride", "has the media turned on Amazon". Those wordings were then
+  added to the rules, tests first, after which all 11 pass (not a fair score; two evidence expectations were corrected, to the
+  price data for "cautious investor ... right now" and the figures for "pile into ... ahead of earnings", since the case checks
+  the notice). **Tests:** 91 new in `tests/test_advice_sentiment_wording.py`; 1017 Python and 253 web tests pass. Twenty-five
+  deliberate breakages (six on the sentiment rule, nineteen on the advice rules) were each caught in the end. Five were first
+  genuinely missed because the tests did not depend on that code (two sentiment negatives had no word from the tone list,
+  the dollar-amount and "where should it go" forms each covered for the other, and a widened window had no long-gap
+  negative), and two more only because my script's search string was wrong; each got a test or a fix. **Weak spots:** (1) Only the
+  fixed notice is attached in code; **the content of an advice-adjacent answer is unchanged**: "Would you say Alphabet is
+  cheap right now?" is answered "the sources do not include Alphabet's market value or P/E ratio", which is untrue, since both
+  are stored and the question is not routed to them. (2) The lists are finite; an advice wording outside them gets no
+  notice, and a missed notice is the costly mistake. A model-based check that can only add the notice is the obvious next
+  experiment and is still not built. (3) Leaning to flag: "How does the 10-K account for its investment in X as an
+  investment?" style questions that match a pattern would get an extra notice (none seen in the 179 evaluation questions).
+  (4) "Cheap" and "expensive" are only judgments at the end of a question or before now / today / at this price, so "Is
+  Microsoft expensive for what you get?" is missed. (5) Existing and not changed: the bare word "mood" and "tone of" route to
+  sentiment ("What mood did Tesla's CEO strike on the earnings call?"), and the word "earnings" in "pile into Nvidia ahead of
+  earnings" sends the question to the profit figures. Still open from the same round: (f) non-company questions ("What did
+  Bitcoin do this month?" is answered from Tesla's Bitcoin note), and the content of advice-adjacent answers.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

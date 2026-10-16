@@ -120,6 +120,13 @@ HOW_MUCH_MONEY_RE = re.compile(
 # No index data is stored, and a filing's "total return" chart (scaled from $100) reads like an index level to a model.
 INDEX_RE = re.compile(r"\b(?:s&p(?:\s*500)?|dow(?:\s+jones)?|nasdaq(?:\s+composite)?|russell\s*\d+)\b", re.IGNORECASE)
 STOCK_NOUN_RE = re.compile(r"\b(?:stocks?(?!-based)|shares)\b", re.IGNORECASE)  # not "stock-based compensation"
+_NEWS_SOURCE = r"reporters?|journalists?|press|media|coverage|headlines?|news(?:\s+flow)?|writers?|commentators?|pundits?|buzz|chatter"
+_NEWS_TONE = (
+    r"kind|harsh|friendly|hostile|fa?vou?rabl[ey]|unfa?vou?rabl[ey]|nice|piling\s+on|bashing|trashing|slamming|praising|"
+    r"treating|upbeat|gloomy|supportive|critical|flattering|rosy|grim|optimistic|pessimistic|warm|cold|gentle|brutal|glowing|"
+    r"scathing|good|bad|better|worse|improving|souring|warming|"
+    r"turned\s+on|turning\s+on|easy\s+ride|rough\s+ride|hard\s+time|free\s+pass|going\s+(?:easy|hard)\s+on"
+)
 SENTIMENT_RE = re.compile(
     r"\b(?:sentiment|mood|bullish|bearish|optimis\w+|pessimis\w+|tone\s+of|(?:good|bad|positive|negative)\s+news|"
     r"how\s+(?:do|does|are)\s+(?:people|investors|the\s+market|reporters|journalists|the\s+press|the\s+media|commentators)\s+"
@@ -130,7 +137,12 @@ SENTIMENT_RE = re.compile(
     r"\b(?:press|media|coverage|reporters|journalists)\b[^?.]{0,30}\b(?:negative|positive)\b|"
     r"\bcoverage\b[^?.]{0,30}\b(?:trend\w*|shift\w*|chang\w*|improv\w*|worsen\w*|deteriorat\w*)\b|"
     r"feel(?:ing|s)?\s+(?:positive|negative|good|bad)|investors?\s+(?:feel|are\s+feeling|think)|what\s+do\s+investors|"
-    r"how\s+(?:negative|positive)\b)",
+    r"how\s+(?:negative|positive)\b|"
+    # a news source near a word about its attitude, either order ("are reporters being kind or harsh", "headlines mostly good"):
+    # structure, not one phrase per wording. Analysts are not a news source here ("do analysts expect positive growth").
+    rf"\b(?:{_NEWS_SOURCE})\b[^?.]{{0,40}}\b(?:{_NEWS_TONE})\b|\b(?:{_NEWS_TONE})\b[^?.]{{0,40}}\b(?:{_NEWS_SOURCE})\b|"
+    r"\b(?:saying|said|writing|written)\s+(?:nice|good|bad|kind|mean|positive|negative)\s+things\s+about\b|"
+    r"\b(?:feeling|feelings|attitude|stance|take)\s+(?:about|on|toward|towards)\b[^?.]{0,50}\b(?:news|press|media|coverage|headlines)\b)",
     re.IGNORECASE,
 )
 CAUSE_RE = re.compile(r"\b(?:why|reasons?|because|what\s+happened|what(?:'s|\s+is|\s+was)\s+(?:behind|driving|causing|moving))\b", re.IGNORECASE)
@@ -300,14 +312,40 @@ ADVICE_ASK_RE = re.compile(
 )
 TRADE_WORD_RE = re.compile(
     r"\b(?:buy(?:ing)?|sell(?:ing)?|hold(?:ing)?|invest(?:ing)?|dump|trim|short(?:ing)?|add(?:ing)?\s+to|accumulat\w+|"
-    r"load(?:ing)?\s+up|get(?:ting)?\s+(?:in|out)|exit|position|put\s+(?:my|our)\s+(?:savings|money|cash)\s+(?:in|into))\b",
+    r"load(?:ing)?\s+up|get(?:ting)?\s+(?:in|out)|exit|position|put\s+(?:my|our)\s+(?:savings|money|cash)\s+(?:in|into)|"
+    r"pick(?:ing)?\s+up|jump(?:ing)?\s+(?:in|into|on)|pil(?:e|ing)\s+(?:in|into|on)|stay(?:ing)?\s+(?:in|invested)|bail(?:ing)?\s+on|double(?:d|\s|-)*down|"
+    r"get(?:ting)?\s+into|get(?:ting)?\s+out\s+of)\b",
     re.IGNORECASE,
 )
 DECISION_CUE_RE = re.compile(
     r"\b(?:should|whether|wise|smart|safe(?:ly)?|good\s+idea|bad\s+idea|thinking\s+(?:about|of)|can\s+i|could\s+i|may\s+i|"
     r"my|our|worth|recommend\w*|advice|advise|suggest\w*|thoughts|opinion|would\s+you|do\s+you\s+think|right\s+time|"
-    r"best\s+time|good\s+time|bad\s+time|reason\s+(?:not\s+)?to|enough\s+to|right\s+(?:stock|company|one)\s+to)\b",
+    r"best\s+time|good\s+time|bad\s+time|reason\s+(?:not\s+)?to|enough\s+to|right\s+(?:stock|company|one)\s+to|"
+    r"too\s+(?:late|early)|the\s+(?:moment|time)|reckon|your\s+(?:take|view|read))\b",
     re.IGNORECASE,
+)
+# Judgments and endorsements that are a request for a recommendation however they are phrased (a probe of 24 everyday
+# wordings found 21 unflagged): a judgment of value ("undervalued", "a bargain", "cheap right now"), an endorsement ("a sure
+# thing", "a keeper", "worth owning", "rate it as an investment"), and the reader's own money ("I have $5,000. Where should
+# it go?"). "Cheap" and "expensive" count only when they end the question or are followed by now / today / at this price,
+# so "the most expensive segment to run" is left alone; "the winner-take-all risk" and "a retirement plan" are left alone too.
+ADVICE_JUDGMENT_RE = re.compile(
+    r"""\b(?:
+        (?:over|under)(?:valued|priced)|fairly\s+(?:valued|priced)|(?:a|the)\s+(?:bargain|steal)|
+        (?:cheap|expensive|pricey)(?=\s*(?:right\s+now|now|today|here|at\s+(?:this|the\s+current)\s+(?:price|level)|\W*$))|
+        sure\s+thing|can'?t\s+lose|(?:safe|good|great|solid|sure|smart|risky)\s+bet|
+        (?:a|the)\s+(?:winner(?!-)|keeper|no[-\s]?brainer)|screaming\s+buy|worth\s+(?:owning|holding|keeping|having)|
+        (?:would|will|do|did)\s+you\s+(?:bet|wager)|rate\s+\w+\s+as\s+an?\s+investment|
+        your\s+(?:take|view|opinion|read|thoughts)\s+on|make\s+(?:me|us)\s+(?:money|rich)|
+        am\s+i\s+(?:crazy|nuts|wrong|silly|foolish|dumb|smart|right)\s+to|
+        (?:is|are|was)\b.{0,50}?\b(?:good|great|solid|safe|smart|risky|better|best)\s+(?:[\w-]+\s+){0,2}(?:buy|sell|investment|bet|hold|pick|choice|play)\b|
+        where\s+should\s+(?:it|that|the\s+money|i|we)\s+(?:go|be\s+put|put|invest)|(?:i|we)\s+(?:have|got)\s+\$\s?\d|
+        (?:in|into|to|for)\s+(?:a|an|my|our|your)\s+(?:retirement|brokerage|savings|college)\s+(?:account|fund)|
+        addition\s+to\s+(?:a|an|my|our|your)\s+(?:[\w-]+\s+){0,2}(?:portfolio|holdings)|
+        too\s+(?:cheap|expensive|pricey|rich|hot)\s+to\s+(?:touch|buy|own|hold|ignore|consider|pass\s+up|miss|sell)|
+        (?:would|should|will|can)\s+(?:a|an|the|some|any)\s+(?:[\w-]+\s+){0,2}investors?\s+(?:go|buy|bet|pick|pile|jump|hold|sell|choose|own)
+    )""",
+    re.IGNORECASE | re.VERBOSE,
 )
 
 
@@ -319,7 +357,7 @@ OWN_MONEY_RE = re.compile(
 
 
 def asks_for_advice(question: str) -> bool:
-    return bool(ADVICE_ASK_RE.search(question)) or bool(OWN_MONEY_RE.search(question)) or (
+    return bool(ADVICE_ASK_RE.search(question)) or bool(ADVICE_JUDGMENT_RE.search(question)) or bool(OWN_MONEY_RE.search(question)) or (
         bool(TRADE_WORD_RE.search(question)) and bool(DECISION_CUE_RE.search(question))
     )
 
