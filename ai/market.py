@@ -72,6 +72,31 @@ NEWS_RE = re.compile(
     r"(?:recent|latest|new|newest|top|breaking|any|some|few|more|other)\s+stories|(?:latest|top|breaking|newest|recent)\s+story)\b",
     re.IGNORECASE,
 )
+# "Google doubled this month", "Why did Nvidia triple this year?": a company's stock moving by a multiple or collapsing. Only a
+# capitalised company name counts as the subject ("Tesla's deliveries doubled", "revenue doubled" are not), a verb with an object
+# is not ("doubled its dividend", "doubled down on", "doubled in size"), and the caller needs a named period or a stock word.
+_CLAIM_VERB = (
+    r"doubl(?:e|ed|es|ing)|tripl(?:e|ed|es|ing)|quadrupl(?:e|ed|es|ing)|halv(?:e|ed|es|ing)|collaps(?:e|ed|es|ing)|"
+    r"plummet(?:ed|s|ing)?|nosedive[sd]?|nosediving|explod(?:e|ed|es|ing)|crater(?:ed|s|ing)?"
+)
+_NOT_A_COMPANY = (
+    r"Revenue|Revenues|Sales|Profit|Profits|Income|Earnings|Dividend|Dividends|Net|Operating|Cash|Free|Margin|Margins|Deliveries|"
+    r"Production|Costs|Expenses|Headcount|Employees|Cloud|Data|Services|Segment|Demand|Spending|Debt|Shares|Stock|Price|Prices|AI"
+)
+PRICE_CLAIM_RE = re.compile(
+    rf"(?-i:\b(?!(?:{_NOT_A_COMPANY})\b)[A-Z][\w.&-]*)\s+(?:(?:has|have|had|just|really|actually|also)\s+)*(?:{_CLAIM_VERB})\b"
+    r"(?!\s+(?:its|their|the|a|an|his|her|our|my|your|down|in\s+(?:size|number|scale|headcount))\b)",
+    re.IGNORECASE,
+)
+# "Tesla can only go up from here", "Do you think Microsoft reaches $650?": predictions about the price, routed to the prices so the
+# prompt's no-prediction rule applies. "reach $100 billion" (a unit) and "revenue to reach" (no capitalised name) are not.
+PRICE_PREDICTION_RE = re.compile(
+    r"\b(?:can|could|will)\s+only\s+go\s+(?:up|down)\b(?=\s+from\b|\s+forever\b|\W*$)|"
+    r"\bonly\s+go(?:es)?\s+(?:up|down)\s+from\s+(?:here|now|this\s+point)\b|"
+    r"(?-i:\b[A-Z][\w.&-]*)\s+(?:(?:will|would|could|might)\s+)?reach(?:es)?\s+\$\s?\d[\d,]*+(?:\.\d+)?+"
+    r"(?!\s*(?:[bmk]\b|billion|million|trillion|thousand|percent|%))",
+    re.IGNORECASE,
+)
 # "Tell me Apple's close from last Thursday", "Where did Nvidia close yesterday?": the noun or verb "close" as a price. Each form
 # needs a day word or a company's possessive, so "Apple's close relationship with TSMC", "close its plant" and "close to a
 # deal" stay filings questions.
@@ -361,7 +386,9 @@ ADVICE_ASK_RE = re.compile(
         better\s+off\s+(?:with|in|buying|owning|holding)\b|
         (?:do|would)\s+you\s+(?:like|favou?r|prefer|pick|choose)\b|
         \b(?:smart|wise|sensible|sound|safe|prudent|good|great|solid)\b.{0,60}?\bfor\s+(?:me|us)\b|
-        (?:put|putting|park|parking)\s+(?:(?:any|some|a\s+little|a\s+lot\s+of)\s+)?(?:money|cash|savings)\s+(?:in|into|with)\b
+        (?:put|putting|park|parking)\s+(?:(?:any|some|a\s+little|a\s+lot\s+of)\s+)?(?:money|cash|savings)\s+(?:in|into|with)\b|
+        (?:good|right|best|smart|wise)\s+(?:point|level|price|entry\s+point)\s+to\s+(?:buy|enter|get\s+in|add|sell|exit)\b|
+        (?:one|something|stocks?)\s+to\s+(?:buy|sell|hold|own|keep|avoid)\b
     )""",
     re.IGNORECASE | re.VERBOSE,
 )
@@ -369,14 +396,23 @@ TRADE_WORD_RE = re.compile(
     r"\b(?:buy(?:ing)?|sell(?:ing)?|hold(?:ing)?|invest(?:ing)?|dump|trim|short(?:ing)?|add(?:ing)?\s+to|accumulat\w+|"
     r"load(?:ing)?\s+up|get(?:ting)?\s+(?:in|out)|exit|position|put\s+(?:my|our)\s+(?:savings|money|cash)\s+(?:in|into)|"
     r"pick(?:ing)?\s+up|jump(?:ing)?\s+(?:in|into|on)|pil(?:e|ing)\s+(?:in|into|on)|stay(?:ing)?\s+(?:in|invested)|bail(?:ing)?\s+on|double(?:d|\s|-)*down|"
-    r"get(?:ting)?\s+into|get(?:ting)?\s+out\s+of)\b",
+    r"get(?:ting)?\s+into|get(?:ting)?\s+out\s+of|"
+    # "Is it time to cash out of Nvidia?": the reader's own sale. A company's own "unload its inventory" or "cash out its stake"
+    # is not (the lookahead; the quantifiers are possessive so a shorter match cannot slip past it).
+    r"cash(?:ing)?\s+out\b(?!\s+(?:its|their)\b)|(?:take|taking)\s+(?:some\s+|my\s+|our\s+)?profits?|"
+    r"lock(?:ing)?\s+in\s+(?:my\s+|our\s+|some\s+|the\s+)?(?:gains?|profits?)|cut(?:ting)?\s+(?:my\s+|our\s+)?losses|"
+    r"bail(?:ing)?\s+out|unload\w*+(?!\s+(?:its|their)\b)|offload\w*+(?!\s+(?:its|their)\b)|"
+    r"ride\s+(?:it|this|that|them|[\w.&-]+)\s+out|hang(?:ing)?\s+on(?:to)?\b(?:\s+to\b)?+(?!\s+(?:its|their)\b)|go(?:ing)?\s+(?:long|short)\b|"
+    r"add(?:ing)?\s+(?:[\w.&-]+\s+){1,2}to\s+(?:the|my|our|a|your)\s+(?:portfolio|holdings|watchlist))\b",
     re.IGNORECASE,
 )
 DECISION_CUE_RE = re.compile(
     r"\b(?:should|whether|wise|smart|safe(?:ly)?|good\s+idea|bad\s+idea|thinking\s+(?:about|of)|can\s+i|could\s+i|may\s+i|"
     r"my|our|worth|recommend\w*|advice|advise|suggest\w*|thoughts|opinion|would\s+you|do\s+you\s+think|right\s+time|"
     r"best\s+time|good\s+time|bad\s+time|reason\s+(?:not\s+)?to|enough\s+to|right\s+(?:stock|company|one)\s+to|"
-    r"too\s+(?:late|early)|the\s+(?:moment|time)|reckon|your\s+(?:take|view|read))\b",
+    r"too\s+(?:late|early)|the\s+(?:moment|time)|reckon|your\s+(?:take|view|read)|"
+    r"is\s+it\s+(?:the\s+)?(?:time|moment|point)\s+to|(?<!\w)time\s+to|would\s+it\s+be\s+(?:[\w-]+\s+){0,2}?to|"
+    r"(?:crazy|reckless|foolish|stupid|dumb|mad|nuts|silly)\s+to|(?:a\s+)?(?:mistake|error|blunder)\s+to)\b",
     re.IGNORECASE,
 )
 # Judgments and endorsements that are a request for a recommendation however they are phrased (a probe of 24 everyday
@@ -518,6 +554,8 @@ def detect_intent(question: str) -> Intent:
         or (bool(PERIOD_MOVE_RE.search(question)) and parse_window(question).explicit)
         or year_start_comparison(question)
         or bool(CLOSE_NOUN_RE.search(question))
+        or bool(PRICE_PREDICTION_RE.search(question))
+        or (bool(PRICE_CLAIM_RE.search(question)) and (parse_window(question).explicit or bool(STOCK_NOUN_RE.search(question))))
         or (bool(PERIOD_COMPARE_RE.search(question)) and not topics and parse_window(question).explicit)  # not "revenue than a year ago"
     )
     sentiment = bool(SENTIMENT_RE.search(question))
@@ -818,6 +856,83 @@ def period_cautions(window: Window, evidence: list, today: Optional[date] = None
     elif window.asked_day == "yesterday" and oldest != today - timedelta(days=1):
         out.append(f"You asked about yesterday, but the newest stored close is from {oldest}, so the answer may not be about yesterday.")
     return out
+
+
+# ---- a move the question assumes, checked against the stored closes ----
+
+_UP_VERBS = r"rise|rose|rises|jump(?:ed|s)?|surg(?:e|ed|es)|soar(?:ed|s)?|gain(?:ed|s)?|climb(?:ed|s)?|rall(?:y|ied|ies)|spik(?:e|ed|es)|increas(?:e|ed|es)|up"
+_DOWN_VERBS = (
+    r"fall|fell|falls|drop(?:ped|s)?|plung(?:e|ed|es)|sink|sank|tumbl(?:e|ed|es)|slid(?:e|es)?|slump(?:ed|s)?|crash(?:ed|es)?|"
+    r"declin(?:e|ed|es)|los(?:t|e|es)|tank(?:ed|s)?|down"
+)
+_PCT_CLAIM_RE = re.compile(
+    rf"\b(?P<verb>{_UP_VERBS}|{_DOWN_VERBS})\s+(?:by\s+|about\s+|nearly\s+|over\s+|around\s+|more\s+than\s+)?"
+    r"(?P<n>\d+(?:\.\d+)?)\s*%",
+    re.IGNORECASE,
+)
+_UP_RE = re.compile(rf"(?:{_UP_VERBS})$", re.IGNORECASE)
+# the least a move must be for the question's word to be fair: "doubled" is +100%, so +80% or more passes; "halved" is -50%
+_MULTIPLE_CLAIMS = (
+    (re.compile(r"\bdoubl(?:e|ed|es|ing)\b", re.IGNORECASE), 80.0, "min"),
+    (re.compile(r"\btripl(?:e|ed|es|ing)\b", re.IGNORECASE), 160.0, "min"),
+    (re.compile(r"\bquadrupl(?:e|ed|es|ing)\b", re.IGNORECASE), 240.0, "min"),
+    (re.compile(r"\bhalv(?:e|ed|es|ing)\b|\b(?:dropp(?:ed|ing)|fell|falling|cut|down|lost|losing)\s+(?:by\s+|in\s+)half\b", re.IGNORECASE), -40.0, "max"),
+)
+_STRONG_UP_RE = re.compile(r"\b(?:soar\w*|skyrocket\w*|surg(?:e|ed|es|ing)|spik(?:e|ed|es|ing)|rocket\w*|explod\w*)\b", re.IGNORECASE)
+_STRONG_DOWN_RE = re.compile(r"\b(?:crash\w*|plung\w*|plummet\w*|tank(?:ed|s|ing)?|collaps\w*|crater\w*|nosedive\w*|tumbl\w*)\b", re.IGNORECASE)
+STRONG_MOVE_PCT = 3.0  # "soared" and "crashed" need at least this much, in the right direction
+_PREDICTION_WORDS_RE = re.compile(
+    r"\b(?:will|would|could|might|may|can|if|whether|going\s+to|about\s+to|likely\s+to|what\s+if)\b", re.IGNORECASE
+)
+
+
+def _claims(question: str):
+    """(the words as written, a test of the actual percentage change) for each move the question asserts or asks about. Predictions and
+    hypotheticals ("will soar", "could crash", "what if it doubles") are skipped: there is nothing to compare."""
+    found, taken = [], []
+
+    def usable(m) -> bool:
+        sentence_start = max(question.rfind(c, 0, m.start()) for c in ".?!") + 1
+        return not _PREDICTION_WORDS_RE.search(question[sentence_start:m.start()])
+
+    for m in _PCT_CLAIM_RE.finditer(question):
+        if not usable(m):
+            continue
+        n = float(m.group("n"))
+        signed = n if _UP_RE.match(m.group("verb")) else -n
+        ok = lambda actual, signed=signed: (
+            abs(actual - signed) <= 1.0 or (actual * signed > 0 and 0.5 <= abs(actual) / abs(signed) <= 2.0)
+        )
+        found.append((m.start(), m.group(0), ok))
+        taken.append(m.span())
+    for pattern, bound, kind in _MULTIPLE_CLAIMS:
+        for m in pattern.finditer(question):
+            if usable(m):
+                test = (lambda actual, b=bound: actual >= b) if kind == "min" else (lambda actual, b=bound: actual <= b)
+                found.append((m.start(), m.group(0), test))
+                taken.append(m.span())
+    for pattern, test in ((_STRONG_UP_RE, lambda actual: actual >= STRONG_MOVE_PCT), (_STRONG_DOWN_RE, lambda actual: actual <= -STRONG_MOVE_PCT)):
+        for m in pattern.finditer(question):
+            if usable(m) and not any(a <= m.start() < b for a, b in taken):
+                found.append((m.start(), m.group(0), test))
+    return [(phrase, ok) for _, phrase, ok in sorted(found, key=lambda t: t[0])]
+
+
+def premise_cautions(question: str, evidence: list, window: Window) -> list[str]:
+    """A plain statement of what the stored closes show when the question assumes a move they do not support ("Google doubled this
+    month" when it rose 1%). It quotes the claim and the data and never calls the question wrong. Silent when there is nothing to compare:
+    no price source, several companies, a period that could not be read, a prediction. At most one statement."""
+    prices = [e for e in evidence if e.kind == "price"]
+    if len(prices) != 1 or window.unmet or prices[0].change_pct is None:
+        return []
+    e = prices[0]
+    for phrase, supported in _claims(question):
+        if not supported(e.change_pct):
+            return [
+                f"You mention that {e.symbol} “{phrase}”; the stored closes show {e.change_pct:+.1f}% over the {window.label}, "
+                "so the question may assume a move that did not happen."
+            ]
+    return []
 
 
 def news_days(window: Window) -> int:

@@ -1170,6 +1170,59 @@ benchmarks.
   print cautions, so they are covered by unit tests, an end-to-end test, and the diagnostic runs above. **Still open from the fresh
   round:** (3) the "cash out" notice and a premise check; (4) follow-ups keeping their topic; (5) the outside-topic and
   writing-request lists; (6) "clear in profit".
+- **Fix (3) of the fresh round: more everyday advice wordings, price claims and predictions reach the prices, and a check of the
+  move a question assumes, 2026-10-16** (branch `feature/copilot-advice-premise`; no prompt change). **What a probe showed first
+  (no model):** of 20 everyday ways to ask whether to buy, sell or hold only 4 carried the notice ("Is it time to cash out of
+  Nvidia?", "Should I take profits on Tesla?", "Is it time to dump Nvidia?", "Would it be crazy to sell Microsoft now?" had none:
+  "cash out", "take profits", "unload" were not trade words, and "is it time to", "would it be crazy to" were not decision cues), and
+  "doubled", "tripled", "halved", "collapsed", "can only go up from here" and "reaches $650" all went to the filings, so no price
+  source existed to check a claim against. **Built (all in `ai/market.py`, one line in `ai/copilot.py`):** (A) trade phrases
+  (cash out, take profits, lock in gains, cut losses, bail out, unload, offload, ride it out, hang on to, go long or short, add X to the
+  portfolio) and decision cues ("is it time to", "time to", "would it be (crazy / ok / smart) to", "crazy / foolish to", "a mistake
+  to"), plus "a good point / level to enter" and "one to hold / own". Each company-side verb carries a lookahead for "its / their"
+  ("Does Tesla say whether it will unload its Bitcoin?" gets no notice; the quantifiers are possessive so a shorter match cannot
+  slip past it). (B) `PRICE_CLAIM_RE`: a capitalised company name followed by doubled / tripled / halved / collapsed / plummeted /
+  exploded / cratered is a price question when a period or a stock word is present, unless an object follows ("doubled its
+  dividend", "doubled down on", "doubled in size") or the subject is a common noun ("Revenue doubled", "Tesla's deliveries
+  doubled"); `PRICE_PREDICTION_RE`: "can only go up / down from here" and "<Name> reaches $650" (not "$100 billion"). (C) `premise_cautions`:
+  reads the move the question asserts or asks about ("doubled" needs about +80% or more, "tripled" +160%, "halved" -40% or less,
+  "plunge 20%" within a factor of two or a point, "soared" or "crashed" at least 3% in the right direction) and compares it with the
+  change over the window the price source shows; on a mismatch the answer carries "You mention that GOOGL “doubled”; the stored
+  closes show -1.3% over the past month, so the question may assume a move that did not happen." It is silent for predictions and
+  hypotheticals ("will soar", "could crash", "what if it doubles"), for several companies, for a period that could not be read, and for
+  plain directions ("rose", "fell"), and gives at most one statement. **Tests first:** 117 new (`tests/test_advice_cash_out_wording.py`,
+  `tests/test_price_claim_routing.py`, `tests/test_premise_check.py`); 1364 Python and 253 web tests pass. Thirty-one deliberate
+  breakages of the new rules: seven were first missed. Five pointed at missing guard tests (a possessive "hang on to its", a
+  "would it be ... to" cue that other cues hid, a lowercase non-company subject that was also in the exclusion list, a claim with
+  no period or stock word, "can only go up" at the end of a question), now added; one ("unload" with a greedy quantifier) is an
+  equivalent mutation because the trailing word boundary already stops it. **Evaluation, one data snapshot (no refresh in between):
+  old code 648 of 738 (87.8%), new code 657 of 738 (89.0%) over 246 cases (the 189 older, the 35, 10 and 12 of the three earlier
+  steps), 3 repeats.** Gains: "cash out" 0 to 3 of 3 and "reaches $650" 0 to 3 (the targets); "been performing", "kind or harsh",
+  "payout ratio" and "since the election" moved up from flaky. Losses: "announcements" 3 to 2 of 3 (a figure the numbers check
+  flagged in one run, 16), "turned on" 3 to 2 of 3 (it swings), and "close from last Friday" 1 to 0 of 3 (flaky for four rounds now,
+  with a low pass rate on old and new code); none touches code changed here. **The fresh round's 35: 67 to 72 of 105.** **Fresh cases
+  written for this step before it was run (12, `fz`): 3 of 12 on the old code, 8 of 12 on the new.** I read every answer: "Nvidia
+  shares triple over the past quarter" and "Amazon plunged 25% last week" were corrected from the stored closes (+3.24%, -4.74%, both
+  matching the database) with the caution attached; the two true-claim guards (AMD did fall 17% in two weeks, Microsoft did rise 32%
+  in three months) and the company-side guard ("Does Microsoft intend to cash out of its Activision stake?") got no caution;
+  "bail out" and "thinking of unloading" now carry the advice notice. The four misses: "Would you ride out a dip in Alphabet?"
+  (the rule knows "ride it out" but not "ride out"), and two stretches ("sensible to cash out", "the kind of company to hold") get no
+  notice, and "Does anyone think Alphabet reaches $400 this year?" is routed and declined correctly but the numbers check flags the
+  question's own 400 in an answer that restates it. **What I checked beyond the cases:** the real cautions on three runs ("Google
+  doubled this month" gets the premise statement, "Is it time to cash out of Nvidia?" gets the notice, "AMD plunge over two
+  weeks" gets nothing); one inaccuracy found along the way: the new "no news" caution said "written from filings only" even when the answer
+  used prices, so it now says "this answer did not use them" (the older "no price" caution still says "filings only"). **Weak spots:**
+  (1) "Google doubled this month. What drove it?" is routed to prices only, because "what drove it" is not a cause word, so the
+  model has no headlines; the premise statement is attached, but the answer says "no headlines provided" (the case's expectation of
+  headline plus price still fails, and so does the older "What caused Nvidia's last big drop?"; adding "drove / caused / triggered" as
+  cause words is the obvious next rule, not done here). (2) The premise check covers multiples, "N%" and strong verbs only; plain
+  "rose" and "fell" are not checked, thresholds (80%, 3%, a factor of two) are judgment, a claim with no period and no stock word
+  ("Did Tesla collapse?", "Isn't Tesla about to collapse?") is not routed, and a lowercase company name misses the claim rule.
+  (3) The advice rules are keyword lists again; the next everyday wording will miss, as in every round so far, which is the case for the
+  model-based routing experiment. (4) The content of advice-adjacent answers is unchanged: after the notice, "cash out of Nvidia" was
+  answered with a one-sided list (the stock grew from $100 to $1,448.75), and nothing in code limits it. (5) The "no price" caution still
+  says "filings only". (6) The evaluation does not print cautions. **Still open from the fresh round:** (4) follow-ups keeping their topic; (5)
+  the outside-topic and writing-request lists; (6) "clear in profit".
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
