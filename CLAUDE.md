@@ -119,8 +119,6 @@ The owner is building this step by step and is not a professional developer, so 
   never touch secrets: `.env` is private and the SEC contact email in it is only ever sent to sec.gov.
 - **Don't store notes about the owner outside this repo** (no separate memory files); anything worth keeping goes in
   these docs where the owner can see and edit it.
-- **Keep an eye on plan limits.** Long sessions use more of the owner's usage allowance, so when a session gets long
-  (the context window passes about 60-70%), say so and suggest a fresh one at a natural boundary.
 
 ## Run and test
 
