@@ -266,7 +266,7 @@ generated from the API.
 | Ask the copilot | `python -m ai.copilot "What are Nvidia's biggest risks?"` | `--symbol NVDA` `--no-expand` `--show-prompt` |
 | See the price and headline evidence | `python -m ai.market NVDA "How has Nvidia stock done this year?"` | `--model` picks whose sentiment labels to use |
 | Check follow-up understanding | `python -m ai.eval_followups` | `--repeat 3` for stability, `--held-out` for the untuned cases. Needs Ollama |
-| Check price, news and sentiment answers | `python -m ai.eval_market` | `--repeat 3`, `--show` (print every answer), `--held-out` (none left right now). Needs Ollama |
+| Check price, news and sentiment answers | `python -m ai.eval_market` | `--repeat 3`, `--show` (print every answer), `--held-out` (the 2026-10-16 cases, already run once; write fresh ones before the next fair score). Needs Ollama |
 | Score headlines | `python -m ai.sentiment AAPL` | `--days 7` `--no-score` (summary only) |
 | Fundamentals (revenue, profit, EPS, margins, market value, P/E) | `python -m data.fundamentals AAPL` | shows where each figure came from and any cautions |
 | Refresh everything | `python -m jobs.refresh` | `--symbols AAPL` `--steps prices news filings fundamentals index sentiment` |

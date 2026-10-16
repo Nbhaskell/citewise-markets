@@ -63,8 +63,8 @@ them (the owner hasn't confirmed the order):
    and flaky cases ("news and stock", "press coverage", "sentiment", "how is X doing") that swing between runs on the same
    code. Scores from different steps are not the same bar, because some checks changed. Not done: the fixes the second
    round points to, in the order DECISIONS gives (price questions with a period first), whether to weigh a model-based
-   routing step against more keyword rules, the content of advice-adjacent answers, and a new set of held-out cases, written after those fixes, to measure them
-   fairly. (The newest-stored-price-a-day-old problem looks fixed by moving the nightly task to 3pm: the 2026-10-15 run
+   routing step against more keyword rules, and the content of advice-adjacent answers. (The fresh held-out round that measured
+   fixes (a) to (f) is done; see below.) (The newest-stored-price-a-day-old problem looks fixed by moving the nightly task to 3pm: the 2026-10-15 run
    left every price on the same day. It is one run, so keep checking `python -m jobs.refresh --status`.)
 
    **Next up (as of 2026-10-15): this step.** Order from DECISIONS ("Second held-out round"). Done (PR #32, merged
@@ -81,20 +81,24 @@ them (the owner hasn't confirmed the order):
    (DECISIONS: "Questions about things outside the tracked companies"; 515 of 537 before, 519 after; 10 fresh cases 6 of 10
    once the checker read refusal text, now tuning material). **That closes items (a) to (f).**
 
-   **Next phase: a fresh held-out round for the whole second-round work (agreed with the owner 2026-10-15; not started).**
-   Purpose: measure fairly whether fixes (a) to (f) generalized, since every case in `CASES` (189) is now tuning material and
-   `HELD_OUT` is empty. How: (1) write about 35 new cases in wording used nowhere else (not in `CASES`, not in any unit test,
-   not in the probe lists in DECISIONS), spread over the same groups as the second round: prices with a period, news and
-   sentiment, financial figures ("earn", "sales", "bring in"), filings, follow-ups ("Now do X", "better or worse than X",
-   comparisons), advice and trap wordings, and questions outside the tracked companies, with a few deliberate stretches;
-   (2) set each expectation from the right behavior, not from what the code does, and write them into `HELD_OUT` in
-   `ai/eval_market.py` (and a few follow-ups into `HELD_OUT` in `ai/eval_followups.py`) **before running anything**; (3) run
-   once (`python -m ai.eval_market --held-out --show`, 3 repeats if time allows), read every answer, passing ones too, and
-   report the score with the by-group breakdown next to the second round's 68 of 105 (65%); (4) only then tune, move the
-   cases into `CASES`, and record it in DECISIONS. The content of advice-adjacent answers is unchanged (only the notice is
-   attached in code), and the advice numbers (21 of 24 unflagged before fix (e)) make a "model may only add the notice" check
-   the first candidate for the model-based experiment; decide on that experiment after the round's numbers, on its own
-   branch. Keep keyword rules until then. Write each phrasing as a test first.
+   **Fresh held-out round for the whole second-round work: run 2026-10-16, fair score 48 of 105 (46%)** (branch
+   `feature/fresh-held-out-round`; the 35 market and 8 follow-up resolution cases were committed, 56ab20b, before the run;
+   DECISIONS: "Fresh held-out round"). The second round scored 68 of 105 (65%) on different questions, and 12 of these 35 were
+   deliberate stretches (3 of 12 passed; the other 23 passed 13), so the numbers are not a trend; about 21 of 35 (60%) after
+   reading every answer and counting six arguable expectations. By group (first pass): prices, news, and sentiment 5 of 12,
+   figures 3 of 5, filings 3 of 3, traps, advice, and outside topics 3 of 10, follow-ups 2 of 5; follow-up resolution 3 of 8.
+   The worst failures are confident wrong answers, not refusals: a false "no price data" or "no news" (the code-side caution
+   fired for some and not others), a wrong period stated as the one asked ("when the year opened", "ninety days"), a missed
+   advice notice ("cash out"), and a false premise accepted ("Google doubled"). **The cases now in `HELD_OUT` have been run, so
+   they are tuning material from now on.** **Fix (1) is built on the same branch (2026-10-16, not committed or merged yet;
+   DECISIONS: "Fix (1) of the fresh round"):** the since-mid-month, "N units ago", "close", "higher than it was ... ago",
+   "chatter" and "stories" wordings now route, and a false "no news" claim carries a caution like the price one; the 189 older
+   cases went 549 to 548 of 567 (a flaky case), the fresh round's 35 went 48 to 65 of 105, and 10 fresh cases went 2 to 6 of 10.
+   **Next:** the rest in the order DECISIONS gives
+   (unread periods flagged, not defaulted; the "cash out" notice and
+   a premise check; follow-ups keeping their topic; the outside-topic and writing-request lists; "clear in profit"), each
+   phrasing as a test first, then decide on the model-based routing experiment (its own branch, measured against these 35 and a
+   new fresh set). Keep keyword rules until then. After tuning, move these cases into `CASES`, write fresh ones, and record the result.
 
 ## Working with the owner
 
@@ -198,8 +202,9 @@ The owner is building this step by step and is not a professional developer, so 
   direction, minus-sign, and cause checks, the "no company named" and index refusals, and the rule that headlines never
   explain a price move. Before changing the prompt, `detect_intent`, or `parse_window`, run `python -m ai.eval_market
   --repeat 3 --show` (needs Ollama) and read the answers, not just the totals; checks that are too loose give false
-  passes. `HELD_OUT` in that file is empty on purpose: write fresh cases in different wording before claiming a fair
-  score, and don't tune against them once run. Before the fundamentals step, three runs scored about 121 to 123 of 129;
+  passes. `HELD_OUT` in that file holds the 35 cases of the 2026-10-16 round, already run once (48 of 105): they are tuning
+  material from now on, so write fresh cases in different wording before claiming a fair score, and don't tune against
+  held-out cases once run. Before the fundamentals step, three runs scored about 121 to 123 of 129;
   after it, 153 to 155 of 165 on the same 43 cases plus 12 new ones (the 14 held-out cases that were then run, 13 passing,
   are now in `CASES` too, so the set is 69; scored whole on 2026-10-14: 190 of 207, then 196 of 207 after the follow-up fix). A swing of two is normal model
   variation, and a case that drops to 0 of 3 is not: A/B it against the old code (a `git worktree` of `main`, 10 to 20

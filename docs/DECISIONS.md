@@ -1010,6 +1010,115 @@ benchmarks.
   tripping the speculation check, as in the earlier entries, and has nothing to do with this. **This closes the list from
   the second held-out round, items (a) to (f).** Still open: the content of advice-adjacent answers, and a new set of
   held-out cases for the whole round, written now, to measure it fairly before deciding on the model-based check.
+- **Fresh held-out round for the whole second-round work: the fair score is 48 of 105 (46%), 2026-10-16** (branch
+  `feature/fresh-held-out-round`; the cases were committed before the run, commit 56ab20b). 35 market cases (`HELD_OUT` in
+  `ai/eval_market.py`) and 8 follow-up resolution cases (`HELD_OUT` in `ai/eval_followups.py`; the 21 earlier cases there were
+  moved into `CASES` first, since they had been run and tuned against). **How the wording was kept fresh:** a script compared
+  every new question with 4,314 quoted strings from the tests, web tests, docs, and the committed eval files. It caught two
+  cases that were already in the repo ("Will Microsoft hit $600 by December?" was in `CASES` and a test; Walmart's employee
+  count was in `tests/test_outside_topics.py`) and several near-copies of a template; all were reworded, and outside topics the rules
+  already list (mortgage rates, Ethereum) were swapped for ones they do not. The final highest similarity was 0.62, a shared
+  run of three function words. Expectations came from the right behavior and read-only queries of the stored data (newest close
+  2026-10-15, Google up about 1% in a month, Tesla's P/E 335.6, Nvidia's market value $5.24 trillion). **Run once, 3 repeats,
+  every answer read; each case came out 0 of 3 or 3 of 3, so nothing was flaky.** **By group (first pass, next to the second
+  round):** prices, news, and sentiment 5 of 12 (prices 3 of 7, news 2 of 5; second round 6 of 10); financial figures 3 of 5
+  (3 of 6); filings 3 of 3 (5 of 5); traps, advice, and outside topics 3 of 10 (traps 2 of 6, outside 1 of 4; second round 5 of 9);
+  follow-ups with history 2 of 5 (3 of 5). **Total 16 of 35 first pass, 48 of 105 over three runs, against 22 of 35 and 68 of 105.**
+  Follow-up resolution (new here): 3 of 8, the same every run. **Caveats on the comparison:** 12 of the 35 are labeled stretch
+  (more than the roughly 25% planned); stretches passed 3 of 12 and the other 23 passed 13 of 23 (57%), so the fall is not only
+  the stretches. **Read-through:** after reading every answer I would put it at about 21 of 35 (60%): six mechanical failures
+  are acceptable answers (fiscal-year revenue for "what does Tesla take in per year"; "does Amazon say anything similar" also
+  searching Microsoft's risks, which is needed to compare; declining the "can only go up" and "reach $650" predictions, which it
+  did; and an honest generic decline for gas prices and Chipotle), partly my expectations being too strict, and one mechanical
+  pass is wrong ("over the past ninety days" used one month). No case was changed after the run. **The failures, by cause:**
+  (1) **Wording that never reaches the price or news data (the biggest group, 6 cases):** "since the middle of August",
+  "Tesla's close from last Friday", "how much higher is Nvidia than twelve months ago", "what's the chatter around Microsoft
+  this week", "pull up some recent stories about Amazon", "were the stories on Tesla more positive or negative" (the last
+  three have no word the news rules know). The 19 mechanical failures are these 6, one wrong period, the missed notice, the
+  accepted premise, 2 follow-ups, 3 outside topics, the Alphabet figure, and 4 acceptable answers (listed above). They fall through to the filings, and the answers then say
+  the data is not there, which is false: AMD "since the middle of August" was answered with "the most recent price data is
+  December 27, 2025 at $234" (prices are stored to 2026-10-15) and "no recent news stories" for Amazon (149 stored in the
+  past week). A diagnostic run (the evaluation does not print cautions) showed `false_price_claim` fired for Tesla last Friday
+  and Nvidia twelve months ago and did not fire for the AMD answer; there is no equivalent for a false "no news" claim.
+  (2) **A wrong period stated with confidence and no caution (2; one passed the rules):** "Is Amazon's share price higher than when the year opened?"
+  compared with 2025-10-14, a year ago, and answered yes; "Compare how AMD and Nvidia traded over the past ninety days" used
+  about a month (from 2026-09-14) and called it ninety days, because `parse_window` does not read "ninety" and the leftover
+  default window is not flagged. The second one passed the rules, which only check that a price was quoted.
+  (3) **A missed advice notice (1, the most serious):** "Is it time to cash out of Nvidia?" got no buy, sell, or hold notice
+  and the answer listed the stock's growth and strong cash. CLAUDE.md says a missed request is worse than one extra notice.
+  (4) **A false premise accepted (1):** "Google doubled this month. What drove it?" was answered as if it had doubled (it rose
+  about 1%). (5) **Follow-ups that lose their history in the full answer (2):** "And did Nvidia do better than that?" after an
+  AMD price question compared Data Center revenue from the filings; "Switch over to Microsoft." after Tesla news gave a general
+  company summary. (6) **Outside topics (3, all stretches):** "Draft an email to my boss about Nvidia's results" produced a
+  full email with filing figures; gas prices and Chipotle got an honest generic decline but not the refusal. As DECISIONS
+  predicted, the company and topic lists are finite; Costco, which is on the list, worked. (7) **Figures (1 real):** "What
+  profit did Alphabet clear in its latest four quarters?" went to the 10-Q and quoted a six-month net income of $174,685
+  million (caught by the numbers check) and in another run a pre-tax figure, both as the latest four quarters.
+  (8) **Follow-up resolution (3 of 8):** "Give me the number for Apple too" and "Skip to Nvidia" lose the earlier topic,
+  "Is Tesla's list longer than that?" loses the word risk, and "Summarize what the companies say about tariffs" after a
+  Nvidia risks question was narrowed to NVDA and AMD; "Does Amazon employ more people than that?" is a checker artifact (the
+  rewrite was right, the topic word "employees" is not in it). This step only resolves the question; it does not answer it.
+  **Passing answers with a reservation:** "what pushed Apple's services segment higher" answered about gross margin, not net
+  sales; "reach $650" declined correctly and then added an unrelated Microsoft backlog figure; the wrong-P/E answer correctly
+  said 335.6 and then guessed at reasons for a high P/E; the AMD and TSMC answer was not checked against the filing text.
+  **What did generalize:** filings (3 of 3); "add up AMD's sales", "what share of Apple's sales ends up as profit", and Nvidia's
+  market cap, all with the right stored figures; "past six weeks" and "fortnight" got the right windows; the numbers check
+  caught the bad Alphabet figure; the retailer-margin and wrong-P/E traps were handled; Costco was refused. **The honest
+  reading:** fixes (a) to (f) fixed their own phrasings and little beyond them. This is the third round in a row where new
+  everyday wording misses in the same places, now with a measured 46% (65% and 72% before, on different questions), and the
+  most harmful failures are confident wrong answers ("no data" when there is data, a wrong period, an accepted premise), not
+  refusals. The model-based routing question is now better supported than before, but this round does not decide it: it
+  measures the keyword rules, not the alternative. **Not done, in the order the failures point to:** (1) the false "no data"
+  claims (extend the code-side caution to cover "no news" and the AMD wording) and the price and news wordings that never
+  route; (2) a window the parser does not read must be flagged, not defaulted ("ninety", "when the year opened"); (3) the
+  advice notice for "cash out" and a check on premises ("doubled") from the stored price move; (4) follow-ups keeping their
+  topic in the full answer; (5) the outside-topic and writing-request lists; (6) "clear in profit". Then a decision on the
+  model-based routing experiment, on its own branch, measured against these 35 cases (now tuning material) and a new fresh set.
+- **Fix (1) of the fresh round: price and news wordings that never routed, and the false "no data" claims, 2026-10-16**
+  (branch `feature/fresh-held-out-round`; no prompt change, no change to `SYSTEM_PROMPT`). **Baseline first, on the code before
+  the change: 549 of 567 (96.8%; 183 of 189 on one pass), the 189 older cases, 3 repeats.** **Built:** (1) `_since_month` reads
+  "since the middle of August" / "mid-August" as the 15th and the window label says so ("reading 'the middle' as the 15th");
+  "since the end of / late August" is deliberately not read (nothing marks it, and a guess would be a made-up period).
+  (2) `_numbered_period` reads "<number> <unit> ago" ("six weeks ago", "twelve months ago") as the window back to then.
+  (3) `CLOSE_NOUN_RE`: "Apple's close from last Thursday", "the close for Microsoft", "Where did Nvidia close yesterday?",
+  "Did Tesla close higher this week?" are price questions; each form needs a possessive or a day word, so "Apple's close
+  relationship with TSMC", "close its plant", "close to a deal" and "the close of the Mandiant deal" are not.
+  (4) `PERIOD_COMPARE_RE`: "How much higher is Nvidia than it was a year ago?" / "Is AMD lower than where it was a month ago?" is a
+  price question when the subject is one bare name, a period is named, and no financial-figure word is present (so "Apple's
+  revenue", "Tesla's headcount" and "revenue than a year ago" are not). (5) `NEWS_RE` gains "chatter" and "recent / latest /
+  new / top / any ... stories" ("customer success stories" is still a filings topic); `SENTIMENT_RE` gains stories, headlines,
+  articles, news or coverage that are "more / mostly positive or negative", "positive or negative", or "lean positive" (plural
+  only, so "headline earnings" is not one; a bare "negative" is not enough). (6) Cautions in `ai/copilot.py`: the price claim now
+  reads plural "prices", "no price data / information / movements / history", "closing prices", and contractions ("don't",
+  "isn't"; the old `\bn't` could never match inside a word); a new `false_news_claim` adds the same kind of caution for a false
+  "no news / no headlines / no stories", with the count and the newest date of the stored headlines (30 days), only when the answer
+  had no headline or sentiment source, every company has recent headlines stored, and the question did not itself ask for news
+  (then "no news this week" is true). **Tests first:** 88 new (`tests/test_price_news_wording.py`,
+  `tests/test_copilot_missing_data_claims.py`), 29 failing before the change; 1162 Python tests pass. Twenty deliberate
+  breakages of the new rules were each caught; five were first missed (a follow-on word after "where did X close", a possessive
+  "close" followed by any word, a comparison with no period, a bare "negative" counted as sentiment, contractions not counted
+  as negations), and each pointed at a missing guard test, now added. **After, on the whole set (224 = the 189 older cases + the 35
+  of the fresh round): 613 of 672 (91%).** The 189 older cases went 549 to 548 of 567 (the only change is "press coverage", which
+  swings between runs: 1 of 3 before, 0 of 3 after); no case that passed before was lost. **The 35 of the fresh round went from 48
+  to 65 of 105 (46% to 62%), not a fair score now:** mid-August, a year ago, chatter, pull up stories and stories more positive
+  or negative went from 0 of 3 to 3 of 3, and "close from last Friday" to 2 of 3. Their answers were read: the AMD window uses the
+  2026-08-14 close (the last one on or before the 15th, a Saturday), the Nvidia answer's difference matches the two closes it
+  quotes (180.03 to 217.23, +37.20), and the Tesla score is consistent with its own counts (+0.15 = (25 - 11) / 94); I did not
+  re-check those closes or counts against the database by hand. **Fresh cases written for this
+  step, before it was run (10, `HELD_OUT`): 2 of 10 on the old code (only the two guards), 6 of 10 on the new code.** Not
+  fixed, and why: "What did Amazon close at last Tuesday?" is routed to prices but nothing fetches a single day's close, so
+  the answer declines or gives the month and the period caution says so; "Is there much chatter about Nvidia today?" is routed to
+  news, but a one-day window had no story at that hour and the answer is the plain refusal; the stretches "word on the street" and
+  "worth more today than eight months back" still go to the filings (the second gets the false-price caution, the first gets
+  nothing, and its answer is a filings summary dressed as chatter). **The new news caution was seen firing on a real run** ("What are
+  people saying online about Amazon?" got it, with 207 stories in 30 days), but "what is trending", "the scoop on" and "is anything
+  being reported" are not news words and get nothing. **Weak spots:** (1) the news caution is a wording match like the price one,
+  so a new way of saying "no news" will miss it; (2) the comparison rule needs a bare company name and a period, so "Is Tesla
+  worth more than it was ..." misses; (3) "ago" windows and "chatter" are read for any question, but only price and news
+  questions use the window; (4) the evaluation still does not print cautions, so they are covered by unit tests, an end-to-end
+  test, and diagnostic runs, not by the totals. **Still open from the fresh round:** (2) unread periods flagged, not defaulted
+  ("when the year opened" is a year-ago comparison and "ninety days" is a month); (3) the "cash out" notice and a premise check;
+  (4) follow-ups keeping their topic; (5) the outside-topic and writing-request lists; (6) "clear in profit".
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
