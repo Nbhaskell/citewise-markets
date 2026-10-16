@@ -1074,6 +1074,51 @@ benchmarks.
   advice notice for "cash out" and a check on premises ("doubled") from the stored price move; (4) follow-ups keeping their
   topic in the full answer; (5) the outside-topic and writing-request lists; (6) "clear in profit". Then a decision on the
   model-based routing experiment, on its own branch, measured against these 35 cases (now tuning material) and a new fresh set.
+- **Fix (1) of the fresh round: price and news wordings that never routed, and the false "no data" claims, 2026-10-16**
+  (branch `feature/fresh-held-out-round`; no prompt change, no change to `SYSTEM_PROMPT`). **Baseline first, on the code before
+  the change: 549 of 567 (96.8%; 183 of 189 on one pass), the 189 older cases, 3 repeats.** **Built:** (1) `_since_month` reads
+  "since the middle of August" / "mid-August" as the 15th and the window label says so ("reading 'the middle' as the 15th");
+  "since the end of / late August" is deliberately not read (nothing marks it, and a guess would be a made-up period).
+  (2) `_numbered_period` reads "<number> <unit> ago" ("six weeks ago", "twelve months ago") as the window back to then.
+  (3) `CLOSE_NOUN_RE`: "Apple's close from last Thursday", "the close for Microsoft", "Where did Nvidia close yesterday?",
+  "Did Tesla close higher this week?" are price questions; each form needs a possessive or a day word, so "Apple's close
+  relationship with TSMC", "close its plant", "close to a deal" and "the close of the Mandiant deal" are not.
+  (4) `PERIOD_COMPARE_RE`: "How much higher is Nvidia than it was a year ago?" / "Is AMD lower than where it was a month ago?" is a
+  price question when the subject is one bare name, a period is named, and no financial-figure word is present (so "Apple's
+  revenue", "Tesla's headcount" and "revenue than a year ago" are not). (5) `NEWS_RE` gains "chatter" and "recent / latest /
+  new / top / any ... stories" ("customer success stories" is still a filings topic); `SENTIMENT_RE` gains stories, headlines,
+  articles, news or coverage that are "more / mostly positive or negative", "positive or negative", or "lean positive" (plural
+  only, so "headline earnings" is not one; a bare "negative" is not enough). (6) Cautions in `ai/copilot.py`: the price claim now
+  reads plural "prices", "no price data / information / movements / history", "closing prices", and contractions ("don't",
+  "isn't"; the old `\bn't` could never match inside a word); a new `false_news_claim` adds the same kind of caution for a false
+  "no news / no headlines / no stories", with the count and the newest date of the stored headlines (30 days), only when the answer
+  had no headline or sentiment source, every company has recent headlines stored, and the question did not itself ask for news
+  (then "no news this week" is true). **Tests first:** 88 new (`tests/test_price_news_wording.py`,
+  `tests/test_copilot_missing_data_claims.py`), 29 failing before the change; 1162 Python tests pass. Twenty deliberate
+  breakages of the new rules were each caught; five were first missed (a follow-on word after "where did X close", a possessive
+  "close" followed by any word, a comparison with no period, a bare "negative" counted as sentiment, contractions not counted
+  as negations), and each pointed at a missing guard test, now added. **After, on the whole set (224 = the 189 older cases + the 35
+  of the fresh round): 613 of 672 (91%).** The 189 older cases went 549 to 548 of 567 (the only change is "press coverage", which
+  swings between runs: 1 of 3 before, 0 of 3 after); no case that passed before was lost. **The 35 of the fresh round went from 48
+  to 65 of 105 (46% to 62%), not a fair score now:** mid-August, a year ago, chatter, pull up stories and stories more positive
+  or negative went from 0 of 3 to 3 of 3, and "close from last Friday" to 2 of 3. Their answers were read: the AMD window uses the
+  2026-08-14 close (the last one on or before the 15th, a Saturday), the Nvidia answer's difference matches the two closes it
+  quotes (180.03 to 217.23, +37.20), and the Tesla score is consistent with its own counts (+0.15 = (25 - 11) / 94); I did not
+  re-check those closes or counts against the database by hand. **Fresh cases written for this
+  step, before it was run (10, `HELD_OUT`): 2 of 10 on the old code (only the two guards), 6 of 10 on the new code.** Not
+  fixed, and why: "What did Amazon close at last Tuesday?" is routed to prices but nothing fetches a single day's close, so
+  the answer declines or gives the month and the period caution says so; "Is there much chatter about Nvidia today?" is routed to
+  news, but a one-day window had no story at that hour and the answer is the plain refusal; the stretches "word on the street" and
+  "worth more today than eight months back" still go to the filings (the second gets the false-price caution, the first gets
+  nothing, and its answer is a filings summary dressed as chatter). **The new news caution was seen firing on a real run** ("What are
+  people saying online about Amazon?" got it, with 207 stories in 30 days), but "what is trending", "the scoop on" and "is anything
+  being reported" are not news words and get nothing. **Weak spots:** (1) the news caution is a wording match like the price one,
+  so a new way of saying "no news" will miss it; (2) the comparison rule needs a bare company name and a period, so "Is Tesla
+  worth more than it was ..." misses; (3) "ago" windows and "chatter" are read for any question, but only price and news
+  questions use the window; (4) the evaluation still does not print cautions, so they are covered by unit tests, an end-to-end
+  test, and diagnostic runs, not by the totals. **Still open from the fresh round:** (2) unread periods flagged, not defaulted
+  ("when the year opened" is a year-ago comparison and "ninety days" is a month); (3) the "cash out" notice and a premise check;
+  (4) follow-ups keeping their topic; (5) the outside-topic and writing-request lists; (6) "clear in profit".
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

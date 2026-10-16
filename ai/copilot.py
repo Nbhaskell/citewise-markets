@@ -479,10 +479,13 @@ def invented_titles_caution(titles: list[str]) -> str:
     )
 
 
+# "not", "no", "doesn't", "cannot", "lacks", ... ("\w*n't" so a contraction counts; a plain \bn't would never match inside a word)
+_NEGATION = r"(?:not|no|none|cannot|unable|without|lack\w*|missing|\w*n['’]t)"
 NO_PRICE_CLAIM_RE = re.compile(
-    r"\b(?:stock|share|market|current|latest)\s+price\b[^.\n]{0,80}\b(?:not|no|n['’]t|unavailable|missing|absent)\b"
-    r"|\b(?:not|no|n['’]t|without|lack\w*|missing)\b[^.\n]{0,80}\b(?:stock|share|market|current|latest)\s+price\b"
-    r"|\bprice\s+(?:data|information)\b[^.\n]{0,60}\b(?:not|no|n['’]t|unavailable|missing)\b",
+    rf"\b(?:stock|share|market|current|latest|closing)\s+prices?\b[^.\n]{{0,80}}\b(?:{_NEGATION}|unavailable|absent)\b"
+    rf"|\b{_NEGATION}\b[^.\n]{{0,80}}\b(?:stock|share|market|current|latest|closing)\s+prices?\b"
+    rf"|\bprice\s+(?:data|information|movements?|history)\b[^.\n]{{0,60}}\b(?:{_NEGATION}|unavailable)\b"
+    rf"|\b{_NEGATION}\b[^.\n]{{0,60}}\bprice\s+(?:data|information|movements?|history)\b",
     re.IGNORECASE,
 )
 NO_PRICE_CAUTION = (
@@ -503,6 +506,47 @@ def false_price_claim(conn: psycopg.Connection, text: str, symbols: list[str], e
     if stored != set(symbols):
         return None
     return NO_PRICE_CAUTION.format(names=", ".join(symbols))
+
+
+# The news words that count: "news", "headlines" (plural, so "headline revenue" is not one), "stories", "news articles" and
+# press or media coverage. Not a bare "articles" ("articles of incorporation").
+_NEWS_THING = (
+    r"(?:(?:recent|latest|current)\s+)?(?:news(?:\s+(?:stories|articles|headlines|coverage))?|headlines|stories|"
+    r"press\s+coverage|media\s+coverage)"
+)
+NO_NEWS_CLAIM_RE = re.compile(
+    rf"\b{_NEGATION}\b[^.\n]{{0,70}}\b{_NEWS_THING}\b|\b{_NEWS_THING}\b[^.\n]{{0,60}}\b(?:{_NEGATION}|unavailable|absent)\b",
+    re.IGNORECASE,
+)
+NEWS_WINDOW_DAYS = 30
+NO_NEWS_CAUTION = (
+    "This answer says there is no news. This app stores headlines for {names}, but the answer was written from filings only "
+    "and did not use them. Ask for the news directly (for example, “What's the latest news on {first}?”) to see them."
+)
+
+
+def false_news_claim(
+    conn: psycopg.Connection, text: str, symbols: list[str], evidence: list, asked_for_news: bool = False
+) -> str | None:
+    """The news version of `false_price_claim`: an answer written without any headline source that says there are no
+    news stories, for companies whose recent headlines are stored. Not when the question asked for news: then the news
+    route ran and found nothing in its window, so "no news this week" is true and not a gap in what was used. Worded to be
+    true either way, with the count and the newest date so the reader can see the data is there."""
+    if asked_for_news or not symbols or not NO_NEWS_CLAIM_RE.search(CITE_RE.sub("", text)):
+        return None
+    if any(isinstance(e, MarketEvidence) and e.kind in ("headline", "sentiment") for e in evidence):
+        return None
+    rows = conn.execute(
+        "SELECT s.symbol, count(*), (max(a.published_at) AT TIME ZONE 'UTC')::date "
+        "FROM news_articles a JOIN news_article_symbols s ON s.article_id = a.id "
+        "WHERE s.symbol = ANY(%s) AND a.published_at >= now() - make_interval(days => %s) GROUP BY s.symbol",
+        (symbols, NEWS_WINDOW_DAYS),
+    ).fetchall()
+    if {r[0] for r in rows} != set(symbols):
+        return None
+    by_symbol = {sym: (n, newest) for sym, n, newest in rows}
+    names = ", ".join(f"{sym} ({by_symbol[sym][0]} in the last {NEWS_WINDOW_DAYS} days, the newest on {by_symbol[sym][1]})" for sym in symbols)
+    return NO_NEWS_CAUTION.format(names=names, first=symbols[0])
 
 
 def _generate_checked_full(
@@ -759,6 +803,7 @@ def answer_question(
     cautions = (
         ([CAUSE_CAUTION] if causes else []) + ([invented_titles_caution(titles)] if titles else [])
         + ([c] if (c := false_price_claim(conn, text, symbols, evidence)) else [])
+        + ([c] if (c := false_news_claim(conn, text, symbols, evidence, intent.headlines or intent.sentiment)) else [])
         + ([ADVICE_CAUTION] if intent.advice else [])
         + period_cautions(window, market, today)
         + relevant_cautions(evidence, intent.fundamentals, text)

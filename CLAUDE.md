@@ -90,8 +90,12 @@ them (the owner hasn't confirmed the order):
    The worst failures are confident wrong answers, not refusals: a false "no price data" or "no news" (the code-side caution
    fired for some and not others), a wrong period stated as the one asked ("when the year opened", "ninety days"), a missed
    advice notice ("cash out"), and a false premise accepted ("Google doubled"). **The cases now in `HELD_OUT` have been run, so
-   they are tuning material once tuning starts; nothing has been tuned yet.** **Next:** fix in the order DECISIONS gives
-   (the false "no data" claims and the wordings that never route; unread periods flagged, not defaulted; the "cash out" notice and
+   they are tuning material from now on.** **Fix (1) is built on the same branch (2026-10-16, not committed or merged yet;
+   DECISIONS: "Fix (1) of the fresh round"):** the since-mid-month, "N units ago", "close", "higher than it was ... ago",
+   "chatter" and "stories" wordings now route, and a false "no news" claim carries a caution like the price one; the 189 older
+   cases went 549 to 548 of 567 (a flaky case), the fresh round's 35 went 48 to 65 of 105, and 10 fresh cases went 2 to 6 of 10.
+   **Next:** the rest in the order DECISIONS gives
+   (unread periods flagged, not defaulted; the "cash out" notice and
    a premise check; follow-ups keeping their topic; the outside-topic and writing-request lists; "clear in profit"), each
    phrasing as a test first, then decide on the model-based routing experiment (its own branch, measured against these 35 and a
    new fresh set). Keep keyword rules until then. After tuning, move these cases into `CASES`, write fresh ones, and record the result.

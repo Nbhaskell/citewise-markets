@@ -63,8 +63,35 @@ PRICE_RE = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 NEWS_RE = re.compile(
-    r"\b(?:news|headlines?|announce\w*|lately|happening|going\s+on|what\s+happened|buzz|in\s+the\s+press|"
-    r"(?:press|media|news)\s+coverage|coverage\s+of)\b",
+    r"\b(?:news|headlines?|announce\w*|lately|happening|going\s+on|what\s+happened|buzz|chatter|in\s+the\s+press|"
+    r"(?:press|media|news)\s+coverage|coverage\s+of|"
+    # "stories" only after a word that makes it the news ("customer success stories" is a filings topic)
+    r"(?:recent|latest|new|newest|top|breaking|any|some|few|more|other)\s+stories|(?:latest|top|breaking|newest|recent)\s+story)\b",
+    re.IGNORECASE,
+)
+# "Tell me Apple's close from last Thursday", "Where did Nvidia close yesterday?": the noun or verb "close" as a price. Each form
+# needs a day word or a company's possessive, so "Apple's close relationship with TSMC", "close its plant" and "close to a
+# deal" stay filings questions.
+_WEEKDAY = r"(?:mon|tues|wednes|thurs|fri|satur|sun)day"
+CLOSE_NOUN_RE = re.compile(
+    rf"\b[\w.&-]+['’]s\s+close\s+(?:price\s+)?(?:from|on|at|for|in)\s+(?:last|yesterday|today|this|the\s+(?:day|week|month|end)|{_WEEKDAY}|\d)"
+    rf"|\bthe\s+close\s+(?:price\s+)?(?:for|on)\s+(?!the\b)[\w.&-]+"
+    rf"|\bclose\s+(?:from|on)\s+(?:last|yesterday|{_WEEKDAY})\b"
+    r"|\bwhere\s+did\s+[\w.&-]+\s+close\b(?!\s+(?:its|their|the|a|an|down|out|off|to)\b)"
+    rf"|\b(?:what\s+)?did\s+[\w.&-]+\s+close\s+(?:at|higher|lower|flat|today|yesterday|on\s+{_WEEKDAY})\b",
+    re.IGNORECASE,
+)
+# "How much higher is Nvidia than it was a year ago?", "Is AMD lower than where it was a month ago?": the stock against its
+# own past. The subject is one bare name, so "Apple's revenue" and "Tesla's headcount" are not caught; the caller also needs a
+# named period and no financial-figure word ("revenue than a year ago" is a figures question).
+_BARE_NAME = r"(?!(?:the|its|their|this|that|these|those|a|an|my|your|our)\b)[\w.&-]+"
+_THAN_THEN = (
+    r"than\s+(?:(?:where\s+)?(?:it|they)\s+(?:was|were|stood|sat)\b|"
+    r"(?:an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,3})\s+(?:day|week|month|year)s?\s+ago\b)"
+)
+PERIOD_COMPARE_RE = re.compile(
+    rf"\bhow\s+much\s+(?:higher|lower|more|less)\s+(?:is|are|was)\s+{_BARE_NAME}\s+(?:now\s+)?{_THAN_THEN}"
+    rf"|\b(?:is|are|was|were)\s+{_BARE_NAME}\s+(?:now\s+)?(?:higher|lower|above|below)\s+{_THAN_THEN}",
     re.IGNORECASE,
 )
 # A company and its stock with nothing else in the question ("What about Tesla's stock?", "Tesla stock?"). It has no verb,
@@ -141,6 +168,11 @@ SENTIMENT_RE = re.compile(
     # a news source near a word about its attitude, either order ("are reporters being kind or harsh", "headlines mostly good"):
     # structure, not one phrase per wording. Analysts are not a news source here ("do analysts expect positive growth").
     rf"\b(?:{_NEWS_SOURCE})\b[^?.]{{0,40}}\b(?:{_NEWS_TONE})\b|\b(?:{_NEWS_TONE})\b[^?.]{{0,40}}\b(?:{_NEWS_SOURCE})\b|"
+    # stories, headlines or articles that are "mostly positive", "more negative than positive", "lean positive or negative"
+    # (plural only, so "headline earnings" is not one; a bare "negative" is not enough, since a list of bad stories is not a score)
+    r"\b(?:stories|headlines|articles|news|coverage)\b[^?.]{0,40}\b(?:(?:more|mostly|mainly|largely|predominantly)\s+(?:positive|negative)|"
+    r"positive\s+(?:or|vs\.?|versus|than)\s+negative|negative\s+(?:or|vs\.?|versus|than)\s+positive|"
+    r"(?:lean\w*|tilt\w*|skew\w*)\s+(?:positive|negative))\b|"
     r"\b(?:saying|said|writing|written)\s+(?:nice|good|bad|kind|mean|positive|negative)\s+things\s+about\b|"
     r"\b(?:feeling|feelings|attitude|stance|take)\s+(?:about|on|toward|towards)\b[^?.]{0,50}\b(?:news|press|media|coverage|headlines)\b)",
     re.IGNORECASE,
@@ -456,16 +488,18 @@ def detect_intent(question: str) -> Intent:
     price_text = re.sub(MARKET_VALUE_PATTERN, " ", question, flags=re.IGNORECASE)  # "How much is Apple worth?" is not "how much is" a price
     if not STOCK_WORD_RE.search(question):  # "How much did Apple earn / pay in dividends?" asks about money, not the stock price
         price_text = HOW_MUCH_MONEY_RE.sub(" ", price_text)
+    topics, rest = question_topics(question)
     prices = (
         bool(PRICE_RE.search(price_text)) or bool(INDEX_RE.search(question)) or bool(BARE_STOCK_RE.search(question))
         or (bool(STOCK_NOUN_RE.search(question)) and parse_window(question).explicit)
         or (bool(PERIOD_MOVE_RE.search(question)) and parse_window(question).explicit)
         or year_start_comparison(question)
+        or bool(CLOSE_NOUN_RE.search(question))
+        or (bool(PERIOD_COMPARE_RE.search(question)) and not topics and parse_window(question).explicit)  # not "revenue than a year ago"
     )
     sentiment = bool(SENTIMENT_RE.search(question))
     general = bool(GENERAL_RE.search(question)) and not STOCK_WORD_RE.search(question)  # "How's Nvidia doing?" wants both
     headlines = bool(NEWS_RE.search(question)) or sentiment or general or (prices and bool(CAUSE_RE.search(question)))
-    topics, rest = question_topics(question)
     if share_count:
         topics = topics | {"shares"}
     market = prices or headlines or sentiment or bool(topics)
@@ -530,17 +564,23 @@ _UNIT_DAYS = {"day": 1.0, "week": 7.0, "month": 30.5, "year": 366.0}
 MAX_NUMBERED_DAYS = 3660
 
 
+_AGO_PERIOD_RE = re.compile(r"\b(\d{1,3}|" + "|".join(_NUMBER_WORDS) + r")\s+(day|week|month|year)s?\s+ago\b", re.IGNORECASE)
+
+
 def _numbered_period(question: str) -> Optional[Window]:
-    """"the last four weeks", "past 10 days", "the last few weeks". None when the number is out of range."""
+    """"the last four weeks", "past 10 days", "the last few weeks", "six weeks ago". None when the number is out of range."""
     m = _NUMBERED_PERIOD_RE.search(question)
-    if not m:
+    if m:
+        number, rough, unit = m.group(1), m.group(2), m.group(3).lower()
+    elif a := _AGO_PERIOD_RE.search(question):  # "than it was six weeks ago": the window back to then
+        number, rough, unit = a.group(1), None, a.group(2).lower()
+    else:
         return None
-    unit = m.group(3).lower()
-    if m.group(2):  # few / couple / several
-        word = re.sub(r"\s+of$", "", m.group(2).lower())
+    if rough:  # few / couple / several
+        word = re.sub(r"\s+of$", "", rough.lower())
         n, note = _ROUGH_AMOUNTS[word], f" (reading '{word}' as {_ROUGH_AMOUNTS[word]})"
     else:
-        raw = m.group(1).lower()
+        raw = number.lower()
         n, note = int(raw) if raw.isdigit() else _NUMBER_WORDS[raw], ""
     if n < 1 or n * _UNIT_DAYS[unit] > MAX_NUMBERED_DAYS:
         return None
@@ -549,21 +589,31 @@ def _numbered_period(question: str) -> Optional[Window]:
     return Window(f"past {n} {unit}{'' if n == 1 else 's'}{note}", int(round(n * _UNIT_DAYS[unit])), True)
 
 
-_SINCE_MONTH_RE = re.compile(rf"\bsince\s+(?:the\s+(?:start|beginning)\s+of\s+)?({_MONTH_RE})\b", re.IGNORECASE)
+_SINCE_MONTH_RE = re.compile(
+    rf"\bsince\s+(?:(?:the\s+)?(?:start|beginning)\s+of\s+|(?P<middle>(?:the\s+)?middle\s+of\s+|mid[\s-]+))?(?P<month>{_MONTH_RE})\b",
+    re.IGNORECASE,
+)
 
 
 def _since_month(question: str, today: date) -> Optional[Window]:
     """"since July": from the first of that month, this year, or last year when the month has not come yet. January is
-    left to the year-to-date window, which is the same thing."""
+    left to the year-to-date window, which is the same thing. "Since the middle of August" (or "mid-August") starts on the
+    15th, and the label says that is how it was read. "Since the end of August" and "late August" are not read: nothing in the
+    daily closes marks them, and a guess of the 25th would be a made-up period."""
     m = _SINCE_MONTH_RE.search(question)
     if not m:
         return None
-    name = m.group(1).lower()
+    middle = m.group("middle") is not None
+    name = m.group("month").lower()
     month = 9 if name == "sept" else _MONTHS.index(name) + 1
-    if month == 1:
+    if month == 1 and not middle:
         return None
-    since = date(today.year if month <= today.month else today.year - 1, month, 1)
-    return Window(f"since {_MONTHS[month - 1].capitalize()} 1", (today - since).days, True, since=since)
+    day = 15 if middle else 1
+    since = date(today.year, month, day)
+    if since > today:  # the month has not come yet this year (or its middle has not)
+        since = date(today.year - 1, month, day)
+    label = f"since {_MONTHS[month - 1].capitalize()} 15 (reading 'the middle' as the 15th)" if middle else f"since {_MONTHS[month - 1].capitalize()} 1"
+    return Window(label, (today - since).days, True, since=since)
 
 
 # Periods the stored daily closes cannot isolate: a day or a calendar stretch. The window used is the nearest one, and

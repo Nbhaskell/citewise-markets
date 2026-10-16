@@ -644,7 +644,7 @@ CASES = CASES + ROUND_THIRTEEN
 # used nowhere else (checked against every case, test, doc, and probe list with a script), with expectations set from the
 # right behavior and the stored data as it was on 2026-10-16 (checked with read-only queries). RUN ONCE the same day, 3 repeats:
 # THE FAIR SCORE is 48 of 105 (46%), 16 of 35 on one pass; about 21 of 35 after reading every answer (docs/DECISIONS.md,
-# "Fresh held-out round"). Not tuned yet. They are tuning material from now on: write new ones before the next fair score.
+# "Fresh held-out round"). Tuning material from fix (1) on (the next block holds the fresh cases written for it).
 # Names start with "fr <group>:"; the group is how the score is broken down. "stretch" marks a wording the rules probably
 # do not know. For period questions the checker only tests that a price was quoted, so the period is judged by reading each
 # answer and its cautions: the right behavior is the period asked, or a plain statement that the answer covers another one.
@@ -655,7 +655,7 @@ TSLA_NEWS = turn("What's the latest news on Tesla?", "Tesla headlines this week 
 AAPL_PE = turn("What's Apple's P/E ratio?", "Apple's P/E ratio is 39.2.", "AAPL")
 OUTSIDE = rf"outside what this app covers|{NO_CO}"  # any refusal made in code, before the model is asked
 
-HELD_OUT: tuple[Case, ...] = (
+ROUND_FIFTEEN: tuple[Case, ...] = (
     # prices with a period
     Case("fr price: since mid-August stretch", "routing", "Where has AMD stock gone since the middle of August?",
          frozenset({"price"}), frozenset({"AMD"}), must=(PRICE_DIGITS,)),
@@ -734,6 +734,35 @@ HELD_OUT: tuple[Case, ...] = (
          must=(rf"isn't one of the companies tracked|{NO_CO}",)),
     Case("fr outside: draft an email stretch", "trap", "Draft an email to my boss about Nvidia's results.", frozenset(), frozenset(),
          must=(OUTSIDE,)),
+)
+
+CASES = CASES + ROUND_FIFTEEN
+
+# Written 2026-10-16 for fix (1) of the fresh round (price and news wordings that never routed, and the false "no data" claims),
+# in wording unlike the unit tests and the 35 cases above, before any was run. "Stretch" cases use wording the rules do not know.
+# The last two are guards: a figures question that starts like a price comparison, and a filings question that shares words with
+# the news. Data-dependent: the newest stored close being 2026-10-15; Apple's revenue being stored. Once run: tuning material.
+HELD_OUT: tuple[Case, ...] = (
+    Case("fx price: ahead since mid-September", "routing", "Is Microsoft stock ahead since mid-September?",
+         frozenset({"price"}), frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
+    Case("fx price: what did close at", "routing", "What did Amazon close at last Tuesday?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(PRICE_DIGITS,), cautions_shown=(r"can't isolate",)),
+    Case("fx price: higher than nine months ago", "routing", "Is Alphabet higher than it was nine months ago?",
+         frozenset({"price"}), frozenset({"GOOGL"}), must=(PRICE_DIGITS,)),
+    Case("fx price stretch: worth more today", "routing", "Is Tesla worth more today than eight months back?",
+         frozenset({"price"}), frozenset({"TSLA"}), must=(PRICE_DIGITS,)),
+    Case("fx news: much chatter today", "routing", "Is there much chatter about Nvidia today?", frozenset({"headline"}),
+         frozenset({"NVDA"})),
+    Case("fx news: anything in recent stories", "routing", "Anything in the recent stories on AMD?", frozenset({"headline"}), frozenset({"AMD"})),
+    Case("fx news stretch: word on the street", "routing", "What's the word on the street about Tesla?", frozenset({"headline"}),
+         frozenset({"TSLA"})),
+    Case("fx sentiment: articles more positive", "routing",
+         "Were Microsoft's recent articles more positive than negative?",
+         frozenset({"headline", "sentiment"}), frozenset({"MSFT"})),
+    Case("fx guard: figures not price", "routing", "Is Apple's net income lower than it was a year ago?", frozenset({"fundamentals"}),
+         frozenset({"AAPL"}), figures=("AAPL:net_income",)),
+    Case("fx guard: customer stories", "routing", "What customer stories does Alphabet's 10-K highlight for its cloud business?",
+         frozenset({"filing"}), frozenset({"GOOGL"}), ungrounded_ok=True),
 )
 
 
