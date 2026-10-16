@@ -71,10 +71,10 @@ them (the owner hasn't confirmed the order):
    2026-10-15): (a) price questions that name a period or compare with the start of
    the year, and (b) reading more periods (numbers, "a few weeks", "since July") and saying in code, as a caution, when
    the period asked cannot be matched or "today" has no close (DECISIONS: "Price questions that name a period"; 422 of 471
-   before, 434 after, tuning material, not a fair score). (c) follow-up carrying ("Now do X", "better or worse than X"
-   keeping both companies) is built on branch `feature/copilot-follow-ups` (not merged yet; DECISIONS: "Follow-up
-   carrying"; 436 of 471 on the market evaluation; 11 fresh follow-up cases went 3 of 11 on `main` to 7 of 11, 9 of 11
-   after adding the words they missed, now tuning material). Still to do: (d) "earn" and "sales" wording; (e) advice and
+   before, 434 after, tuning material, not a fair score). Done (PR #33, merged 2026-10-16): (c) follow-up carrying ("Now
+   do X", "better or worse than X" keeping both companies; DECISIONS: "Follow-up carrying"; 436 of 471 on the market
+   evaluation; 11 fresh follow-up cases went 3 of 11 on `main` to 7 of 11, 9 of 11 after adding the words they missed, now
+   tuning material). Still to do: (d) "earn" and "sales" wording; (e) advice and
    sentiment wording again; (f) non-company questions. Agreed with the owner (2026-10-15): keep keyword rules for now,
    write fresh held-out cases after (c) to (f), and only then weigh a model-based routing step (a "model may only add a
    route" prototype on its own branch, measured on those cases). Write each phrasing as a test first, then fresh held-out
@@ -114,9 +114,9 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-15 (after PR #32): 844 Python tests, 253 web tests, all passing (run on the branch before
+- Baseline as of 2026-10-16 (after PR #33): 888 Python tests, 253 web tests, all passing (run on the branch before
   the merge; the merge added nothing else). Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
-  refresh ran at 3pm that day (success, 0 problems).
+  refresh ran at 3pm on 2026-10-15 (success, 0 problems).
 
 ## Rules
 
