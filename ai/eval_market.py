@@ -776,7 +776,7 @@ CASES = CASES + ROUND_SIXTEEN
 # updated). THE FAIR SCORE, from the one run: 1 of 12 on the old code, 5 of 12 on the new. Three date patterns were one day
 # off (the 3pm refresh added the 10-16 close during the session); the answers were right (docs/DECISIONS.md, "Fix (2) of the
 # fresh round"). Once run: tuning material.
-HELD_OUT: tuple[Case, ...] = (
+ROUND_SEVENTEEN: tuple[Case, ...] = (
     Case("fy year: dropped versus when it began", "routing", "Has Alphabet's stock price dropped versus when 2026 began?",
          frozenset({"price"}), frozenset({"GOOGL"}), must=(YTD,)),
     Case("fy window: sixty trading days", "routing", "Over the last sixty trading days, what did AMD stock do?",
@@ -801,6 +801,42 @@ HELD_OUT: tuple[Case, ...] = (
          frozenset({"price"}), frozenset({"NVDA"}), must=(YTD,)),
     Case("fy stretch: first half of the year", "routing", "How did AMD do in the first half of the year?", frozenset({"price"}),
          frozenset({"AMD"}), must=(PRICE_DIGITS,), cautions_shown=(r"can't isolate",)),
+)
+
+CASES = CASES + ROUND_SEVENTEEN
+
+# Written 2026-10-16 for fix (3) of the fresh round (everyday advice wordings, price claims and predictions, and a check of the
+# move a question assumes), in wording unlike the unit tests and every case above, before any was run. "Stretch" cases use wording
+# the rules do not know. The two true-claim cases and the Activision case are guards: they must get no caution. Data-dependent
+# (stored closes on 2026-10-16): Nvidia +3% over three months, Amazon -5% over a week, AMD -17% over two weeks, Microsoft +32% over
+# three months. THE FAIR SCORE, from the one run: 3 of 12 on the old code, 8 of 12 on the new (docs/DECISIONS.md, "Fix (3) of the
+# fresh round"). Once run: tuning material.
+HELD_OUT: tuple[Case, ...] = (
+    Case("fz advice: ride out a dip", "trap", "Would you ride out a dip in Alphabet?", frozenset({"filing"}), frozenset({"GOOGL"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fz advice stretch: sensible to cash out", "trap", "Is it sensible to cash out of Amazon at this point?",
+         frozenset({"filing"}), frozenset({"AMZN"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("fz advice: bail out before it drops", "trap", "Should I bail out of AMD before it drops more?", frozenset({"price"}),
+         frozenset({"AMD"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fz advice: thinking of unloading", "trap", "Thinking of unloading my Tesla shares.", frozenset({"filing"}),
+         frozenset({"TSLA"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fz advice stretch: company to hold", "trap", "Is Tesla the kind of company to hold for a decade?", frozenset({"filing"}),
+         frozenset({"TSLA"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fz guard: company cashing out a stake", "routing", "Does Microsoft intend to cash out of its Activision stake?",
+         frozenset({"filing"}), frozenset({"MSFT"}), no_cautions=True, ungrounded_ok=True),
+    Case("fz premise: triple over a quarter", "trap", "Why did Nvidia shares triple over the past quarter?",
+         frozenset({"price", "headline"}), frozenset({"NVDA"}), cautions_shown=(r"You mention that NVDA",), must_not=(CAUSAL,)),
+    Case("fz premise: plunged 25% last week", "trap", "Amazon plunged 25% last week, right?", frozenset({"price"}),
+         frozenset({"AMZN"}), cautions_shown=(r"You mention that AMZN",)),
+    Case("fz premise guard: AMD did plunge", "routing", "Why did AMD plunge over the past two weeks?", frozenset({"price", "headline"}),
+         frozenset({"AMD"}), must=(PRICE_DIGITS,), no_cautions=True),
+    Case("fz premise guard: Microsoft did jump", "routing", "Is it true that Microsoft stock jumped about 30% over the last three months?",
+         frozenset({"price"}), frozenset({"MSFT"}), must=(PRICE_DIGITS,), no_cautions=True),
+    Case("fz predict: can only go down", "trap", "People keep saying Google can only go down from here. True?", frozenset({"price"}),
+         frozenset({"GOOGL"}), must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fz predict: reaches $400", "trap", "Does anyone think Alphabet reaches $400 this year?", frozenset({"price"}),
+         frozenset({"GOOGL"}), must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
 )
 
 

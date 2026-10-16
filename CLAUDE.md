@@ -98,9 +98,13 @@ them (the owner hasn't confirmed the order):
    opened" are read exactly, and every other named period that is not read is flagged by a caution (prices and headlines) instead
    of defaulting silently; a window past the first stored close says so. A clean old-against-new run on 234 cases went 631 to 636
    of 702; 12 fresh cases went 1 to 5.
+   **Fix (3) is built on branch `feature/copilot-advice-premise` (2026-10-16, not committed or merged yet; DECISIONS: "Fix (3) of
+   the fresh round"):** "cash out", "take profits", "unload", "is it time to", "would it be crazy to" and the like now carry the
+   advice notice (with company-side guards), "Google doubled" and "can only go up" reach the prices, and a new code-side premise
+   statement quotes the stored move when the question assumes one that did not happen. A clean old-against-new run on 246 cases went
+   648 to 657 of 738; 12 fresh cases went 3 to 8. Known gap: "what drove it" is not a cause word, so that question gets no headlines.
    **Next:** the rest in the order DECISIONS gives
-   (the "cash out" notice and
-   a premise check; follow-ups keeping their topic; the outside-topic and writing-request lists; "clear in profit"), each
+   (follow-ups keeping their topic; the outside-topic and writing-request lists; "clear in profit"), each
    phrasing as a test first, then decide on the model-based routing experiment (its own branch, measured against these 35 and a
    new fresh set). Keep keyword rules until then. After tuning, move these cases into `CASES`, write fresh ones, and record the result.
 

@@ -23,6 +23,7 @@ from .market import (
     outside_scope,
     parse_window,
     period_cautions,
+    premise_cautions,
     relevant_cautions,
 )
 from .search import SearchResult, search_filings
@@ -520,8 +521,8 @@ NO_NEWS_CLAIM_RE = re.compile(
 )
 NEWS_WINDOW_DAYS = 30
 NO_NEWS_CAUTION = (
-    "This answer says there is no news. This app stores headlines for {names}, but the answer was written from filings only "
-    "and did not use them. Ask for the news directly (for example, “What's the latest news on {first}?”) to see them."
+    "This answer says there is no news. This app stores headlines for {names}, but this answer did not use them. "
+    "Ask for the news directly (for example, “What's the latest news on {first}?”) to see them."
 )
 
 
@@ -806,6 +807,7 @@ def answer_question(
         + ([c] if (c := false_news_claim(conn, text, symbols, evidence, intent.headlines or intent.sentiment)) else [])
         + ([ADVICE_CAUTION] if intent.advice else [])
         + period_cautions(window, market, today)
+        + premise_cautions(search_question, market, window)
         + relevant_cautions(evidence, intent.fundamentals, text)
         + ([not_calculated_note(intent.unstored)] if intent.unstored else [])
     )
