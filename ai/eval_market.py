@@ -640,9 +640,11 @@ ROUND_THIRTEEN: tuple[Case, ...] = (
 
 CASES = CASES + ROUND_THIRTEEN
 
-# Cases nobody has looked at yet: the fresh round for the whole second-round work (fixes (a) to (f)), written 2026-10-16 BEFORE
-# anything was run, in wording used nowhere else (checked against every case, test, doc, and probe list with a script),
-# with expectations set from the right behavior and the stored data as it was on 2026-10-16 (checked with read-only queries).
+# The fresh round for the whole second-round work (fixes (a) to (f)), written 2026-10-16 BEFORE anything was run, in wording
+# used nowhere else (checked against every case, test, doc, and probe list with a script), with expectations set from the
+# right behavior and the stored data as it was on 2026-10-16 (checked with read-only queries). RUN ONCE the same day, 3 repeats:
+# THE FAIR SCORE is 48 of 105 (46%), 16 of 35 on one pass; about 21 of 35 after reading every answer (docs/DECISIONS.md,
+# "Fresh held-out round"). Not tuned yet. They are tuning material from now on: write new ones before the next fair score.
 # Names start with "fr <group>:"; the group is how the score is broken down. "stretch" marks a wording the rules probably
 # do not know. For period questions the checker only tests that a price was quoted, so the period is judged by reading each
 # answer and its cautions: the right behavior is the period asked, or a plain statement that the answer covers another one.

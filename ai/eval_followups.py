@@ -120,7 +120,8 @@ CASES = CASES + PREVIOUS_HELD_OUT + STEP_C
 
 # Fresh cases for the whole second-round work, written 2026-10-16 BEFORE anything was run, in wording used nowhere else
 # (checked against every case, test, and doc with a script). "stretch" marks a wording the rules probably do not know.
-# Once run, they are tuning material: write new ones after.
+# RUN 2026-10-16 (3 repeats, identical each time): 3 of 8 passed (docs/DECISIONS.md, "Fresh held-out round"). Not tuned yet.
+# They are tuning material from now on: write new ones before the next fair score.
 HELD_OUT: tuple[Case, ...] = (
     Case("fr resolve: same again for", "follow-up", (TSLA_RISK,), "Same again for AMD, please.", frozenset({"AMD"}), "risk"),
     Case("fr resolve: longer list stretch", "follow-up", (NVDA_RISK,), "Is Tesla's list longer than that?",
