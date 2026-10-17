@@ -357,6 +357,35 @@ def test_copilot_reports_headlines_as_sources_with_their_links(client, llm):
     assert first["kind"] == "headline" and first["url"].startswith("http") and "automatic label" in first["title"]
 
 
+def test_copilot_says_nothing_about_the_router_when_the_keywords_decided(client, llm, monkeypatch):
+    monkeypatch.setenv("COPILOT_ROUTER", "model")
+    llm.reply = "Zeta Co closed at 499.00 on 2026-10-09 [1]."
+    body = client.post("/api/copilot", json={"question": "What is the ZZAPI stock price?"}).json()
+    assert body["evidence_kinds"] == ["price"] and body["model_route"] == []         # present, and empty
+
+
+def test_copilot_reports_what_the_model_chose_when_the_router_routed_it(client, llm, monkeypatch):
+    import json as _json
+
+    from ai.router import ROUTER_SYSTEM
+
+    class RoutingLLM(type(llm)):
+        def generate(self, system, user, json_schema=None):
+            if system == ROUTER_SYSTEM:
+                return _json.dumps({"category": "research", "price": True, "news": False, "sentiment": False, "figures": [],
+                                    "filings": False, "advice": False})
+            return super().generate(system, user, json_schema)
+
+    routed = RoutingLLM(reply="Zeta Co closed at 499.00 on 2026-10-09 [1].")
+    app.dependency_overrides[get_chat_model] = lambda: routed
+    monkeypatch.setenv("COPILOT_ROUTER", "model")
+    body = client.post("/api/copilot", json={"question": "Has ZZAPI pulled back from its high this year?"}).json()
+    assert body["model_route"] == ["price"] and body["evidence_kinds"] == ["price"] and not body["refused"]
+    monkeypatch.setenv("COPILOT_ROUTER", "off")
+    body = client.post("/api/copilot", json={"question": "Has ZZAPI pulled back from its high this year?"}).json()
+    assert body["model_route"] == []                                                   # the same question with the router off
+
+
 def test_copilot_a_wrong_way_price_move_is_reported_not_hidden(client, llm):
     llm.reply = "The stock fell 31.00 over the past month [1]."  # it rose 31.00
     body = client.post("/api/copilot", json={"question": "How did the ZZAPI stock do this month?"}).json()

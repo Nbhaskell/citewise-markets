@@ -28,7 +28,7 @@ from .market import (
     premise_cautions,
     relevant_cautions,
 )
-from .router import apply_route, ask_router, needs_router, router_enabled
+from .router import apply_route, ask_router, changed_kinds, needs_router, router_enabled
 from .search import SearchResult, search_filings
 from .table_units import add_units
 
@@ -171,6 +171,7 @@ class Answer:
     disclaimer: str = DISCLAIMER
     refused: bool = False  # True when nothing relevant was found (or no company was named), so the model wasn't asked
     cautions: list[str] = field(default_factory=list)  # plain-language warnings the app must show with the answer
+    model_route: list[str] = field(default_factory=list)  # kinds of evidence the local model chose, when it and not the keywords did
 
     @property
     def sources(self) -> list[tuple[int, SearchResult | MarketEvidence]]:
@@ -819,10 +820,12 @@ def answer_question(
     `today` is only for tests (it dates the freshness notes and cautions)."""
     search_question, symbols, interpreted = resolve_question(conn, llm, question, symbols, history)
     intent = detect_intent(search_question)
+    model_route: list[str] = []  # set below when the router picked the evidence; every answer, refusals too, carries it
 
     def refuse(text: str, found=(), queries=()) -> Answer:
         return Answer(
-            question, text, symbols, list(found), queries=list(queries), interpreted_question=interpreted, refused=True
+            question, text, symbols, list(found), queries=list(queries), interpreted_question=interpreted, refused=True,
+            model_route=model_route,
         )
 
     tracked = [r[0] for r in conn.execute("SELECT symbol FROM instruments WHERE active ORDER BY symbol")]
@@ -836,7 +839,9 @@ def answer_question(
         return refuse(outside_scope_message("unknown", name, tracked))
     router_says_outside = False
     if router_enabled(router) and needs_router(intent, search_question):  # no specific route found: ask the model what kind of question this is
+        keyword_intent = intent
         intent, verdict = apply_route(intent, ask_router(llm, search_question), has_company=bool(symbols), question=search_question)
+        model_route = changed_kinds(keyword_intent, intent)
         if verdict == "writing":
             return refuse(outside_scope_message("writing", "", tracked))
         router_says_outside = verdict == "outside"  # only a hint: it changes the message when nothing relevant is found, never the search
@@ -878,7 +883,7 @@ def answer_question(
     )
     return Answer(
         question, text, symbols, evidence, cited, grounded=bool(cited), unverified_numbers=bad,
-        queries=queries, interpreted_question=interpreted, cautions=cautions,
+        queries=queries, interpreted_question=interpreted, cautions=cautions, model_route=model_route,
     )
 
 
@@ -898,7 +903,10 @@ def main(argv: list[str] | None = None) -> int:
             print(build_prompt(args.question, ans.retrieved), "\n")
 
     print(f"[{llm.name}] companies: {', '.join(ans.symbols) or 'none detected'}")
-    print(f"searches: {' | '.join(ans.queries) or 'none (no filing search was needed)'}\n")
+    print(f"searches: {' | '.join(ans.queries) or 'none (no filing search was needed)'}")
+    if ans.model_route:
+        print(f"chosen by the local model, not the keyword rules: {', '.join(ans.model_route)}")
+    print()
     print(ans.text)
     if ans.retrieved and not ans.grounded and not ans.refused:
         print("\nWARNING: this answer cites no passages, so treat it as unverified.")

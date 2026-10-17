@@ -156,6 +156,22 @@ WRITING_CUE_RE = re.compile(
 )
 
 
+def evidence_kinds(intent: Intent) -> list[str]:
+    """The kinds of evidence an intent asks for, in the API's order (the same names as the sources' kinds)."""
+    asked = {
+        "price": intent.prices, "fundamentals": bool(intent.fundamentals), "sentiment": intent.sentiment,
+        "headline": intent.headlines, "filing": intent.filings,
+    }
+    return [kind for kind, wanted in asked.items() if wanted]
+
+
+def changed_kinds(before: Intent, after: Intent) -> list[str]:
+    """What the model chose, for the answer to say so: the kinds of evidence the intent asks for after the router, or nothing when
+    they are the same as the keyword route's. Which figures, and the advice flag, are not kinds: the notices say those themselves."""
+    kinds = evidence_kinds(after)
+    return kinds if kinds != evidence_kinds(before) else []
+
+
 def apply_route(intent: Intent, route: Optional[Route], has_company: bool, question: str = "") -> tuple[Intent, Optional[str]]:
     """The intent after the model's say, and a verdict: "writing" (decline now), "outside" (a hint: the question may be about
     something the app does not hold; it is used only if nothing relevant is found), or None. The model only adds: the advice flag

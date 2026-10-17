@@ -72,7 +72,9 @@ at or above where it started, red if below. The math lives in `src/lib/chart.ts`
 - **Follow-ups work, with limits.** Each new question is sent with the last three finished questions of the current
   topic (citation markers removed, answers trimmed). The server uses them only to rewrite a follow-up into a
   standalone question; the answer is written from the stored sources alone. The page shows "Understood as: ..." under a
-  question that was rewritten, so a wrong reading is visible.
+  question that was rewritten, so a wrong reading is visible. When the optional local-model router (off unless
+  `COPILOT_ROUTER=model` on the API) picked which kinds of data to look at, a second muted line under "Looked at ..." says
+  so (`model_route` in the response); it is a different thing from "Understood as".
 - **Topics:** "Start a new topic" keeps earlier questions on screen (with a divider) but stops them being sent. The
   topic is saved, so a reload doesn't quietly resume the old one. Only finished, real answers count as history, not
   refusals, errors, or stopped questions. A retry uses only what came before that question.

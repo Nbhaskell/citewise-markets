@@ -73,6 +73,31 @@ describe("AnswerView with prices and headlines", () => {
     expect(screen.getByRole("link", { name: "View filing" })).toBeInTheDocument();
   });
 
+  it("says when the local model, not the keyword rules, chose what to look at", () => {
+    render(<AnswerView result={marketAnswer({ model_route: ["price", "headline"] })} />);
+    expect(screen.getByText(
+      "The app's keyword rules found no specific kind of data for this question, so the local model chose: prices and headlines.",
+    )).toBeInTheDocument();
+    expect(screen.getByText("Looked at prices and headlines for NVDA")).toBeInTheDocument();      // what was looked at is still said
+  });
+
+  it("names every kind the model chose, in words", () => {
+    render(<AnswerView result={marketAnswer({ model_route: ["price", "fundamentals", "sentiment", "headline", "filing"] })} />);
+    expect(screen.getByText(/so the local model chose: prices, financial figures, headline sentiment, headlines and filings\./)).toBeInTheDocument();
+  });
+
+  it("says nothing about the model when the keyword rules decided", () => {
+    render(<AnswerView result={marketAnswer({ model_route: [] })} />);
+    expect(screen.queryByText(/local model chose/)).not.toBeInTheDocument();
+  });
+
+  it("also says it on a refusal, so a surprising 'which company?' can be explained", () => {
+    render(<AnswerView result={copilotAnswer({ refused: true, grounded: false, companies: [], evidence_kinds: [], sources: [],
+      answer: "Tell me which company you mean.", model_route: ["price"] })} />);
+    expect(screen.getByText("No matching data found")).toBeInTheDocument();
+    expect(screen.getByText(/so the local model chose: prices\./)).toBeInTheDocument();
+  });
+
   it("says plainly when no company was named for a market question", () => {
     render(<AnswerView result={copilotAnswer({ refused: true, grounded: false, companies: [], evidence_kinds: [], sources: [],
       answer: "Tell me which company you mean." })} />);

@@ -564,6 +564,11 @@ export interface components {
              * @description How a follow-up was understood (the standalone question that was searched). Null if the question was used as written
              */
             interpreted_question?: string | null;
+            /**
+             * Model Route
+             * @description The kinds of data the local model chose to look at, because the keyword rules found no specific kind for this question. Empty when the keyword rules decided, the model was not asked, or it chose the same as the keywords. It says what the model chose, not what was found: evidence_kinds says what the answer was written from
+             */
+            model_route: ("filing" | "price" | "headline" | "sentiment" | "fundamentals")[];
             /** Question */
             question: string;
             /**

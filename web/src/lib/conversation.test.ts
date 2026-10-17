@@ -225,6 +225,27 @@ describe("answers saved before prices and headlines were added", () => {
     expect(loadExchanges().map((x) => x.id)).toEqual(["id-4"]);
   });
 
+  it("still load when they were saved before the app said what the model chose", () => {
+    const { model_route, ...rest } = copilotAnswer();
+    void model_route;
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([{ ...done(5), result: rest }]));
+    const [loaded] = loadExchanges();
+    expect(loaded.result?.model_route).toEqual([]);
+  });
+
+  it("keep what the model chose across a reload", () => {
+    const e = done(6);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([{ ...e, result: { ...e.result, model_route: ["price", "headline"] } }]));
+    expect(loadExchanges()[0].result?.model_route).toEqual(["price", "headline"]);
+  });
+
+  it("reject a model route that isn't a list of known kinds", () => {
+    const e = done(7);
+    const bad = (model_route: unknown) => ({ ...e, id: String(model_route), result: { ...e.result, model_route } });
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([bad(["rumour"]), bad("price"), bad([3]), bad(null)]));
+    expect(loadExchanges()).toEqual([]);
+  });
+
   it("reject a source kind the app doesn't know", () => {
     const e = done(3);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify([{ ...e, result: { ...e.result, evidence_kinds: ["rumour"] } }]));
