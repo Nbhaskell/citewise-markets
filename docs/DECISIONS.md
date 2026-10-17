@@ -1382,6 +1382,74 @@ benchmarks.
   passed in full once the evaluation had finished, the known dead-index flakiness, not this change. (8) The evaluation does not print cautions.
   **Still open from the fresh round:** (6) "clear in profit". Then the decision on the model-based routing experiment, which this
   step's weak spots (1) to (5) support: every list here will miss the next wording.
+- **Model-based routing experiment, 2026-10-17** (branch `feature/copilot-model-router`; no change to `SYSTEM_PROMPT` or the rewrite
+  prompt; built and measured, not yet merged). **Why:** six fixes in a row added keyword rules and every fresh round missed on the
+  next wording (46%, then 65%, 72% before). **Baseline first, on current `main`, before any router existed:** 39 new questions in
+  everyday wording across every route (prices with a period, news, sentiment, the stored figures, filings, outside topics, advice,
+  predictions, a false premise, follow-ups), 3 repeats: **18 of 39 on the first pass, 52 of 117 (44%)**; prices 2 of 7, news 1 of 5,
+  figures 5 of 7, filings 4 of 4, refusals and traps 6 of 11, follow-ups 1 of 5. I read every answer: **17 of the 21 misses never reached
+  the right data** (the question fell through to the filings, or to "I couldn't find anything"); the other four were extra price data
+  on an EPS question, a missed buy/sell notice, a dividend yield worded without "yield", and an expectation I would not defend. A
+  second set of 38 was written at the same time, **sealed** (`--sealed`, run once, never tuned on).
+  **Design (`ai/router.py`, off unless `COPILOT_ROUTER=model` or `answer_question(..., router=True)`):** when the keyword rules find
+  no specific route (the question would go to the filings only), the local model (`qwen3`, thinking off, temperature 0.1) is asked one
+  question about the standalone question alone: a JSON reply constrained by a schema (category research / outside / writing; price,
+  news, sentiment, figures from pe / market_value / eps / shares / profit / margin / revenue, filings, advice). The model never names a
+  company, never writes an answer and sees no history or earlier answer; companies, periods, figures, the numbers checks and every
+  caution stay in Python. A failure of any kind (offline, bad JSON, a wrong type) leaves the keyword route, so the router cannot make an
+  answer fail. It only adds: the advice flag is the union of keywords and model, and a verdict that chooses nothing leaves the keyword
+  intent alone. **What iterating on the 39 showed:** the first prompt scored 59 of 117 (the model put "general" into the figures for
+  everything and turned filings questions into figure questions); removing that option and tightening the prompt gave 80 to 85 of
+  117. **Showing the model the previous question** (so "do the same for Google" has a topic) was built, tested and **removed**: 80 of
+  117, no better, and it stretched the history rule. Of the 12 development cases that still fail, most are not router problems (the
+  keyword route itself, the follow-up rewrite having lost the topic, or an expectation).
+  **The regression run found what the keywords had learned the hard way.** On the 282 older cases the first router version scored the
+  same total as the keywords (755 of 846 both) while winning 9 cases and losing 8, because it overrode routes the keyword rules send to
+  the filings on purpose: "revenue in its latest 10-K", "total revenue in its annual report", "dividends paid", "dividend payout
+  ratio", "What drove Tesla's jump in energy storage revenue", and "Apple's iPhone sales" (a product line, not the twelve-month total;
+  12 of 12 with the router off against 0 of 12 with it on in an A/B). Telling the model so in the prompt did not hold (it kept returning revenue for a 10-K question, and
+  called dividend questions "outside"). **Guards in code instead, each with a question of its own:** the model is not asked when the
+  question names a filing, a quarter or a segment, asks why, mentions dividends or a payout, or contains "sales" that the keyword rules did
+  not read as the company's total (`deliberately_filings`); it may add headlines only when the question has a news or why-the-stock-moved
+  word (`NEWS_CUE_RE`, only ever removes); and "the latest / most recent four quarters" is the twelve-month stretch like "the last four
+  quarters" (a keyword fix, `TWELVE_MONTHS_AS_QUARTERS_RE`).
+  **Evaluation on the final code (3 repeats, one data snapshot): the 282 older cases 761 of 846 with the router off, 769 with it on
+  (89.9% to 90.9%)**; the development 39: 52 to 83 of 117 (44% to 71%). Eight older cases got worse in some run; A/B, 12 runs each, off
+  against on: "iPhone sales" fixed by the sales guard (6 of 6 with the router on after it), "much chatter today" 0 of 12 against 0 of
+  12, "buy back, quarter named" 12 of 12 against 12 of 12, "tanking premise" is the day's headline tripping the speculation check, as
+  before; the rest are the usual swings. Gains: gas, egg prices and a one-pager request, "take in per year", "make in a year", "caused
+  to fall", "announcements". **The sealed test, run once (38 cases, 3 repeats): keywords 78 of 114 (68%), router 93 of 114 (82%); first
+  pass 26 against 31 of 38; five cases better, none worse.** Then I looked at the answers and found two things the score had hidden,
+  which I fix and say plainly make the sealed set a second-look set from here on: **(1) false declines.** The model's "outside" verdict
+  declined 13 of about 38 ordinary research questions that name no tracked company ("What is CUDA?", "What is Azure?", "How big is the
+  Cybertruck order book?", "What did Jensen Huang say about Blackwell?"); filings can answer some of those. **(2)** "Could Apple be a
+  dependable long-term holding?" was declined with the message "it doesn't write emails". **Fixes:** the "outside" verdict is now only a
+  hint (it never stops a search; it swaps in the clearer "outside what this app covers" message only if nothing relevant is found),
+  and the "writing" verdict declines only a question that has a writing word in it (`WRITING_CUE_RE`). On the final code: **sealed 90
+  of 114 (79%) against 78 for the keywords, 30 against 26 of 38 on the first pass, four cases better, none worse (the "Bank of Canada"
+  gain went with the up-front outside decline); the 282 cases 769 against 761; the false-decline probe declined none of 38 ordinary
+  questions.** Two of those 38 were rerouted to a market route with no company named ("Does Prime matter much?", "What does Wall Street
+  think of AI spending?"), so they now get the "tell me which company" notice instead of a filings attempt. **Merge rule (agreed before
+  the results), checked: (1) the sealed set improves by at least 4 of 38 and holds over 3 repeats: yes, 4 (5 in the first version);
+  (2) the 282 older cases lose no more than noise (4 of 846): they gained 8; (3) no legitimate research question wrongly declined or
+  rerouted: after the two fixes, none in the probes or the sealed guards (filings 5 of 5), with the two rerouted questions above as
+  the cost; (4) added time about one second or less: the average per case was 1.6 s against 1.5 s on the 282 and 1.7 against 1.3 on the
+  sealed set (only the questions that fall through pay for the extra call).** **Tests:** 296 new (`tests/test_router.py`, a fake model,
+  and one keyword wording test); 2038 Python and 253 web tests pass. Breaking each router rule on purpose (the parser, when to ask,
+  every part of applying a route, the advice union, the switch, the guards, every news and writing cue word, the wiring in
+  `answer_question`) was caught every time after tests were added for what the first passes missed (6 router rules, then 3 guard
+  lines, then about 55 cue words that had no question of their own); one mutation was unreachable and the code was simplified instead.
+  **Weak spots:** (1) The router is asked only when the keywords find no route, so it fixes a question that falls through, not one the
+  keywords route wrongly ("Has Apple been climbing or sliding lately?" still goes to headlines). (2) Follow-ups gain little: when the
+  rewrite step loses the topic ("do the matching calculation for Google") the router cannot recover it. (3) The guards that make it
+  safe are keyword lists again (the deliberate-filings cues, the news cue, the writing cue); they only ever remove what the model adds,
+  but they are lists. (4) The model is over-eager with headlines and sentiment (it adds them to price questions, which fails a case that
+  expects price only) and sometimes returns everything for an advice question. (5) It depends on the local model for one extra call on
+  fall-through questions; a failure falls back to the keywords, a swing between runs is possible, and a different model needs the
+  prompt re-checked. (6) The sealed set is no longer sealed: a fair next score needs a new set. (7) Nothing shows the user that the
+  router was used; "Understood as" is unchanged. (8) The development 39 and the 38 sealed cases are in `CASES` now (359 in all).
+  **Recommendation:** merge, and turn it on by default with `COPILOT_ROUTER=off` as the switch back, because the rule is met; this
+  is the owner's call (it adds a model call to every question the keywords send to the filings by default, and changes what some questions retrieve).
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

@@ -17,6 +17,8 @@ from ai.market import detect_intent
     ("What did Microsoft earn last year?", {"profit"}),
     ("How much does Apple earn?", {"profit"}),
     ("How much money has Alphabet earned over the last four quarters?", {"profit"}),
+    ("How much has Amazon pocketed in profit over its latest four quarters?", {"profit"}),     # "latest" and "recent" are the same stretch
+    ("What are Microsoft's net sales across the most recent four quarters?", {"revenue"}),
     ("How much did Apple's sales grow?", {"revenue"}),
     ("How many dollars of sales did Nvidia bring in over the last four quarters?", {"revenue"}),
     ("What were Nvidia's sales over the trailing twelve months?", {"revenue"}),

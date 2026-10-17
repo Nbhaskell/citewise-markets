@@ -927,8 +927,7 @@ CASES = CASES + ROUND_TWENTYONE
 # premises, follow-ups), in wording unlike the unit tests and every case above, before any was run (an overlap script compared them with
 # every quoted string in the repo). "Stretch" cases use wording the rules probably do not know. This is the baseline the router is judged
 # against (docs/DECISIONS.md, "Model-based routing experiment"); do not tune the keyword rules against it, or the comparison is spoiled.
-FM_PRICE = r"\d{2,4}\.\d\d"
-HELD_OUT: tuple[Case, ...] = (
+ROUND_FM: tuple[Case, ...] = (
     # prices
     Case("fm price: week higher than started", "routing", "Did Amazon gain or lose ground across the week?",
          frozenset({"price"}), frozenset({"AMZN"}), must=(PRICE_DIGITS,)),
@@ -1017,7 +1016,7 @@ HELD_OUT: tuple[Case, ...] = (
 # routing and on the router, and never used to tune either: a second look makes it development material and the comparison unfair.
 # `--sealed` is the only way to run it, so `--held-out` and a plain run never touch it. Includes guards (research questions that
 # must not be declined or rerouted). Decision rule: docs/DECISIONS.md, "Model-based routing experiment".
-SEALED: tuple[Case, ...] = (
+SEALED_ROUND_ONE: tuple[Case, ...] = (
     # prices
     Case("sb price: slump or tear", "routing", "Is Microsoft stock in a slump or on a tear these days?", frozenset({"price"}),
          frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
@@ -1097,6 +1096,17 @@ SEALED: tuple[Case, ...] = (
     Case("sb follow: stack up against Nvidia", "routing", "And Nvidia's figure, how close is it to that?", frozenset({"fundamentals"}),
          frozenset({"AAPL", "NVDA"}), history=(AAPL_PE,), figures=("AAPL:pe", "NVDA:pe")),
 )
+
+
+# Both sets above are tuning material now (docs/DECISIONS.md, "Model-based routing experiment"): the 39 `fm` cases were the router's
+# development set; the 38 `sb` cases were run once as the sealed test (keywords 78 of 114, router 90 of 114 on the final code, 93 on the
+# first version) and then looked at, because they exposed a false decline. Write a new sealed set before the next fair comparison.
+CASES = CASES + ROUND_FM + SEALED_ROUND_ONE
+
+# Fresh cases only (none have been run). Write new ones before claiming a fair score.
+HELD_OUT: tuple[Case, ...] = ()
+# The sealed test set: run only with `--sealed`, once, at the end of an experiment, and never tuned on.
+SEALED: tuple[Case, ...] = ()
 
 
 def expected_figure(conn, spec: str) -> str:
