@@ -1314,7 +1314,7 @@ benchmarks.
   does not print cautions. **Still open from the fresh round:** (5) the outside-topic and writing-request lists; (6) "clear in profit".
   Then the decision on the model-based routing experiment.
 - **Fix (5) of the fresh round: questions the app cannot answer are declined in code, 2026-10-17** (branch
-  `feature/copilot-outside-topics`; no prompt change; built and measured, not yet merged). **What a no-model probe of 90 questions showed
+  `feature/copilot-outside-topics`; no prompt change; merged as PR #42 on 2026-10-17). **What a no-model probe of 90 questions showed
   first** (it follows the order in `answer_question`): of 26 off-list company questions (Lululemon, Etsy, FedEx, Chipotle, Eli Lilly...)
   none was caught by the company list, 4 got the generic "tell me which company" notice and 22 reached the filings answer; of 25 asset or
   topic questions (gas prices, diesel, coffee, "the economy", Tether, REITs, the yuan...) 1 got the scope message, 8 the generic notice and

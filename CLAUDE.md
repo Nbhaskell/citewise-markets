@@ -113,7 +113,7 @@ them (the owner hasn't confirmed the order):
    One clean old-against-new run on 266 cases went 707 to 711 of 798; follow-up resolution 39 (40 after a checker fix) to 46 of 46; 10 fresh
    cases (fair score) went 3 to 4 of 10, 8 of 10 after adding the words they missed (now tuning material). The next wording will miss
    again: these are still word lists.
-   **Fix (5) is built on `feature/copilot-outside-topics` and not yet merged (2026-10-17; DECISIONS: "Fix (5) of the fresh round"):** a
+   **Fix (5) is merged (PR #42, 2026-10-17; DECISIONS: "Fix (5) of the fresh round"):** a
    question that names no tracked company and contains a capitalised name found in no stored filing or headline is declined by name
    (`unknown_name`, so no company list is needed for it); the company list grew from 70 to 183 names; more outside assets (gas, diesel,
    crops, "the economy", REITs, stablecoins, more currencies); and a request to write an email, post, poem, code, slides or a translation
@@ -159,8 +159,8 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-17: 1742 Python tests, 253 web tests, all passing on the unmerged fix (5) branch (1512 Python on
-  `main` after PR #41). A full test run can fail one or two vector-search tests while an evaluation shares the database;
+- Baseline as of 2026-10-17 (after PR #42): 1742 Python tests, 253 web tests, all passing (the Python count re-run on
+  `main` after the merge). A full test run can fail one or two vector-search tests while an evaluation shares the database;
   run the suite when no evaluation is running. Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
   refresh ran at 3pm on 2026-10-16 (success, 0 problems).
 
