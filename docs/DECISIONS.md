@@ -1223,6 +1223,38 @@ benchmarks.
   answered with a one-sided list (the stock grew from $100 to $1,448.75), and nothing in code limits it. (5) The "no price" caution still
   says "filings only". (6) The evaluation does not print cautions. **Still open from the fresh round:** (4) follow-ups keeping their topic; (5)
   the outside-topic and writing-request lists; (6) "clear in profit".
+- **Cause words: "what drove / caused / triggered it" bring the headlines, 2026-10-16** (branch `feature/copilot-cause-words`; the known
+  gap from fix (3); no prompt change). **What a probe showed first (no model):** of 17 ways to ask what moved a stock, only "why" ones
+  got headlines (2 of 17). The other 15 reached the prices with none ("What drove it?", "What caused Nvidia's last big drop?", "What
+  triggered the selloff in Tesla stock?", "How come Tesla stock fell?", "What made Apple shares fall?"), and 4 did not reach the prices at
+  all because the move is a noun ("What sparked Amazon's jump this month?", "What's responsible for Nvidia's slide?", "the story behind
+  Amazon's jump", "the move in Microsoft stock"). Cause words only matter on a price question, so business questions that share them
+  ("What drove Apple's services revenue growth?") were never affected. **Built, in `ai/market.py`:** (1) `CAUSE_RE` adds "what drove /
+  caused / triggered / sparked / prompted / pushed / made / led to / explains", "how come", "what's responsible for", "the story / cause /
+  reason behind", and "drove / caused / triggered / sparked / prompted it, that, this, the move / drop / jump ...". (2)
+  `PRICE_MOVE_NOUN_RE`: with a cause word, "<Company>'s jump / slide / swoon" (a capitalised name, a period or a stock word, and not
+  followed by "in <metric>": "Nvidia's slide in gross margin" is not the stock) and "the move / jump / slide / selloff / plunge /
+  rally / surge in <Company> stock" are price questions. Only the nouns no price rule knew are named. **Tests first:** 38 new
+  (`tests/test_cause_words.py`), 21 failing before; 1402 Python and 253 web tests pass. Thirteen deliberate breakages: three were first
+  missed (a "what triggered" case whose object another alternative also covered, a lowercase subject, and a mutation string that
+  did not match), tests added, all caught. **Evaluation, one data snapshot:** a first new-code run crashed on a model timeout
+  because two full runs and extra runs shared Ollama (not a code problem; the runs were redone one at a time). **Old code 675 of 774
+  (87.2%), new code 681 of 774 (88.0%) over 258 cases, 3 repeats.** The target moved: "What caused Nvidia's last big drop?" (failing for
+  five rounds) went 0 to 3 of 3; "Google doubled this month. What drove it?" now gets prices and headlines and its answer corrects the
+  premise ("fell, not doubled") with the headlines as context, though the case still fails because it demands a phrase about the
+  cause. Seven other cases moved up from flaky and "press coverage" went 2 to 0 of 3 and "can only go down" 3 to 1 of 3; both were A/B'd,
+  12 runs each: press coverage 0 of 12 on old and on new code (the day's headlines), can only go down 11 of 12 against 12 of 12, so
+  neither is caused by this. **Fresh cases written before running (8, `fc`): 1 of 8 on the old code, 7 of 8 on the new.** I read every
+  answer: all five cause questions get the price move plus headlines and none claims a cause (they say the data cannot show one and give
+  the headlines as context); "Tesla stock jumped 30% this week. What caused that?" got the premise statement and the answer said it fell
+  7%, not jumped; the Tesla energy-storage guard stayed on the filings. The one miss is the stretch "What lies behind Nvidia's jump over the
+  past quarter?" (answered from the filings as if revenue growth were the cause of a stock jump). **Weak spots:** (1) "behind" with
+  "lies", "set off", "got X moving" and similar are not cause words; the next wording will miss. (2) "drop", "rally", "surge", "crash",
+  "spike" were price words already, everywhere, so "What caused the drop in Apple's revenue this year?" and "the crash test results for the
+  Cybertruck" still go to the prices: a pre-existing misroute that this step did not touch and that a bare price word will keep
+  causing. (3) A bare "<Company> jumped 30%" with no stock word is not a price question (only the noun forms are). (4) The evaluation
+  does not print cautions. **Still open from the fresh round:** (4) follow-ups keeping their topic; (5) the outside-topic and
+  writing-request lists; (6) "clear in profit".
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
