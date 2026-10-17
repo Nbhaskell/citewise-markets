@@ -1504,6 +1504,22 @@ benchmarks.
   today only adds (the advice flag, headlines behind a news word), and a fix for 12 of these 13 has to REMOVE evidence the keywords chose
   (prices or mood from a filings question, headlines from a price question; only the cause case needs an addition), so a second look needs a rule for when the model may override, which is a new kind of risk and must
   be measured, not assumed. **Not done:** nothing has been run with a model; the shadow-mode measurement is the next step.
+  **Step 2, the shadow script is built, not yet run (`ai/eval_router_shadow.py`, `tests/test_eval_router_shadow.py`).** It asks the
+  router question only (no answer, no search, no change to the app) for the 302 research cases that have no follow-up and expect no
+  refusal made in code, `--repeat` times, and saves the router's raw reply per case (`--run --out FILE`); five policies are then scored
+  offline from the recording, so a changed rule is re-scored without the model (`--score FILE`). When the keywords found nothing the
+  model decides, as now, in every policy; the policies differ only when the keywords chose something specific: `today` (never second-guess),
+  `replace` (the model overrules), `replace-to-filings` (overrule only to send it to the filings), `intersect-else-router` and
+  `intersect-else-keywords` (keep only what both chose; if nothing is shared, the model or the keywords). The existing guards hold in
+  every policy (a named filing, a quarter, "why", dividends, "sales", an unstored ratio, advice, a failed call, and the model's "outside"
+  and "writing" verdicts all keep the keyword route). A case passes when the kinds of evidence equal the expected ones, the evaluation's
+  own primary check; no answer is read. There is no option for the sealed set and any sealed case is dropped. **Found while building:** one
+  older case name ("filings only") is used twice and scores are keyed by name, so a repeat silently dropped a case and shifted the group
+  totals by one (the plan showed 28 development cases instead of 29); repeated names now get " (2)". **Offline, no model:** the keywords
+  alone get 12 of 29 development cases and 248 of 273 older ones. **Tests:** 66, with a fake model, plus 33 deliberate breakages, all
+  caught except one rewrite that gives the same list (an intersection written in the other order). The full suite passed (2133); one run
+  failed `test_search.py::test_latest_only_drops_older_filings_of_the_same_form` with nothing else using the database, and it passed alone
+  three times and in the next full run, which looks like the known dead-index flakiness but was not investigated.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
