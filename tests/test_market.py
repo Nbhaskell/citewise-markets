@@ -307,7 +307,9 @@ def test_a_derived_figure_the_model_calculated_is_flagged(conn):
 def test_a_market_question_without_a_company_is_not_guessed_at(conn):
     llm = ScriptedLLM("should not be asked")
     ans = answer_question(conn, FakeEmbedder(), llm, "How is the stock market doing this week?", expand=False)
-    assert ans.text == NO_COMPANY and ans.refused and llm.calls == []
+    # Declined in code either way. Since fix (5) of the fresh round "the stock market" is on the outside-topics list, so the specific
+    # "outside what this app covers" message comes first; it used to be the generic notice only.
+    assert ans.refused and llm.calls == [] and (ans.text == NO_COMPANY or "outside what this app covers" in ans.text)
 
 
 def test_an_index_question_without_a_company_is_refused_not_answered_from_a_filing(conn):

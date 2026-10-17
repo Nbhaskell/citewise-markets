@@ -425,7 +425,9 @@ ROUND_NINE: tuple[Case, ...] = (
     Case("ho trap: debt to equity", "trap", "What's Amazon's debt to equity?", frozenset(), frozenset({"AMZN"}),
          must=(NOT_CALCULATED,)),
     Case("ho trap: the Nasdaq", "trap", "Where is the Nasdaq today?", frozenset(), frozenset(), must=(NO_CO,)),
-    Case("ho trap: the economy", "trap", "How is the economy doing?", frozenset(), frozenset(), must=(NO_CO,)),
+    # Expected the generic notice until 2026-10-17; "the economy" is on the outside-topics list now (fix 5), so either refusal made in code is right.
+    Case("ho trap: the economy", "trap", "How is the economy doing?", frozenset(), frozenset(),
+         must=(rf"{NO_CO}|outside what this app covers",)),
     Case("ho trap: untracked company", "trap", "What is Meta's stock price?", frozenset(), frozenset(), must=(NO_CO,)),
     # follow-ups
     Case("ho follow: and Alphabet's", "routing", "And Alphabet's?", frozenset({"price"}), frozenset({"GOOGL"}),
@@ -889,6 +891,36 @@ ROUND_TWENTY: tuple[Case, ...] = (
 )
 
 CASES = CASES + ROUND_TWENTY
+
+# Written 2026-10-17 for fix (5) of the fresh round (things the app cannot answer: unknown company names, more outside assets, and
+# requests to write something), in wording unlike the unit tests, every case above, and the docs, and with company names that are on
+# no list in the code, before any was run on the new code (an overlap script compared them with every quoted string in the repo).
+# "Stretch" cases use wording the rules do not know. Two guards must still be answered (a summary request, a place the filings name).
+# Any refusal naming the thing asked about is right for the first four; the others expect a refusal made in code.
+# THE FAIR SCORE, from the one run (3 repeats): 2 of 11 on the old code (the two guards), 8 of 11 on the new (docs/DECISIONS.md, "Fix (5)
+# of the fresh round"); the misses are the stretches (eggs, uranium, the one-pager). Tuning material from now on: folded into CASES.
+ROUND_TWENTYONE: tuple[Case, ...] = (
+    Case("fw name: Ulta Beauty", "trap", "Roughly how many outlets does Ulta Beauty have?", frozenset(), frozenset(), must=(r"Ulta Beauty",)),
+    Case("fw name: Garmin", "trap", "Is Garmin's wearables business growing?", frozenset(), frozenset(), must=(r"Garmin",)),
+    Case("fw name: Hasbro", "trap", "Roughly how large is Hasbro's workforce?", frozenset(), frozenset(), must=(r"Hasbro",)),
+    Case("fw name: Harley-Davidson", "trap", "Does Harley-Davidson owe a lot of money?", frozenset(), frozenset(),
+         must=(r"Harley-Davidson",)),
+    Case("fw asset stretch: egg prices", "trap", "How much are eggs costing these days?", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("fw asset stretch: uranium", "trap", "What is uranium trading at?", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("fw name: Baltic Dry Index", "trap", "Is the Baltic Dry Index climbing?", frozenset(), frozenset(), must=(r"Baltic",)),
+    Case("fw writing: Slack message", "trap", "Draft a Slack message to my team about Tesla's margins.", frozenset(), frozenset(),
+         must=(r"doesn't write",)),
+    Case("fw writing stretch: one-pager", "trap", "Write up a one-pager on Amazon's debt for my boss.", frozenset(), frozenset(),
+         must=(r"doesn't write",)),
+    Case("fw guard: two-sentence summary", "routing", "Give me a two-sentence summary of Apple's view on tariffs.", frozenset({"filing"}),
+         frozenset({"AAPL"}), ungrounded_ok=True),
+    Case("fw guard: a place the filings name", "routing", "How much do chipmakers depend on Taiwan?", frozenset({"filing"}),
+         ungrounded_ok=True),
+)
+
+CASES = CASES + ROUND_TWENTYONE
 
 # Fresh cases only (none have been run). Write new ones before claiming a fair score.
 HELD_OUT: tuple[Case, ...] = ()

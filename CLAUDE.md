@@ -113,12 +113,19 @@ them (the owner hasn't confirmed the order):
    One clean old-against-new run on 266 cases went 707 to 711 of 798; follow-up resolution 39 (40 after a checker fix) to 46 of 46; 10 fresh
    cases (fair score) went 3 to 4 of 10, 8 of 10 after adding the words they missed (now tuning material). The next wording will miss
    again: these are still word lists.
-   **Next:** the rest in the order DECISIONS gives
-   (the outside-topic and writing-request lists; "clear in profit"), each
-   phrasing as a test first, then decide on the model-based routing experiment (its own branch, measured against these 35 and a
-   new fresh set). Keep keyword rules until then. After tuning, move these cases into `CASES`, write fresh ones, and record the result.
-   The 8 cause-word and 8 resolve cases and the 10 `ff` cases of fix (4) are all in `CASES` now (271 market, 51 follow-up
-   resolution), so `HELD_OUT` is empty in both evaluation files: write new cases before the next fair score.
+   **Fix (5) is built on `feature/copilot-outside-topics` and not yet merged (2026-10-17; DECISIONS: "Fix (5) of the fresh round"):** a
+   question that names no tracked company and contains a capitalised name found in no stored filing or headline is declined by name
+   (`unknown_name`, so no company list is needed for it); the company list grew from 70 to 183 names; more outside assets (gas, diesel,
+   crops, "the economy", REITs, stablecoins, more currencies); and a request to write an email, post, poem, code, slides or a translation
+   is declined **even when a tracked company is named** (`writing_request`; summaries, lists and tables are research and stay answerable).
+   One clean old-against-new run on 271 cases went 726 to 730 of 813 (gas prices, Chipotle and "draft an email" 0 to 3 of 3); 11 fresh
+   cases (fair score) went 2 to 8 of 11. A false-positive spot check of 38 ordinary questions with no tracked company found 3 wrongly
+   declined (Brussels, the Pentagon, Llama: names in nothing stored). Eggs, uranium and "write up a one-pager" still miss.
+   **Next:** "clear in profit", then decide on the model-based routing experiment (its own branch, measured against a new fresh set):
+   every list so far (periods, advice, cause words, switches, assets, companies, writing requests) has missed on the next wording.
+   Keep keyword rules until then. After tuning, move cases into `CASES`, write fresh ones, and record the result. The fresh cases of
+   fixes (4) and (5) are all in `CASES` now (282 market, 51 follow-up resolution), so `HELD_OUT` is empty in both evaluation files:
+   write new cases before the next fair score.
 
 ## Working with the owner
 
@@ -152,8 +159,9 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-17 (after PR #41): 1512 Python tests, 253 web tests, all passing (the Python count re-run on
-  `main` after the merge). Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
+- Baseline as of 2026-10-17: 1742 Python tests, 253 web tests, all passing on the unmerged fix (5) branch (1512 Python on
+  `main` after PR #41). A full test run can fail one or two vector-search tests while an evaluation shares the database;
+  run the suite when no evaluation is running. Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
   refresh ran at 3pm on 2026-10-16 (success, 0 problems).
 
 ## Rules
@@ -221,7 +229,7 @@ The owner is building this step by step and is not a professional developer, so 
   explain a price move. Before changing the prompt, `detect_intent`, or `parse_window`, run `python -m ai.eval_market
   --repeat 3 --show` (needs Ollama) and read the answers, not just the totals; checks that are too loose give false
   passes. `HELD_OUT` in that file is empty; the 35 of the fresh round, the 10, 12 and 12 of fixes (1) to (3), the 8 of the cause-word step and
-  the 5 of fix (4) are in `CASES` (271 with the older ones). All of them are tuning
+  the 5 of fix (4) and the 11 of fix (5) are in `CASES` (282 with the older ones). All of them are tuning
   material from now on, so write fresh cases in different wording before claiming a fair score, and don't tune against
   held-out cases once run. Before the fundamentals step, three runs scored about 121 to 123 of 129;
   after it, 153 to 155 of 165 on the same 43 cases plus 12 new ones (the 14 held-out cases that were then run, 13 passing,
@@ -257,6 +265,13 @@ The owner is building this step by step and is not a professional developer, so 
   mismatched periods); a correct number can still mislead. Keep rejecting a leftover concept (Amazon's 2009 gross
   profit). Figures are checked against the filing text, not just for self-consistency. Tests use fake SEC data and
   `ZZFUN`.
+- **Questions the app cannot answer (`ai/market.py`: `outside_scope`, `unknown_name`, `writing_request`; used in
+  `answer_question`):** declined in code, before the model, with a fixed message. A request to write something is declined
+  even when a tracked company is named; the other rules run only when none is named or chosen, and a filings cue ("which
+  companies", "10-K", "according to") keeps a research question answerable. A decline must say truthfully what is missing ("I can't
+  find X in anything stored"); never decline a summary, list or table request. The company and asset lists are finite: add a
+  phrasing as a test first, with a question of its own for every alternative (breaking each alternative on purpose found 46
+  untested ones). Tests that need stored text insert their own filing and headline and no filing chunks.
 - **Copilot fundamentals (`ai/market.py`, `ai/copilot.py`):** the figures reach the model only as one numbered source
   (kind `fundamentals`), every number from `data/fundamentals.py`, growth direction in words and checked like a price
   move. **Cautions are attached to the answer in code** (`relevant_cautions` into `Answer.cautions`), scoped to the
