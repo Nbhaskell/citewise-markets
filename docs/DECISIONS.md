@@ -1256,7 +1256,7 @@ benchmarks.
   does not print cautions. **Still open from the fresh round:** (4) follow-ups keeping their topic; (5) the outside-topic and
   writing-request lists; (6) "clear in profit".
 - **Fix (4) of the fresh round: follow-ups keep their topic even when the model's rewrite loses or invents it, 2026-10-16** (branch
-  `feature/copilot-follow-up-topics`; no prompt change; built and measured, not yet merged). **What a no-model probe showed first** (a fake
+  `feature/copilot-follow-up-topics`; no prompt change; merged as PR #41 on 2026-10-17). **What a no-model probe showed first** (a fake
   rewrite step over the real database, with the rewrites the model might give): "Switch over to Microsoft.", "Skip to Nvidia." and "Give
   me the number for Apple too." are not bare switches (`switch`, `skip`, `to`, `number` were not filler words), so the topic was never
   carried; "And did Nvidia do better than that?" was already rebuilt into the AMD price question when the model returned it unchanged, but

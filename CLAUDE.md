@@ -105,7 +105,7 @@ them (the owner hasn't confirmed the order):
    **The cause-word gap from fix (3) is merged (PR #40, 2026-10-16; DECISIONS: "Cause words"):** "what drove / caused / triggered it", "how come" and "what's responsible for" bring the headlines to a price question, and
    "<Company>'s jump / slide" or "the move in <Company> stock" with a cause word reaches the prices. A clean old-against-new run on 258
    cases went 675 to 681 of 774; 8 fresh cases went 1 to 7.
-   **Fix (4) is built on `feature/copilot-follow-up-topics` and not yet merged (2026-10-16; DECISIONS: "Fix (4) of the fresh round"):** a
+   **Fix (4) is merged (PR #41, 2026-10-17; DECISIONS: "Fix (4) of the fresh round"):** a
    question that is only a company switch ("Skip to Nvidia.", "Switch over to Microsoft.", "Give me the number for Apple too.") or only
    a comparison ("Is Tesla's list longer than that?", "Does Amazon say anything similar?", "Did Microsoft fare better than that?") names
    no topic, so the earlier question rebuilt with the new company now wins over the model's rewrite (it used to be trusted when it named
@@ -152,8 +152,8 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-16: 1512 Python tests, 253 web tests, all passing on the unmerged fix (4) branch (1402 Python
-  on `main` after PR #40). Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
+- Baseline as of 2026-10-17 (after PR #41): 1512 Python tests, 253 web tests, all passing (the Python count re-run on
+  `main` after the merge). Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
   refresh ran at 3pm on 2026-10-16 (success, 0 problems).
 
 ## Rules
