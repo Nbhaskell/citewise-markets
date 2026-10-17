@@ -73,11 +73,15 @@ def test_other_comparison_wordings_are_rebuilt_too(conn, question):
     assert ans.interpreted_question == "How many employees does Zetacorp have, compared with Omegaware?"
 
 
-def test_a_rewrite_that_kept_both_companies_is_trusted(conn):
+def test_a_rewrite_that_kept_both_companies_is_no_longer_trusted_for_a_bare_comparison(conn):
+    """Changed on purpose (fix 4 of the fresh round). It used to keep the rewrite when it named both companies, but a bare
+    comparison names no topic, so a rewrite that kept both ("Did Nvidia do better than AMD?") had lost or invented the
+    earlier topic. The earlier question, rebuilt, wins; here the two differ by a comma. Tests of the new rule:
+    tests/test_copilot_follow_up_topics.py."""
     llm = RoutingLLM(rewrite="How many employees does Zetacorp have compared with Omegaware?")
     ans, _ = ask(conn, llm, "Is that more or fewer than Omegaware?")
     assert sorted(ans.symbols) == ["ZZCA", "ZZCB"]
-    assert ans.interpreted_question == "How many employees does Zetacorp have compared with Omegaware?"
+    assert ans.interpreted_question == "How many employees does Zetacorp have, compared with Omegaware?"
 
 
 def test_a_comparison_with_a_topic_of_its_own_keeps_both_companies_but_not_the_old_topic(conn):
