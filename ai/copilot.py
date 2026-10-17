@@ -28,6 +28,7 @@ from .market import (
     premise_cautions,
     relevant_cautions,
 )
+from .router import apply_route, ask_router, needs_router, router_enabled
 from .search import SearchResult, search_filings
 from .table_units import add_units
 
@@ -811,6 +812,7 @@ def answer_question(
     expand: bool = True,
     history: list[Turn] | None = None,
     today: date | None = None,
+    router: bool | None = None,
 ) -> Answer:
     """Answer from filings, stored prices, financial figures, and headlines. `history` only helps understand a follow-up;
     the answer itself is written from the retrieved sources alone, so earlier answers can never be used as evidence.
@@ -832,6 +834,12 @@ def answer_question(
         return refuse(outside_scope_message(outside[0], outside[1], tracked))
     if not symbols and (name := unknown_name(conn, search_question)):  # a name the stored text has never seen
         return refuse(outside_scope_message("unknown", name, tracked))
+    router_says_outside = False
+    if router_enabled(router) and needs_router(intent, search_question):  # no specific route found: ask the model what kind of question this is
+        intent, verdict = apply_route(intent, ask_router(llm, search_question), has_company=bool(symbols), question=search_question)
+        if verdict == "writing":
+            return refuse(outside_scope_message("writing", "", tracked))
+        router_says_outside = verdict == "outside"  # only a hint: it changes the message when nothing relevant is found, never the search
     if intent.market and not symbols:
         return refuse(NO_COMPANY)
     market: list[MarketEvidence] = []
@@ -851,7 +859,7 @@ def answer_question(
                 queries += extra
                 passages, _ = retrieve(conn, embedder, queries, symbols, limit, forms)
         elif not market:
-            return refuse(NO_EVIDENCE, found, queries)
+            return refuse(outside_scope_message("chat", "", tracked) if router_says_outside else NO_EVIDENCE, found, queries)
     if not market and not passages:
         return refuse(NO_EVIDENCE)
 

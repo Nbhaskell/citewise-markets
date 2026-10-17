@@ -299,7 +299,9 @@ FILING_FORM_RE = re.compile(
 )
 # "The last four quarters" is the twelve months the stored figures cover, not a request for one quarter's filing; "last
 # quarter" and "the second quarter" still are.
-TWELVE_MONTHS_AS_QUARTERS_RE = re.compile(r"\b(?:last|past|previous|trailing|prior)\s+(?:4|four)\s+quarters\b", re.IGNORECASE)
+TWELVE_MONTHS_AS_QUARTERS_RE = re.compile(
+    r"\b(?:last|past|previous|trailing|prior|latest|recent)\s+(?:4|four)\s+quarters\b", re.IGNORECASE
+)
 WHY_RE = re.compile(
     r"\b(?:why|reasons?|because|explain\w*|what\s+(?:happened|drove|drives|caused|causes)|driv(?:e|es|ing|en|ers?)|"
     r"caus(?:e|es|ed|ing)|what(?:'s|\s+is|\s+was)\s+behind)\b",
