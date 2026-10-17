@@ -707,8 +707,10 @@ ROUND_FIFTEEN: tuple[Case, ...] = (
          frozenset({"AMD", "NVDA"}), history=(AMD_PRICE,), must=(PRICE_DIGITS,)),
     Case("fr follow: switch over stretch", "routing", "Switch over to Microsoft.", frozenset({"headline"}), frozenset({"MSFT"}),
          history=(TSLA_NEWS,)),
-    Case("fr follow: anything similar", "routing", "Does Amazon say anything similar?", frozenset({"filing"}), frozenset({"AMZN"}),
-         history=(MSFT_RISKS,), must=(r"risk",), ungrounded_ok=True),
+    # Expected {"AMZN"} until 2026-10-16; changed to both: "similar" is similar to what Microsoft said, so Microsoft's risks must be
+    # searched too to compare (DECISIONS: "Fix (4) of the fresh round").
+    Case("fr follow: anything similar", "routing", "Does Amazon say anything similar?", frozenset({"filing"}),
+         frozenset({"AMZN", "MSFT"}), history=(MSFT_RISKS,), must=(r"risk",), ungrounded_ok=True),
     Case("fr follow: market value next to", "routing", "How does its market value look next to AMD's?", frozenset({"fundamentals"}),
          frozenset({"AAPL", "AMD"}), history=(AAPL_PE,), figures=("AAPL:market_value", "AMD:market_value")),
     # advice, prediction, false premises, and numbers the data does not hold
@@ -845,8 +847,9 @@ CASES = CASES + ROUND_EIGHTEEN
 # tests and every case above, before any was run. "Stretch" cases use wording the rules do not know. The Tesla energy case is a guard
 # (a business metric, not the stock). The cause check (an answer that implies a cause fails the case) applies to all of them.
 # Data-dependent (stored closes on 2026-10-16): Tesla -7% over a week. THE FAIR SCORE, from the one run: 1 of 8 on the old code, 7 of 8
-# on the new (docs/DECISIONS.md, "Cause words"). Once run: tuning material.
-HELD_OUT: tuple[Case, ...] = (
+# on the new (docs/DECISIONS.md, "Cause words"). Run and tuned against: folded into CASES on 2026-10-16 (258 cases), so HELD_OUT is
+# empty again.
+ROUND_NINETEEN: tuple[Case, ...] = (
     Case("fc cause: drove the slide", "routing", "What drove the slide in Alphabet stock over the past week?",
          frozenset({"price", "headline"}), frozenset({"GOOGL"}), must=(PRICE_DIGITS,)),
     Case("fc cause: caused to fall", "routing", "What caused Tesla stock to fall so much this week?",
@@ -864,6 +867,31 @@ HELD_OUT: tuple[Case, ...] = (
     Case("fc guard: energy storage jump", "routing", "What drove Tesla's jump in energy storage revenue this year?",
          frozenset({"filing"}), frozenset({"TSLA"}), ungrounded_ok=True),
 )
+
+CASES = CASES + ROUND_NINETEEN
+
+# Written 2026-10-16 for fix (4) of the fresh round (follow-ups that lose their topic in the full answer), in wording unlike the
+# unit tests, every case above, and the docs, before any was run on the new code (an overlap script compared them with every quoted
+# string in the repo). "Stretch" cases use wording the rules do not know. THE FAIR SCORE, from the first run: 1 of 5 on the old code, 2 of 5
+# on the new (docs/DECISIONS.md, "Fix (4) of the fresh round"); the words "fare", "perform", "idea", "pivot" were added afterwards (4 of 5).
+# Tuning material from now on: folded into CASES below (266 + 5), so HELD_OUT is empty again.
+ROUND_TWENTY: tuple[Case, ...] = (
+    Case("ff follow: fared better than that", "routing", "Did Microsoft fare better than that?", frozenset({"price"}),
+         frozenset({"AMD", "MSFT"}), history=(AMD_PRICE,), must=(PRICE_DIGITS,)),
+    Case("ff follow: over to, same idea", "routing", "Over to Nvidia, same idea.", frozenset({"headline"}), frozenset({"NVDA"}),
+         history=(TSLA_NEWS,)),
+    Case("ff follow: report something alike", "routing", "Does Apple report something alike?", frozenset({"filing"}),
+         frozenset({"AAPL", "MSFT"}), history=(MSFT_RISKS,), must=(r"risk",), ungrounded_ok=True),
+    Case("ff follow stretch: same ratio", "routing", "Pull that same ratio up for Microsoft as well.", frozenset({"fundamentals"}),
+         frozenset({"MSFT"}), history=(AAPL_PE,), figures=("MSFT:pe",)),
+    Case("ff follow stretch: rosier by comparison", "routing", "Was Tesla's month any rosier by comparison?", frozenset({"price"}),
+         frozenset({"NVDA", "TSLA"}), history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
+)
+
+CASES = CASES + ROUND_TWENTY
+
+# Fresh cases only (none have been run). Write new ones before claiming a fair score.
+HELD_OUT: tuple[Case, ...] = ()
 
 
 def expected_figure(conn, spec: str) -> str:

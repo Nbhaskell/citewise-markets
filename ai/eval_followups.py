@@ -121,14 +121,14 @@ CASES = CASES + PREVIOUS_HELD_OUT + STEP_C
 # Fresh cases for the whole second-round work, written 2026-10-16 BEFORE anything was run, in wording used nowhere else
 # (checked against every case, test, and doc with a script). "stretch" marks a wording the rules probably do not know.
 # RUN 2026-10-16 (3 repeats, identical each time): 3 of 8 passed (docs/DECISIONS.md, "Fresh held-out round"). Not tuned yet.
-# They are tuning material from now on: write new ones before the next fair score.
-HELD_OUT: tuple[Case, ...] = (
+# They are tuning material from now on (folded into CASES on 2026-10-16): write new ones before the next fair score.
+FRESH_ROUND_RESOLVE: tuple[Case, ...] = (
     Case("fr resolve: same again for", "follow-up", (TSLA_RISK,), "Same again for AMD, please.", frozenset({"AMD"}), "risk"),
     Case("fr resolve: longer list stretch", "follow-up", (NVDA_RISK,), "Is Tesla's list longer than that?",
          frozenset({"NVDA", "TSLA"}), "risk"),
     Case("fr resolve: number for too", "follow-up", (MSFT_REV,), "Give me the number for Apple too.", frozenset({"AAPL"}), "revenue"),
     Case("fr resolve: more people than", "follow-up", (AAPL_EMP,), "Does Amazon employ more people than that?",
-         frozenset({"AAPL", "AMZN"}), "employees"),
+         frozenset({"AAPL", "AMZN"}), "employ"),  # was "employees": a checker artifact, the rewrite "employ more people than Apple" was right
     Case("fr resolve: skip to stretch", "follow-up", (GOOGL_LEGAL,), "Skip to Nvidia.", frozenset({"NVDA"}), "legal"),
     Case("fr resolve: which of the two", "follow-up", (APPLE_TESLA_DEBT,), "Which of the two spends more on research?",
          frozenset({"AAPL", "TSLA"}), "research"),
@@ -137,6 +137,26 @@ HELD_OUT: tuple[Case, ...] = (
     Case("fr resolve: standalone, all companies", "standalone", (NVDA_RISK,), "Summarize what the companies say about tariffs.",
          frozenset(), "tariffs"),
 )
+CASES = CASES + FRESH_ROUND_RESOLVE
+
+# Written 2026-10-16 for fix (4) of the fresh round, in wording unlike the unit tests and every case above (an overlap script compared
+# them with every quoted string in the repo), before any was run on the new code. "Stretch" marks a wording the rules do not know.
+# THE FAIR SCORE, from the first run: 2 of 5 on the old code and 2 of 5 on the new (docs/DECISIONS.md, "Fix (4) of the fresh round");
+# "pivot", "idea", "treatment" were added afterwards (4 of 5). Tuning material from now on: folded into CASES below.
+ROUND_TWENTY: tuple[Case, ...] = (
+    Case("ff resolve stretch: pivot to", "follow-up", (GOOGL_LEGAL,), "Pivot to Amazon, please.", frozenset({"AMZN"}), "legal"),
+    Case("ff resolve: next up", "follow-up", (MSFT_REV,), "Next up: Tesla.", frozenset({"TSLA"}), "revenue"),
+    Case("ff resolve stretch: same treatment", "follow-up", (AAPL_EMP,), "Give Nvidia the same treatment.", frozenset({"NVDA"}),
+         "employees"),
+    Case("ff resolve stretch: roster longer", "follow-up", (NVDA_RISK,), "Does Amazon's roster run to more items than that?",
+         frozenset({"NVDA", "AMZN"}), "risk"),
+    Case("ff resolve: standalone, all of the companies", "standalone", (TSLA_EMP,), "Do all of the companies discuss inflation?",
+         frozenset(), "inflation"),
+)
+CASES = CASES + ROUND_TWENTY
+
+# Fresh cases only (none have been run). Write new ones before claiming a fair score.
+HELD_OUT: tuple[Case, ...] = ()
 
 
 @dataclass

@@ -1255,6 +1255,64 @@ benchmarks.
   causing. (3) A bare "<Company> jumped 30%" with no stock word is not a price question (only the noun forms are). (4) The evaluation
   does not print cautions. **Still open from the fresh round:** (4) follow-ups keeping their topic; (5) the outside-topic and
   writing-request lists; (6) "clear in profit".
+- **Fix (4) of the fresh round: follow-ups keep their topic even when the model's rewrite loses or invents it, 2026-10-16** (branch
+  `feature/copilot-follow-up-topics`; no prompt change; built and measured, not yet merged). **What a no-model probe showed first** (a fake
+  rewrite step over the real database, with the rewrites the model might give): "Switch over to Microsoft.", "Skip to Nvidia." and "Give
+  me the number for Apple too." are not bare switches (`switch`, `skip`, `to`, `number` were not filler words), so the topic was never
+  carried; "And did Nvidia do better than that?" was already rebuilt into the AMD price question when the model returned it unchanged, but
+  when the model wrote "Did Nvidia do better than AMD?" (both companies, no stock) the rewrite was trusted and went to the filings (the
+  Data Center revenue answer); "Is Tesla's list longer than that?" was not a bare comparison (`longer`, `list` unknown), so only a note
+  "(comparing NVDA and TSLA)" was added and the topic was lost; "Summarize what the companies say about tariffs." was handed to the model,
+  which named NVDA and AMD though AMD never appeared in the conversation. The baseline run confirmed each (the model returned "Skip to
+  Nvidia" and "Give me the number" unchanged, rewrote the Tesla list as "...longer than NVIDIA's?", and invented AMD). **The decision
+  behind the main change:** a question that is only a company switch or only a comparison names no topic, so any topic in the model's
+  rewrite is the earlier one reworded or one it invented. The earlier *question* (never its answer), rebuilt with the new company, now wins
+  over the rewrite whenever it can be rebuilt (the existing `carry_topic` and `carry_comparison`); when it cannot (two companies in the
+  earlier question, nothing to swap in) the rewrite is still used. This reverses one earlier rule on purpose: "a rewrite that kept both
+  companies is trusted" (its test now expects the rebuilt question, which differs by a comma). **Built, in `ai/copilot.py`:** (1)
+  `SWITCH_PHRASE_RE`: switch / skip / move on / jump / go / hop / cut / turn / shift / flip / pivot (over, on, ahead...) "to", "over to",
+  "onto" count as a switch; generic nouns (number, figure, one, question, idea, thing, approach, treatment) are switch filler. (2)
+  `carry_topic` now runs whatever the rewrite said (it used to run only when the rewrite returned the question unchanged). (3) A
+  comparison with no topic of its own is rebuilt even when the rewrite kept both companies; its filler list gained longer / shorter, list /
+  number / count / total / amount / figure, say / mention / anything / something / alike / comparable, has / have / had, and fare /
+  perform. (4) `SIMILAR_RE`: "anything / something similar (alike, comparable, like that)", or "similar / alike / likewise" ending the
+  question, is both a comparison and a reference back, so "Does Amazon say anything similar?" searches Microsoft too and keeps the risks
+  topic ("similar" before a noun, "a similar number of", is not it). **That answers the open question** from the fresh round: yes,
+  searching the earlier company is right, because "similar" can only be judged against what it said; the case's expectation was changed
+  from {AMZN} to {AMZN, MSFT} (and its answer now starts with Microsoft's risks, then Amazon's). (5) `ALL_COMPANIES_RE`: "the companies",
+  "all (of) the companies", "every / each / any company", "which company / companies", "across companies", "companies'" with no company
+  named and no reference word is used as written, with no companies. **Tests first:** 110 new in
+  `tests/test_copilot_follow_up_topics.py` (37 of the first 56 failed before the change; 11 of the 15 added later for the fresh cases'
+  words failed before their change), one old test changed; 1512 Python and 253 web tests pass. About 80 deliberate breakages of the new rules: 14 were first
+  missed (the "similar" cues passed through each other, the filler words were never isolated, the all-companies guards had no test, the
+  "no comparing note when nothing was lost" line), each pointed at a missing test, now added; one remaining miss was a word that was
+  already in the filler list. **Evaluation, one data snapshot (no refresh in between), 3 repeats:** old code, then new code, over the 266
+  cases (258 + the 8 cause-word cases moved into `CASES`): **market 707 of 798 (88.6%) to 711 of 798 (89.1%); follow-up resolution 39 of
+  46 to 46 of 46** (one case, "more people than", had a checker artifact: the topic word "employees" is not in "employ more people than
+  Apple"; its word is now "employ", and by inspection the old code passes it, so 40 of 46 to 46 of 46). Gains: "did Nvidia do better"
+  0 to 3 of 3, "switch over" 0 to 3 of 3, "been performing" and "why did it move" flaky cases up; the resolve cases "skip to", "number for
+  too", "longer list", "all companies" and two Understood-as-employee-count checker cases now pass every run. Drops: "crashing premise"
+  3 to 2, "last Friday" 2 to 0, "press coverage" 1 to 0; none has a history, and every new rule needs one, so none can come from this
+  change; A/B, 12 runs each, old against new: 12 of 12 against 12 of 12, 6 of 12 against 8 of 12, 0 of 12 against 0 of 12. I read the
+  answers: the AMD and Nvidia answer quotes both stored moves (+4.87% and +0.92%) with their closes, the Microsoft switch answer lists
+  Microsoft's headlines, the Amazon answer compares both companies' risks, and the other 19 history cases read the same as before.
+  **Fresh cases written before the run (10: 5 market `ff follow`, 5 resolve `ff resolve`, in wording unlike the tests; an overlap script
+  found a highest similarity of 0.69 against any quoted string in the repo other than the cases' own names, after three were reworded
+  for being close to a failing case's template): fair score 4 of 10 on the new code against 3 of 10 on the old (market 2 of 5 against 1
+  of 5, resolve 2 of 5 against 2 of 5).** The misses were wordings the rules did not know: "fare better" (answered from the filings),
+  "Over to Nvidia, same idea" (`idea`), "Pivot to Amazon" (`pivot`), "the same treatment" (`treatment`), "roster ... more items than
+  that", and "rosier by comparison" (no comparison word). I then added the words the first four needed (with tests), which makes those
+  cases tuning material: 8 of 10 afterwards, but that is not a fair score. **Weak spots:** (1) The fix is again word lists: the next
+  switch or comparison wording will miss, which is the case for the model-based routing experiment. The two fresh misses left are
+  "Does Amazon's roster run to more items than that?" (a comparison with words not on the list, so the model's rewrite is kept and it
+  lost the topic) and "Was Tesla's month any rosier by comparison?" (no `than`; answered "the question is unclear" and only Tesla). (2)
+  Code wins whenever the earlier question can be rebuilt, so a model rewrite that was actually better is overridden for a bare switch or
+  comparison; no case showed a loss, but "Understood as" is the only place the user can see it. (3) "The companies" after a turn about
+  two companies is read as all of them, not those two ("the two companies" is not matched). (4) "Similar" fires on any question with
+  a new company and "anything similar" in it, including one with its own topic. (5) "Over to Nvidia, same idea" now reaches the
+  headlines, but the answer lists headlines that are not about Nvidia (headline relevance, unchanged by this step). (6) The evaluation
+  does not print cautions. **Still open from the fresh round:** (5) the outside-topic and writing-request lists; (6) "clear in profit".
+  Then the decision on the model-based routing experiment.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

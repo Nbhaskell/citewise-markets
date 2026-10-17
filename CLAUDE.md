@@ -105,10 +105,20 @@ them (the owner hasn't confirmed the order):
    **The cause-word gap from fix (3) is merged (PR #40, 2026-10-16; DECISIONS: "Cause words"):** "what drove / caused / triggered it", "how come" and "what's responsible for" bring the headlines to a price question, and
    "<Company>'s jump / slide" or "the move in <Company> stock" with a cause word reaches the prices. A clean old-against-new run on 258
    cases went 675 to 681 of 774; 8 fresh cases went 1 to 7.
+   **Fix (4) is built on `feature/copilot-follow-up-topics` and not yet merged (2026-10-16; DECISIONS: "Fix (4) of the fresh round"):** a
+   question that is only a company switch ("Skip to Nvidia.", "Switch over to Microsoft.", "Give me the number for Apple too.") or only
+   a comparison ("Is Tesla's list longer than that?", "Does Amazon say anything similar?", "Did Microsoft fare better than that?") names
+   no topic, so the earlier question rebuilt with the new company now wins over the model's rewrite (it used to be trusted when it named
+   both companies); "similar" searches the earlier company too; "the companies" / "which company" with no company named is used as written.
+   One clean old-against-new run on 266 cases went 707 to 711 of 798; follow-up resolution 39 (40 after a checker fix) to 46 of 46; 10 fresh
+   cases (fair score) went 3 to 4 of 10, 8 of 10 after adding the words they missed (now tuning material). The next wording will miss
+   again: these are still word lists.
    **Next:** the rest in the order DECISIONS gives
-   (follow-ups keeping their topic; the outside-topic and writing-request lists; "clear in profit"), each
+   (the outside-topic and writing-request lists; "clear in profit"), each
    phrasing as a test first, then decide on the model-based routing experiment (its own branch, measured against these 35 and a
    new fresh set). Keep keyword rules until then. After tuning, move these cases into `CASES`, write fresh ones, and record the result.
+   The 8 cause-word and 8 resolve cases and the 10 `ff` cases of fix (4) are all in `CASES` now (271 market, 51 follow-up
+   resolution), so `HELD_OUT` is empty in both evaluation files: write new cases before the next fair score.
 
 ## Working with the owner
 
@@ -142,8 +152,8 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-16 (after PR #40): 1402 Python tests, 253 web tests, all passing (run on the branch before
-  the merge; the merge added nothing else). Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
+- Baseline as of 2026-10-16: 1512 Python tests, 253 web tests, all passing on the unmerged fix (4) branch (1402 Python
+  on `main` after PR #40). Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
   refresh ran at 3pm on 2026-10-16 (success, 0 problems).
 
 ## Rules
@@ -210,8 +220,8 @@ The owner is building this step by step and is not a professional developer, so 
   direction, minus-sign, and cause checks, the "no company named" and index refusals, and the rule that headlines never
   explain a price move. Before changing the prompt, `detect_intent`, or `parse_window`, run `python -m ai.eval_market
   --repeat 3 --show` (needs Ollama) and read the answers, not just the totals; checks that are too loose give false
-  passes. `HELD_OUT` in that file holds the 8 cases written for the cause-word step on 2026-10-16, already run once (7 of 8 on the
-  new code); the 35 of the fresh round and the 10, 12 and 12 of fixes (1) to (3) are in `CASES` (258 with the older ones). All of them are tuning
+  passes. `HELD_OUT` in that file is empty; the 35 of the fresh round, the 10, 12 and 12 of fixes (1) to (3), the 8 of the cause-word step and
+  the 5 of fix (4) are in `CASES` (271 with the older ones). All of them are tuning
   material from now on, so write fresh cases in different wording before claiming a fair score, and don't tune against
   held-out cases once run. Before the fundamentals step, three runs scored about 121 to 123 of 129;
   after it, 153 to 155 of 165 on the same 43 cases plus 12 new ones (the 14 held-out cases that were then run, 13 passing,
