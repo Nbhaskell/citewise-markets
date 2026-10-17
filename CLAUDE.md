@@ -98,8 +98,7 @@ them (the owner hasn't confirmed the order):
    opened" are read exactly, and every other named period that is not read is flagged by a caution (prices and headlines) instead
    of defaulting silently; a window past the first stored close says so. A clean old-against-new run on 234 cases went 631 to 636
    of 702; 12 fresh cases went 1 to 5.
-   **Fix (3) is built on branch `feature/copilot-advice-premise` (2026-10-16, not committed or merged yet; DECISIONS: "Fix (3) of
-   the fresh round"):** "cash out", "take profits", "unload", "is it time to", "would it be crazy to" and the like now carry the
+   **Fix (3) is merged (PR #39, 2026-10-16; DECISIONS: "Fix (3) of the fresh round"):** "cash out", "take profits", "unload", "is it time to", "would it be crazy to" and the like now carry the
    advice notice (with company-side guards), "Google doubled" and "can only go up" reach the prices, and a new code-side premise
    statement quotes the stored move when the question assumes one that did not happen. A clean old-against-new run on 246 cases went
    648 to 657 of 738; 12 fresh cases went 3 to 8. Known gap: "what drove it" is not a cause word, so that question gets no headlines.
@@ -140,7 +139,7 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-16 (after PR #38): 1247 Python tests, 253 web tests, all passing (run on the branch before
+- Baseline as of 2026-10-16 (after PR #39): 1364 Python tests, 253 web tests, all passing (run on the branch before
   the merge; the merge added nothing else). Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
   refresh ran at 3pm on 2026-10-16 (success, 0 problems).
 
@@ -208,8 +207,8 @@ The owner is building this step by step and is not a professional developer, so 
   direction, minus-sign, and cause checks, the "no company named" and index refusals, and the rule that headlines never
   explain a price move. Before changing the prompt, `detect_intent`, or `parse_window`, run `python -m ai.eval_market
   --repeat 3 --show` (needs Ollama) and read the answers, not just the totals; checks that are too loose give false
-  passes. `HELD_OUT` in that file holds the 12 cases written for fix (2) on 2026-10-16, already run once (5 of 12 on the new
-  code); the 35 of the fresh round and the 10 of fix (1) are in `CASES` (234 with the older ones). All of them are tuning
+  passes. `HELD_OUT` in that file holds the 12 cases written for fix (3) on 2026-10-16, already run once (8 of 12 on the new
+  code); the 35 of the fresh round and the 10 and 12 of fixes (1) and (2) are in `CASES` (246 with the older ones). All of them are tuning
   material from now on, so write fresh cases in different wording before claiming a fair score, and don't tune against
   held-out cases once run. Before the fundamentals step, three runs scored about 121 to 123 of 129;
   after it, 153 to 155 of 165 on the same 43 cases plus 12 new ones (the 14 held-out cases that were then run, 13 passing,
