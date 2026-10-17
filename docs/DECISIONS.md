@@ -1383,7 +1383,7 @@ benchmarks.
   **Still open from the fresh round:** (6) "clear in profit". Then the decision on the model-based routing experiment, which this
   step's weak spots (1) to (5) support: every list here will miss the next wording.
 - **Model-based routing experiment, 2026-10-17** (branch `feature/copilot-model-router`; no change to `SYSTEM_PROMPT` or the rewrite
-  prompt; built and measured, not yet merged). **Why:** six fixes in a row added keyword rules and every fresh round missed on the
+  prompt; merged as PR #43 on 2026-10-17 with the router off by default). **Why:** six fixes in a row added keyword rules and every fresh round missed on the
   next wording (46%, then 65%, 72% before). **Baseline first, on current `main`, before any router existed:** 39 new questions in
   everyday wording across every route (prices with a period, news, sentiment, the stored figures, filings, outside topics, advice,
   predictions, a false premise, follow-ups), 3 repeats: **18 of 39 on the first pass, 52 of 117 (44%)**; prices 2 of 7, news 1 of 5,
