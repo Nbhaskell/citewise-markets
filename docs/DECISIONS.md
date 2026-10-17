@@ -1477,6 +1477,33 @@ benchmarks.
   only when the model's kinds differ from the keyword route's, so a question the model looked at and left on the filings looks the same
   as one it never saw. (2) It reports the model's choice, not whether the model was right. (3) The wording is fixed and long for five
   kinds. (4) The default is still off: turning it on is the owner's call, to be made at the end of this branch.
+- **Router second look, step 1: two new question sets, nothing run yet, 2026-10-17** (branch `feature/router-second-look`, cut from
+  `feature/router-visibility`; no change to any rule, prompt or the router). **Question being prepared for:** the router is asked only
+  when the keywords find no route, so a question the keywords route to something specific but wrong is never put to the model (weak
+  spot 1 of the routing experiment), and a follow-up whose rewrite lost its topic cannot be recovered (weak spot 2). Measuring either
+  needs questions the keywords have not been tuned on, because on the 322 old cases without history the keywords already match the
+  expected evidence for 248 and only 5 are wrong-and-never-asked (an offline, no-model count: the old cases were tuned until they
+  passed, so they cannot show the problem). **The order mattered:** the sealed set was written first, before the keyword word lists
+  were opened for this work, and was not screened against the rules (some will route right, some wrong); the development set was
+  written second, with the lists open, aimed at the structural ways the rules go wrong. **Sealed set, `SEALED_ROUND_TWO` (41 cases,
+  `s2`, run with `--sealed`, not in `CASES`):** 7 prices, 6 news and mood, 6 stored figures, 6 filings (guards: legitimate research
+  that must not be declined or rerouted), 10 traps (outside topics, writing, an unknown name, advice, a prediction, a false premise, an
+  unstored ratio) and 6 follow-ups. **Development set, `ROUND_SL` (37 cases, `sl`, in `CASES`):** 3 price questions that carry a news
+  word ("lately"), 9 filings questions that carry a price or mood word ("falling demand", "closed", "volatility", "optimistic",
+  "bullish", "mood"), 5 money wordings, 2 cause wordings the rules may not know, 2 news wordings, 8 controls the keywords should
+  already route right, and 8 follow-ups ("Run the same numbers for Microsoft", "Lay Amazon alongside it"). **Overlap check by script**
+  (every string literal in every `.py` file, the web tests' questions, and the two new sets against each other): the first pass found
+  8 near-copies of older cases or test strings (including one sealed question that was almost word for word an older case), all
+  reworded; the highest remaining similarity is 0.80 (a shared template, "What was X's ... over the last twelve months?"), and the
+  sealed and development sets are at most 0.65 from each other. This is a looser measure than the one used for the earlier sets, so
+  the numbers are not comparable. **What the keywords do on the development set, offline with no model (29 cases without history):
+  12 right, 4 wrong but the router would be asked, 13 wrong and never asked.** The 13 are the weak spot made concrete: 3 price
+  questions routed to headlines because of "lately"; 6 filings questions routed to prices because of "falling", "closed", "trading",
+  "volatility", "fell", "rising"; 3 filings questions routed to headlines and mood because of "optimistic", "bullish", "mood"; and
+  "accounts for the tumble" (prices without the headlines a cause question brings). **What this says about the design:** the router
+  today only adds (the advice flag, headlines behind a news word), and a fix for 12 of these 13 has to REMOVE evidence the keywords chose
+  (prices or mood from a filings question, headlines from a price question; only the cause case needs an addition), so a second look needs a rule for when the model may override, which is a new kind of risk and must
+  be measured, not assumed. **Not done:** nothing has been run with a model; the shadow-mode measurement is the next step.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
