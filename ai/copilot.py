@@ -22,6 +22,8 @@ from .market import (
     join_names,
     outside_scope,
     parse_window,
+    unknown_name,
+    writing_request,
     period_cautions,
     premise_cautions,
     relevant_cautions,
@@ -56,6 +58,17 @@ def outside_scope_message(kind: str, name: str, tracked: list[str]) -> str:
         return (
             f"{name} isn't one of the companies tracked here, so I have no filings, prices, figures, or headlines for it. "
             f"{held} To look at {name}, use the \"Add a company\" box on the dashboard, then ask again."
+        )
+    if kind == "unknown":
+        return (
+            f"I can't find \"{name}\" in anything stored here (filings, prices, or headlines), so I can't answer a question about "
+            f"it. {held} If it is a company, use the \"Add a company\" box on the dashboard, then ask again."
+        )
+    if kind == "writing":
+        return (
+            "That's outside what this app covers: it answers questions about companies from stored data, and it doesn't write "
+            f"emails, posts, poems, code, or other documents. {held} Ask for the facts you need about a tracked company, then write "
+            "the message yourself."
         )
     if kind == "chat":
         return f"That's outside what this app covers: it answers questions about companies from stored data. {held}"
@@ -810,11 +823,15 @@ def answer_question(
             question, text, symbols, list(found), queries=list(queries), interpreted_question=interpreted, refused=True
         )
 
+    tracked = [r[0] for r in conn.execute("SELECT symbol FROM instruments WHERE active ORDER BY symbol")]
+    if writing_request(question) or writing_request(search_question):  # even with a tracked company named: an email is not research
+        return refuse(outside_scope_message("writing", "", tracked))
     if intent.unstored_only:
         return refuse(not_calculated(intent.unstored))
     if not symbols and (outside := outside_scope(search_question)):  # before the generic refusal: it says what is missing
-        tracked = [r[0] for r in conn.execute("SELECT symbol FROM instruments WHERE active ORDER BY symbol")]
         return refuse(outside_scope_message(outside[0], outside[1], tracked))
+    if not symbols and (name := unknown_name(conn, search_question)):  # a name the stored text has never seen
+        return refuse(outside_scope_message("unknown", name, tracked))
     if intent.market and not symbols:
         return refuse(NO_COMPANY)
     market: list[MarketEvidence] = []

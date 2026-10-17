@@ -1313,6 +1313,75 @@ benchmarks.
   headlines, but the answer lists headlines that are not about Nvidia (headline relevance, unchanged by this step). (6) The evaluation
   does not print cautions. **Still open from the fresh round:** (5) the outside-topic and writing-request lists; (6) "clear in profit".
   Then the decision on the model-based routing experiment.
+- **Fix (5) of the fresh round: questions the app cannot answer are declined in code, 2026-10-17** (branch
+  `feature/copilot-outside-topics`; no prompt change; built and measured, not yet merged). **What a no-model probe of 90 questions showed
+  first** (it follows the order in `answer_question`): of 26 off-list company questions (Lululemon, Etsy, FedEx, Chipotle, Eli Lilly...)
+  none was caught by the company list, 4 got the generic "tell me which company" notice and 22 reached the filings answer; of 25 asset or
+  topic questions (gas prices, diesel, coffee, "the economy", Tether, REITs, the yuan...) 1 got the scope message, 8 the generic notice and
+  16 reached the filings; of 15 writing or task requests with no company ("Give me a haiku about spring", "Draft an email to my boss",
+  "Write a python function...") 1 was declined; and of 12 writing requests that **name a tracked company** ("Write a LinkedIn post about
+  Apple's earnings") none was, because the scope rule only runs when no tracked company is named. **Built, in `ai/market.py` and
+  `ai/copilot.py`:** (1) `unknown_name`: in a question that names no tracked company, a capitalised name (or run of up to four
+  capitalised words) that appears as a whole word, in any case, in no stored filing and no stored headline is declined by name ("I can't
+  find "Ulta Beauty" in anything stored here..."), before the model is asked. A word is skipped when it is a function word, a month or
+  weekday, an acronym like SEC or EPS, the lone first word of a sentence (unless it is a possessive: "Peloton's risks"), or lowercase. The
+  stored text is the vocabulary, so it needs no list, and it is cheap (about 35 ms: 6.7 MB of filings and the headlines). A prototype first
+  flagged 16 of 26 off-list names and 1 of 38 evaluation questions with no tracked company (a correct decline); the 10 misses were names
+  that do occur in stored text (Nintendo, Chipotle, General Motors, UPS...), so (2) the company list also grew from 70 to 183 names (not
+  the ambiguous ones: Target, Visa, Ford, Shell, Block...; words that are also ordinary, such as UPS, Puma, Intuit, Workday, need the
+  capital). (3) The filings cue that vetoes the scope rules was split: for a named or unknown company only "companies", "which",
+  "filings", "10-K", "according to", "exposure", "each", "every", "across"... veto; "mention", "disclose" and "discuss" no longer do,
+  because "Does Nintendo disclose anything about piracy?" is about Nintendo. The asset rule keeps the broad cue. (4) `OUTSIDE_ASSET_RE`
+  grew: gas, gasoline, diesel, jet fuel and fuel prices, "at the pump", coffee, corn, soybeans, sugar, cattle, cotton, lumber, cocoa, the
+  VIX, the ten-year yield, "the economy", "the stock market", REITs, index funds and ETFs, meme stocks, student loans, a housing bubble,
+  consumer confidence and sentiment, retail sales, the labor market, jobs numbers and payrolls, Tether, USDC and stablecoins, the yuan,
+  yen, peso and rupee, a government shutdown, the debt ceiling. Indexes (S&P 500, Dow, Nasdaq) keep their own generic notice, which tests
+  expect. (5) `writing_request`: write, draft, compose, create, make, generate, prepare, craft, produce, pen, whip up, put together, come
+  up with, plus up to three words (none a preposition) and an email, letter, memo, message, tweet, caption, script, slides, deck,
+  presentation, resume, press release, newsletter, toast, essay, speech, poem, song, haiku, limerick, joke, rap, riddle, social post or
+  thank-you note; "give / get / show me a ..." the same; "email my boss ...", "text my friend ..."; code in python, javascript or SQL;
+  "translate"; "sing me a ...". It is checked on the user's words and on the rewrite, **even with a tracked company named or chosen**, and
+  declines with a fixed message ("it doesn't write emails, posts, poems, code, or other documents... write the message yourself"). A
+  summary, list, table, comparison or overview is research and is not on the list ("Write a summary of Apple's legal proceedings",
+  "Summarize Nvidia's risks in three bullets" are answered). **Two older expectations changed on purpose:** "How is the stock market
+  doing this week?" and the eval case "the economy" used to get only the generic notice; they now get the specific "outside what this app
+  covers" message first (both accept either). **Tests first:** about 230 new, mostly in `tests/test_outside_unknown_names.py` (1742 Python
+  and 253 web tests pass). The stored-text tests insert their own filing and headline and no filing chunks, because chunks inserted and
+  deleted by many tests leave dead vector-index entries. About 130 deliberate breakages of the new rules (every alternative of the asset,
+  verb and thing lists, every preposition, the cue splits, the word-boundary and case handling, the stop words, the list entries, and the
+  wiring in `answer_question`): the first pass **missed 46** (an alternative with no question of its own, a stop word nothing tested, the
+  rewrite-only and question-only paths, the guard against a thing inside a longer word such as "deckhand"), each now has a test; five
+  remained: one was a duplicate alternative (`slide deck`, removed), one a mutation that hit a different copy of a word, and three needed
+  one more question (added). A helper that checks that every name on the company list is declined by name was added because deleting an
+  entry would not otherwise be noticed. **Evaluation, one data snapshot, 3 repeats, 271 cases:** old code 726 of 813 (89.3%), new code 730
+  of 813 (89.8%); follow-up resolution 50 of 51 on both (the one miss is the "roster" stretch of fix (4)). The three targets that failed
+  at 0 of 3 for two rounds (gas prices, Chipotle, "draft an email") went to 3 of 3. Five cases dropped: "reaches $650" 3 to 0, "stock
+  doubled" 2 to 1, "since the election" 3 to 1, "been performing" 3 to 2, "sentiment" 3 to 1; all five name a tracked company or none,
+  and none is touched by the new rules (a scan of all 333 distinct evaluation questions shows the scope, unknown-name and writing rules
+  fire on 22, every one a question meant to be declined). A/B, 12 runs each, old against new: 12 of 12 against 12 of 12, 4 of 12 against 5 of 12, 11 against 12, 2 against 2, and
+  "stock doubled" 8 of 12 against 4 of 12, which I extended by 40 more runs: 33 of 44 old, 31 of 44 new. All noise. **Fresh cases written
+  before the run (11, `fw`, with company names on no list in the code; the highest similarity to anything in the repo was 0.65): fair
+  score 8 of 11 on the new code against 2 of 11 on the old (24 of 33 against 6 of 33)**; the old code's two passes are the guards. I read
+  every answer: the four unknown companies, "Baltic Dry Index" and the Slack message are declined with the right message and no model
+  call. Misses: "How much are eggs costing these days?" and "What is uranium trading at?" (assets not on the list, 0 of 3) and "Write up
+  a one-pager on Amazon's debt for my boss" (answered with a summary of Amazon's debt commitments, 0 of 3). **A false-positive spot check
+  written after the rules (38 ordinary research questions that name no tracked company, not tuned on):** the new unknown-name rule
+  declined 3 ("Are there antitrust cases in Brussels?", "Is the Pentagon a customer?", "What is Llama?"), 8%; two more were declined
+  by older rules ("What is the Inflation Reduction Act?", "How is Intel Foundry doing?"). All three are honest (the name is in nothing
+  stored) but not helpful, and the first two are not companies, so the message was reworded to not call the name a company ("so I can't
+  answer a question about it... if it is a company, use the Add a company box"). **Weak spots:** (1) A place, a person or a product that
+  the stored text never uses is declined; the spot check puts it at about 1 in 12 for questions with no tracked company, and a cross-company
+  question with a filings cue is never declined. (2) A name that does occur in some stored headline or filing (a competitor named
+  in a filing, PepsiCo in an Nvidia headline) passes as known and reaches the filings answer, the old behavior; only the list catches
+  those. (3) The first word of a question is not looked at unless it is a possessive ("Peloton?" alone is not declined). (4) The asset list
+  is finite: eggs and uranium miss; the writing list is finite: "one-pager", "sonnet", "thread" miss. (5) General knowledge and
+  arithmetic ("What is the capital of France?", "What is 17 times 23?") are still left to the relevance gate; no finite list covers
+  them. (6) The narrower cue lets a list company through the veto for "mention / disclose / discuss", so "Which companies mention
+  Chipotle?" is still answered (it has "which") but "Does anyone mention Chipotle?" is declined. (7) Three full-suite runs failed one or
+  two vector-search tests (`test_search`, `test_copilot`) while a background evaluation shared the database; they pass alone and the suite
+  passed in full once the evaluation had finished, the known dead-index flakiness, not this change. (8) The evaluation does not print cautions.
+  **Still open from the fresh round:** (6) "clear in profit". Then the decision on the model-based routing experiment, which this
+  step's weak spots (1) to (5) support: every list here will miss the next wording.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
