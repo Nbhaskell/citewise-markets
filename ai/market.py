@@ -225,7 +225,23 @@ SENTIMENT_RE = re.compile(
     r"\b(?:feeling|feelings|attitude|stance|take)\s+(?:about|on|toward|towards)\b[^?.]{0,50}\b(?:news|press|media|coverage|headlines)\b)",
     re.IGNORECASE,
 )
-CAUSE_RE = re.compile(r"\b(?:why|reasons?|because|what\s+happened|what(?:'s|\s+is|\s+was)\s+(?:behind|driving|causing|moving))\b", re.IGNORECASE)
+# A question that asks what moved the price. On a price question it brings the headlines too (published beside the move, never offered as
+# its cause). "What drove it?", "What caused ...", "What triggered ...", "How come ...", "What's responsible for ..." count as well as "why".
+CAUSE_RE = re.compile(
+    r"\b(?:why|reasons?|because|what\s+happened|what(?:'s|\s+is|\s+was)\s+(?:behind|driving|causing|moving)|"
+    r"what\s+(?:drove|caused|triggered|sparked|prompted|pushed|made|led\s+to|explains?|explained)|how\s+come|"
+    r"what(?:'s|\s+is|\s+was)\s+(?:responsible\s+for|the\s+(?:story|cause|reason)\s+(?:behind|of|for))|"
+    r"(?:drove|caused|triggered|sparked|prompted)\s+(?:it|that|this|the\s+(?:move|drop|jump|rise|fall|surge|plunge|rally|selloff|slide|spike)))\b",
+    re.IGNORECASE,
+)
+# The move named as a noun: "Amazon's jump this month", "Nvidia's slide", "the move in Microsoft stock". With a cause word these are price
+# questions even without a price verb or the word "stock". Only the nouns that no price rule knew ("jump", "slide", "swoon") are named here:
+# "drop", "rally", "surge", "crash" were price words already. "Nvidia's slide in gross margin" is a business metric, not the stock.
+PRICE_MOVE_NOUN_RE = re.compile(
+    r"(?-i:\b[A-Z][\w.&-]*)['’]s\s+(?:jump|slide|swoon)\b(?!\s+in\s+(?!stock\b|shares?\b|price\b))|"
+    r"\b(?:move|moves|jump|slide|swoon|selloff|sell-off|plunge|rally|surge)\s+in\s+(?-i:[A-Z][\w.&-]*)\s+(?:stock|shares?)\b",
+    re.IGNORECASE,
+)
 FILING_RE = re.compile(
     r"\b(?:filings?|10-?k|10-?q|annual\s+report|quarterly\s+report|sec|risks?|risk\s+factors|legal|litigation|lawsuits?|"
     r"competition|competitors?|employees|headcount|revenues?|income|profits?|margins?|segments?|strategy|business|"
@@ -555,6 +571,10 @@ def detect_intent(question: str) -> Intent:
         or year_start_comparison(question)
         or bool(CLOSE_NOUN_RE.search(question))
         or bool(PRICE_PREDICTION_RE.search(question))
+        or (
+            bool(PRICE_MOVE_NOUN_RE.search(question)) and bool(CAUSE_RE.search(question))
+            and (parse_window(question).explicit or bool(STOCK_NOUN_RE.search(question)))
+        )
         or (bool(PRICE_CLAIM_RE.search(question)) and (parse_window(question).explicit or bool(STOCK_NOUN_RE.search(question))))
         or (bool(PERIOD_COMPARE_RE.search(question)) and not topics and parse_window(question).explicit)  # not "revenue than a year ago"
     )

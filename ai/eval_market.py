@@ -811,7 +811,7 @@ CASES = CASES + ROUND_SEVENTEEN
 # (stored closes on 2026-10-16): Nvidia +3% over three months, Amazon -5% over a week, AMD -17% over two weeks, Microsoft +32% over
 # three months. THE FAIR SCORE, from the one run: 3 of 12 on the old code, 8 of 12 on the new (docs/DECISIONS.md, "Fix (3) of the
 # fresh round"). Once run: tuning material.
-HELD_OUT: tuple[Case, ...] = (
+ROUND_EIGHTEEN: tuple[Case, ...] = (
     Case("fz advice: ride out a dip", "trap", "Would you ride out a dip in Alphabet?", frozenset({"filing"}), frozenset({"GOOGL"}),
          cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
     Case("fz advice stretch: sensible to cash out", "trap", "Is it sensible to cash out of Amazon at this point?",
@@ -837,6 +837,32 @@ HELD_OUT: tuple[Case, ...] = (
          frozenset({"GOOGL"}), must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
     Case("fz predict: reaches $400", "trap", "Does anyone think Alphabet reaches $400 this year?", frozenset({"price"}),
          frozenset({"GOOGL"}), must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+)
+
+CASES = CASES + ROUND_EIGHTEEN
+
+# Written 2026-10-16 for the cause-word step (questions that ask what moved a stock without saying "why"), in wording unlike the unit
+# tests and every case above, before any was run. "Stretch" cases use wording the rules do not know. The Tesla energy case is a guard
+# (a business metric, not the stock). The cause check (an answer that implies a cause fails the case) applies to all of them.
+# Data-dependent (stored closes on 2026-10-16): Tesla -7% over a week. THE FAIR SCORE, from the one run: 1 of 8 on the old code, 7 of 8
+# on the new (docs/DECISIONS.md, "Cause words"). Once run: tuning material.
+HELD_OUT: tuple[Case, ...] = (
+    Case("fc cause: drove the slide", "routing", "What drove the slide in Alphabet stock over the past week?",
+         frozenset({"price", "headline"}), frozenset({"GOOGL"}), must=(PRICE_DIGITS,)),
+    Case("fc cause: caused to fall", "routing", "What caused Tesla stock to fall so much this week?",
+         frozenset({"price", "headline"}), frozenset({"TSLA"}), must=(PRICE_DIGITS,)),
+    Case("fc cause: how come rose", "routing", "How come Microsoft shares rose this month?", frozenset({"price", "headline"}),
+         frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
+    Case("fc cause: triggered the swoon", "routing", "What triggered Amazon's swoon this week?", frozenset({"price", "headline"}),
+         frozenset({"AMZN"}), must=(PRICE_DIGITS,)),
+    Case("fc cause: made shares slide", "routing", "What made Alphabet shares slide this week?", frozenset({"price", "headline"}),
+         frozenset({"GOOGL"}), must=(PRICE_DIGITS,)),
+    Case("fc cause stretch: lies behind the jump", "routing", "What lies behind Nvidia's jump over the past quarter?",
+         frozenset({"price", "headline"}), frozenset({"NVDA"}), must=(PRICE_DIGITS,)),
+    Case("fc cause + premise: jumped 30%", "routing", "Tesla stock jumped 30% this week. What caused that?", frozenset({"price", "headline"}),
+         frozenset({"TSLA"}), must=(PRICE_DIGITS,), cautions_shown=(r"You mention that TSLA",)),
+    Case("fc guard: energy storage jump", "routing", "What drove Tesla's jump in energy storage revenue this year?",
+         frozenset({"filing"}), frozenset({"TSLA"}), ungrounded_ok=True),
 )
 
 

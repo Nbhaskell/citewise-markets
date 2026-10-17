@@ -101,7 +101,11 @@ them (the owner hasn't confirmed the order):
    **Fix (3) is merged (PR #39, 2026-10-16; DECISIONS: "Fix (3) of the fresh round"):** "cash out", "take profits", "unload", "is it time to", "would it be crazy to" and the like now carry the
    advice notice (with company-side guards), "Google doubled" and "can only go up" reach the prices, and a new code-side premise
    statement quotes the stored move when the question assumes one that did not happen. A clean old-against-new run on 246 cases went
-   648 to 657 of 738; 12 fresh cases went 3 to 8. Known gap: "what drove it" is not a cause word, so that question gets no headlines.
+   648 to 657 of 738; 12 fresh cases went 3 to 8.
+   **The cause-word gap from fix (3) is built on branch `feature/copilot-cause-words` (2026-10-16, not committed or merged yet; DECISIONS:
+   "Cause words"):** "what drove / caused / triggered it", "how come" and "what's responsible for" bring the headlines to a price question, and
+   "<Company>'s jump / slide" or "the move in <Company> stock" with a cause word reaches the prices. A clean old-against-new run on 258
+   cases went 675 to 681 of 774; 8 fresh cases went 1 to 7.
    **Next:** the rest in the order DECISIONS gives
    (follow-ups keeping their topic; the outside-topic and writing-request lists; "clear in profit"), each
    phrasing as a test first, then decide on the model-based routing experiment (its own branch, measured against these 35 and a
