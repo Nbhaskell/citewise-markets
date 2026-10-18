@@ -148,6 +148,11 @@ them (the owner hasn't confirmed the order):
    cause question about a "slide" or "jump" counts "lately" as the period; 4 of 11 fresh cases on the old code, 10 of 11 on the new.
    Still open: a price or mood word inside a filings question ("falling demand", "optimistic") goes to prices or headlines; the model
    was right on all 6 tried, and a narrow "model may send it to the filings" policy is the candidate if wanted.
+   **Follow-up topic carry is built on `feature/followup-topic-carry` (2026-10-18, DECISIONS: "Follow-up topic carry"):** a follow-up that
+   points back without naming a topic gets the earlier question's topic in code (a new company swapped in, a comparison "..., compared with
+   X", or a cause question appended to an earlier price question). On 61 follow-up cases, old against new, answers: 138 to 177 of 183;
+   the 16 fresh ones 34 to 45 of 48; `ai.eval_followups` 50/51 to 51/51. Still failing: "Where does Tesla land on that scale?". It is
+   a word list again, and a rebuilt comparison replaces the user's own comparison wording.
 
 ## Working with the owner
 
@@ -181,10 +186,10 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-17 (on `feature/lately-price-rule`, which stacks the router-visibility and router-second-look branches on
-  PR #43's 2038 and 253): 2224 Python tests, 260 web tests, all passing (the web count last run on the visibility branch; nothing in
-  `web/` changed since). `tests/test_search.py` has failed one or two tests in 3 of about 5 full runs with no evaluation running and
-  passes alone: rerun before assuming a break. A full test run can fail one or two vector-search tests while an evaluation shares the database;
+- Baseline as of 2026-10-18 (on `feature/followup-topic-carry`, after PRs #44 to #46 merged): 2300 Python tests, 260 web tests, all
+  passing (the web count last run on 2026-10-17; nothing in `web/` changed since). `tests/test_search.py` fails one or two tests in
+  about half of the full runs, always the first run after the database was used by other runs, and passes alone and on the rerun:
+  rerun before assuming a break (not investigated). A full test run can fail one or two vector-search tests while an evaluation shares the database;
   run the suite when no evaluation is running. Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
   refresh ran at 3pm on 2026-10-16 (success, 0 problems).
 
@@ -246,7 +251,13 @@ The owner is building this step by step and is not a professional developer, so 
   put them in the prompt that writes the answer, or an earlier answer could become evidence; a test guards this. Keep
   showing "Understood as", keep the "No company was named" notice, and validate anything read back from
   `localStorage`. After changing the rewrite prompt or the pronoun safeguard, run `python -m ai.eval_followups` (needs
-  Ollama) and `--held-out`; don't tune against the held-out cases, add fresh ones instead.
+  Ollama) and `--held-out`; don't tune against the held-out cases, add fresh ones instead. **A follow-up that points back without a
+  topic** ("Do the matching calculation for Google.", "Lay Amazon alongside it.", "What explains that?") is rebuilt from the earlier
+  *question* in code when the user's words name no topic and the rewrite routes nowhere (`POINTS_BACK_RE`, `names_a_topic`,
+  `routes_somewhere`, `carry_topic`, `carry_comparison`, `carry_cause`; DECISIONS: "Follow-up topic carry"); keep it visible under
+  "Understood as" and keep it out of the answer prompt. Measure a change to it with the real `resolve_question`, not only
+  `ai.eval_followups` (every case in that eval was tuned): the 45 follow-ups with history in `CASES` plus fresh ones, old against new.
+  A breakage script that reports everything caught is meaningless unless the unmutated code is verified green first.
 - **Copilot market data (`ai/market.py`):** prices, headlines, and sentiment reach the model only as numbered sources, with
   every figure computed in Python (the model never calculates) and the direction written in words. Keep the numbers,
   direction, minus-sign, and cause checks, the "no company named" and index refusals, and the rule that headlines never

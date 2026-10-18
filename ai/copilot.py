@@ -16,6 +16,9 @@ from .embeddings import Embedder, FastEmbedder
 from .llm import LLM, get_llm
 from .market import (
     BARE_STOCK_RE,
+    CAUSE_RE,
+    FILING_RE,
+    STOCK_WORD_RE,
     MarketEvidence,
     detect_intent,
     gather_market_evidence,
@@ -623,6 +626,36 @@ SWITCH_PHRASE_RE = re.compile(
 PRONOUN_RE = re.compile(r"\b(its|their)\b|\b(it|they)\b", re.IGNORECASE)
 
 
+# A follow-up that points back at the earlier question without saying what about ("Do the matching calculation for Google.", "Lay
+# Amazon alongside it.", "What explains that?"). The rewriting step keeps these vague phrases and loses the topic; when the rewrite
+# also names no topic, the earlier question's topic is reused (DECISIONS: "Follow-up topic carry"). Each word needs a question of its own.
+POINTS_BACK_RE = re.compile(
+    r"\b(?:that|those|same|matching|equivalent|counterpart|likewise|alongside|comparable|by\s+comparison|as\s+much|just\s+did)\b",
+    re.IGNORECASE,
+)
+# Of those, the ones that say "compared with the earlier company" rather than "the same thing for this one".
+POINTING_COMPARE_RE = re.compile(r"\b(?:alongside|comparable|by\s+comparison|as\s+much)\b", re.IGNORECASE)
+
+
+def routes_somewhere(text: str) -> bool:
+    """Would the app search for something specific? A market route (prices, headlines, mood, the stored figures), a ratio it does not
+    compute, a buy/sell request, a filing noun (risks, legal, employees...), or a 10-K or quarter."""
+    intent = detect_intent(text)
+    return bool(intent.market or intent.unstored or intent.advice or FILING_RE.search(text) or detect_forms(text))
+
+
+def names_a_topic(text: str) -> bool:
+    """Does the text say what is being asked about? Whatever `routes_somewhere` finds, or a stock word (stock, shares, price): the
+    user's own "stock" is a topic even when no price rule reads the sentence."""
+    return routes_somewhere(text) or bool(STOCK_WORD_RE.search(text))
+
+
+def points_back_without_a_topic(question: str, rewrite: str) -> bool:
+    """The user's words point back and name no topic, and the rewrite did not supply a routable one either (a rewrite with only a
+    stock word in it, "that move in Nvidia's stock", still goes to the filings)."""
+    return bool(POINTS_BACK_RE.search(question)) and not names_a_topic(question) and not routes_somewhere(rewrite)
+
+
 def _is_bare_switch(text: str, mentions: dict[str, list[re.Match]]) -> bool:
     """Only company names and filler words: "What about Tesla?", "And Tesla's?". Nothing says what to ask about it."""
     rest = text
@@ -680,18 +713,19 @@ def _is_bare_comparison(text: str, mentions: dict[str, list[re.Match]]) -> bool:
     return not re.sub(r"[\W_]+", "", COMPARE_FILLER_RE.sub(" ", rest))
 
 
-def comparison_companies(conn: psycopg.Connection, question: str, history: list[Turn]) -> list[str] | None:
+def comparison_companies(
+    conn: psycopg.Connection, question: str, history: list[Turn], pointing: bool = False
+) -> list[str] | None:
     """"Is that better or worse than Amazon?" after a question about Nvidia compares Nvidia (what "that" is) with Amazon.
     The rewriting step is meant to name both and sometimes names only the new one, so only Amazon was searched. Returns the
     companies of the last turn followed by the newly named ones, or None when this is not that kind of question: no
     comparison word, no reference back ("that", "it"), a reference to something older ("the other one"), no earlier
     company, or a question that already names the earlier company (then it says what it means)."""
     similar = bool(SIMILAR_RE.search(question))
-    if (
-        not history or BACKREF_RE.search(question)
-        or not (COMPARE_RE.search(question) or similar) or not (REFERENCE_RE.search(question) or similar)
-    ):
+    if not history or BACKREF_RE.search(question):
         return None
+    if not pointing and (not (COMPARE_RE.search(question) or similar) or not (REFERENCE_RE.search(question) or similar)):
+        return None  # a question that points back without a topic ("Lay Amazon alongside it.") is already known to compare
     named = company_mentions(conn, question)
     recent = [c.upper() for c in history[-1].companies]
     if not named or not recent or set(named) & set(recent):
@@ -699,20 +733,24 @@ def comparison_companies(conn: psycopg.Connection, question: str, history: list[
     return recent + sorted(named, key=lambda symbol: named[symbol][0].start())
 
 
-def carry_comparison(conn: psycopg.Connection, question: str, history: list[Turn], companies: list[str]) -> str | None:
+def carry_comparison(
+    conn: psycopg.Connection, question: str, history: list[Turn], companies: list[str], pointing: bool = False
+) -> str | None:
     """A bare comparison asked again about the earlier topic: "Is that better or worse than Amazon?" after "How has Nvidia
     stock done this month?" becomes "How has Nvidia stock done this month, compared with Amazon?". Only the earlier
     *question* is reused, never its answer. None when the question has a topic of its own or the earlier topic does not
     clearly belong to the company "that" stands for."""
     named = company_mentions(conn, question)
     recent = [c.upper() for c in history[-1].companies]
-    if not _is_bare_comparison(question, named):
+    if not (pointing or _is_bare_comparison(question, named)):
         return None
     typed = " and ".join(m.group(0) for m in sorted((ms[0] for ms in named.values()), key=lambda m: m.start()))
     for earlier in reversed(history):
         before = company_mentions(conn, earlier.question)
         if before and _is_bare_switch(earlier.question, before):
             continue  # a bare "What about Tesla?" has no topic; the question before it does
+        if pointing and not names_a_topic(earlier.question):
+            return None  # nothing to carry
         base = earlier.question
         if len(before) == 1 and len(recent) == 1 and set(before) != set(recent):
             base = _swap_company(base, next(iter(before.values())), recent[0])  # the topic, about the company "that" is
@@ -721,13 +759,13 @@ def carry_comparison(conn: psycopg.Connection, question: str, history: list[Turn
     return None
 
 
-def carry_topic(conn: psycopg.Connection, question: str, history: list[Turn]) -> str | None:
+def carry_topic(conn: psycopg.Connection, question: str, history: list[Turn], pointing: bool = False) -> str | None:
     """"What about Tesla?" after a question about Nvidia means the same question about Tesla. The rewriting step is told
     to leave a question that switches company alone, so it hands this back unchanged and the search ran on nothing but
     a company name. Only the earlier *question* is reused (its answer never is), and only when it is clear what to swap:
     the earlier question names exactly one tracked company, or has a pronoun standing for it. Returns None otherwise."""
     named = company_mentions(conn, question)
-    if not named or not _is_bare_switch(question, named) or set(named) & {c.upper() for c in history[-1].companies}:
+    if not named or not (pointing or _is_bare_switch(question, named)) or set(named) & {c.upper() for c in history[-1].companies}:
         return None
     typed = " and ".join(  # the company as the user wrote it, in the order they wrote it
         m.group(0) for m in sorted((ms[0] for ms in named.values()), key=lambda m: m.start())
@@ -736,11 +774,30 @@ def carry_topic(conn: psycopg.Connection, question: str, history: list[Turn]) ->
         before = company_mentions(conn, earlier.question)
         if before and _is_bare_switch(earlier.question, before):
             continue  # an earlier "What about Tesla?" has no topic either; the one before it does
+        if pointing and not names_a_topic(earlier.question):
+            return None  # nothing to carry
         if len(before) == 1:
             return _swap_company(earlier.question, next(iter(before.values())), typed)
         if not before and PRONOUN_RE.search(earlier.question):
             return PRONOUN_RE.sub(lambda m: f"{typed}'s" if m.group(1) else typed, earlier.question)
         return None
+    return None
+
+
+def carry_cause(conn: psycopg.Connection, question: str, history: list[Turn]) -> str | None:
+    """"What explains that?" after a question about a stock's price means "... and what explains that?": the earlier question with
+    the cause question appended (its answer is never used). Only when the question names no company and the earlier question is a
+    price question, because a cause question about a price brings the headlines (published beside the move, never offered as its
+    cause). None otherwise."""
+    if not CAUSE_RE.search(question) or company_mentions(conn, question):
+        return None
+    for earlier in reversed(history):
+        before = company_mentions(conn, earlier.question)
+        if before and _is_bare_switch(earlier.question, before):
+            continue  # a bare "What about Tesla?" has no topic; the question before it does
+        if not detect_intent(earlier.question).prices:
+            return None
+        return f"{earlier.question.rstrip(' ?.!')}, and {question[0].lower()}{question[1:]}"
     return None
 
 
@@ -754,15 +811,26 @@ def resolve_question(
     """Work out what is really being asked: (standalone question, companies to search, how a follow-up was
     understood or None). Chosen companies always win; otherwise they come from the standalone question."""
     history = history or []
-    compare = None if symbols else comparison_companies(conn, question, history)
     search_question = condense_question(llm, question, history) if history else question
-    carried = carry_topic(conn, question, history) if history and not symbols else None
+    # "Do the matching calculation for Google.": the question points back and neither it nor the rewrite says what about.
+    pointing = not symbols and points_back_without_a_topic(question, search_question)  # (every use below also needs a history)
+    # A rewrite that names the earlier company ("Is Tesla in the same boat?" -> "...as Microsoft") is a comparison, whatever words the user
+    # chose; a swap would drop the earlier company. (When the user named it too, the comparison and swap rules both decline.)
+    earlier_companies = {c.upper() for c in history[-1].companies} if history else set()
+    added_earlier = bool(set(detect_symbols(conn, search_question)) & earlier_companies)
+    comparing = pointing and bool(
+        COMPARE_RE.search(question) or SIMILAR_RE.search(question) or POINTING_COMPARE_RE.search(question) or added_earlier
+    )
+    compare = None if symbols else comparison_companies(conn, question, history, pointing=comparing)
+    carried = carry_topic(conn, question, history, pointing=pointing and not comparing) if history and not symbols else None
     if carried:
         # A bare switch ("Skip to Nvidia.") names no topic, so any topic in the rewrite is the earlier one reworded or one it
         # invented ("Microsoft's company summary"). The earlier question itself, about the new company, wins.
         search_question = carried
     elif history and not symbols and BARE_STOCK_RE.search(question) and not detect_intent(search_question).prices:
         search_question = question  # "ok, and Alphabet stock?" was rewritten into the earlier risks question; the user's words win
+    elif pointing and (caused := carry_cause(conn, question, history)):
+        search_question = caused  # "What explains that?": the earlier price question, and the cause question about it
     if (
         history and not symbols and ALL_COMPANIES_RE.search(question) and not REFERENCE_RE.search(question)
         and not BACKREF_RE.search(question) and not detect_symbols(conn, question)
@@ -783,12 +851,12 @@ def resolve_question(
             return question, recent, f"{question} (assuming {', '.join(recent)})"
     note = None
     lost = bool(compare) and not set(compare) <= set(detect_symbols(conn, search_question))
-    if compare and (lost or _is_bare_comparison(question, company_mentions(conn, question))):
+    if compare and (lost or comparing or _is_bare_comparison(question, company_mentions(conn, question))):
         # The rewrite lost the company "that" stands for, or the comparison names no topic of its own, so a topic in the
         # rewrite is the earlier one reworded or an invented one ("Data Center revenue"). Rebuild the question from the
         # earlier one when the comparison has no topic of its own; otherwise keep the model's wording and, when it lost a
         # company, say which companies were compared.
-        rebuilt = carry_comparison(conn, question, history, compare)
+        rebuilt = carry_comparison(conn, question, history, compare, pointing=comparing)
         if rebuilt:
             search_question = rebuilt
         elif lost:
