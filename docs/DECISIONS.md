@@ -1676,6 +1676,70 @@ benchmarks.
   right on all 6 questions it was shown, so nothing is lost on the evidence, but it is a place where the keyword rule has the last word.
   (6) The 6 controls are few, and one is a case whose own check is too tight. (7) `tests/test_search.py` failed one or two tests in the
   first full run after the evaluations and breakage runs again, and passed on the rerun (known flakiness; a session was proposed for it).
+- **Third sealed round: a fair score after PRs #43 to #48, 2026-10-18** (branch `feature/sealed-round-three`; no product code changed,
+  only `ai/eval_market.py`). **Method:** 43 new cases (`SEALED_ROUND_THREE`, `s3`) were written without opening `ai/market.py` or the
+  router (only the older cases and these notes), checked by script against every string in the repo (4 near-copies reworded before the
+  run), committed unrun (ad9fd25), then run **once** with `--sealed --show` on one data snapshot, router off and then `COPILOT_ROUTER=model`.
+  Mix: 8 prices, 7 news and mood, 6 stored figures, 7 filings (the company speaking, in verbs nobody listed: "admit", "flagged", "talk",
+  "warn"), 10 traps, 5 follow-ups. **Score (case passes, one run each): keywords only 25 of 43 (58%); router on 30 of 43 (70%).** The router
+  turned 5 failures into passes and lost none: "end of last week", "winning streak this fortnight", "Nvidia and AMD over 60 days",
+  "tone brighter than last week", and the false premise "Nvidia roughly tripled" (the answer now says it fell 6.61%). **I read every answer.**
+  Of the 13 failures with the router on, 4 are arguable (my checker or expectation, not the app): "since the start of September" is
+  answered correctly (-1.93%) but the check wanted a price; "cents left after all costs" is answered correctly (17.4%) but price was
+  also shown; "Did Microsoft keep pace?" answers from the past month, not the earlier period, and only the check complains about digits;
+  "bad press" also showed mood. So roughly 34 of 43 on a looser reading, which I do not use as the score. **The wrong answers that
+  matter, in order:** (1) **Advice missed on both runs:** "My cousin says to go all in on AMD. Should I?" got no notice and a risk
+  list (`asks_for_advice` does not know "go all in" or a bare "Should I?" after a statement). (2) **A writing request answered when a company
+  was named:** "Put together a short LinkedIn update on Amazon's quarter" was answered from the filings on the router run (mixing a six-month
+  total with a three-month one and calling it the quarter) and, with the router off, invented a Q2 2024 post (the numbers check flagged six
+  figures, but the text was shown). (3) **A false "no data"/"not available":** "How big is Apple, in terms of what all its shares are
+  worth?" went to prices and said market value is not available (it is stored); "Show me what the papers are printing about Amazon" went
+  to the filings and said there are no headlines; "Highest and lowest close of the past quarter" and "wild swings since spring" said the
+  prices do not cover it (router on fixed neither; the wording is not read as a period). (4) **The speaker rule's known gap:** "Did Alphabet
+  warn that ad prices were dropping?" still goes to prices ("warn" is not a speaker verb); "Does Tesla make money from running the business
+  itself?" went to the filings and answered from operating cash flow, not the profit figure. (5) **Period said wrong but passing:** with the
+  router off, "Is Tesla's stock cheaper now than at New Year?" compared with 2025-10-15 and called it "the New Year close" (the check did
+  not catch it). "Has Apple been on a winning streak" answers "yes" from the two end points only. **Unchanged by the router:** it is asked
+  only when the keywords find no route, and the cases it fixed are those; the cases where a keyword rule chose wrongly stay wrong (advice,
+  speaker, "papers", market value). **Decision for the owner:** the router did no harm on a set it never saw and added 5 passes, which meets
+  the rule set beforehand for turning it on by default; this round does not turn it on (one line plus a test; switch back with
+  `COPILOT_ROUTER=off`). **State of the set:** spent. `SEALED_ROUND_THREE` stays in `SEALED` (not in `CASES`, so full-run scores do not
+  mix in; the shadow run still excludes it) and `SEALED_ROUND_TWO` joined `CASES` unrun as a set, since the "lately" rule spoiled it.
+  The next fair comparison needs `SEALED_ROUND_FOUR`. **Weak spots of this measurement:** one run per configuration (a swing of two is
+  normal), 43 cases, my expectations for 4 cases were arguable, and `tests/test_search.py` was not run.
+- **Advice and writing misses, 2026-10-18** (branch `feature/sealed-round-three`, after the third sealed round; no prompt change, no
+  model call). **The problem:** two confident wrong answers from the sealed round. "My cousin says to go all in on AMD. Should I?" got
+  no buy/sell/hold notice, and "Put together a short LinkedIn update on Amazon's quarter." was answered (with the router off the model
+  invented a Q2 2024 post). **Built:** (1) `TRADE_WORD_RE` knows the reader's own all-in: go / going / be / being all in, "all in on", bet
+  big / heavy / heavily / everything / it all / the farm / the house, go big / heavy on, put everything in / into / on, pull the trigger,
+  back up the truck, throw money at (each still needs a decision cue beside it, so "What does Tesla say about going all in on autonomy?"
+  and "Is Microsoft going all in on AI, according to its 10-K?" get no notice). (2) `ADVICE_ASK_RE` knows "Should I?" with the trade left
+  unsaid: a bare "should I / we" ending the question, "should I do it / go for it / take the plunge, leap, bet", "should I join
+  (in, them, him, her)" and "should I listen (to him, her, them, it, that)" at the end, and "should I follow / take / heed / trust /
+  listen to ... advice, tip, suggestion, recommendation, hunch". (3) `WRITING_REQUEST_RE` knows a platform "update" (LinkedIn, Facebook,
+  ...) with any writing verb or "give / get / show me", and, **only after a writing verb** (`_WRITE_ONLY_THING`), status / team / weekly /
+  monthly / progress updates, blurbs, slogans, taglines, jingles, bios, and an announcement "for / to my / our ...". (4) **A refusal now
+  carries the advice notice too** (`refuse()` in `ai/copilot.py`): "A colleague says bet the farm on Amazon. Should I listen?" was
+  refused with "couldn't find anything" and nothing about why no call was given, and "Should I buy Bitcoin?" had the same gap. The web
+  page already shows cautions on a refusal. **Tests first: 105 new (`tests/test_advice_and_writing_misses.py`) plus 8 in
+  `tests/test_copilot_advice.py`; full suite 2501 passed with nothing else using the database.** The first run of the new tests had 51
+  failures (the misses), and the controls found a real problem before it shipped: with the new words in the shared list, "Give me a status
+  update on Tesla's recall" and "Give me a bio of Tesla's CEO" would have been declined, so the new words became write-verb-only.
+  **Deliberate breakages: about 90 (every alternative, every pronoun and noun, both end anchors, the announcement guard, the split
+  between write-only and shared words, and the refusal condition both ways), all caught on a baseline verified green.** The first pass had
+  survivors that were my tests' fault, not the code's: three "bet" questions were also flagged by older rules ("would you bet", "smart ...
+  bet"), so the questions were rewritten to be flagged by one alternative only. **Evidence, old code against new code (a `git worktree` of
+  the parent commit, router off):** (a) **offline on 2,623 distinct questions** (every evaluation case and history turn, every string
+  literal in the `.py` files that reads like a question, the web tests' questions): 72 routes change, and **every one is a question
+  written for this fix; no older question changed**; (b) **14 fresh cases written before the fix (`ROUND_AW`, in `CASES`), 3 runs each:
+  9 of 42 on the old code, 33 of 42 on the new**; the 9 remaining failures are three cases whose evidence expectation I wrote too strictly
+  (the answers carry the notice; I did not loosen them); (c) the spent sealed set re-run as a development check: keywords 25 to 27 of 43,
+  router 30 to 32 of 43, and **exactly the two targeted cases changed** (not a fair score any more). **Weak spots:** (1) these are word
+  lists again; the next phrasing ("all-in" spelt "allin", "yolo", "load the boat") will miss. (2) A bare "should I" at the end now flags
+  anything ("Should I?" after a research question): by design, one extra notice. (3) Company-side false positives are possible when a
+  decision cue sits beside the company's own all-in ("Should Microsoft go all in on AI?" is flagged). (4) "Did Tesla create a new slogan?"
+  would be declined as a writing request (the write verb rule has never looked at tense). (5) `ROUND_AW` has 14 cases; one run of three.
+  (6) Web tests were not run (nothing in `web/` changed).
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
