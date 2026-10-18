@@ -1477,6 +1477,69 @@ benchmarks.
   only when the model's kinds differ from the keyword route's, so a question the model looked at and left on the filings looks the same
   as one it never saw. (2) It reports the model's choice, not whether the model was right. (3) The wording is fixed and long for five
   kinds. (4) The default is still off: turning it on is the owner's call, to be made at the end of this branch.
+- **Router second look, step 1: two new question sets, nothing run yet, 2026-10-17** (branch `feature/router-second-look`, cut from
+  `feature/router-visibility`; no change to any rule, prompt or the router). **Question being prepared for:** the router is asked only
+  when the keywords find no route, so a question the keywords route to something specific but wrong is never put to the model (weak
+  spot 1 of the routing experiment), and a follow-up whose rewrite lost its topic cannot be recovered (weak spot 2). Measuring either
+  needs questions the keywords have not been tuned on, because on the 322 old cases without history the keywords already match the
+  expected evidence for 248 and only 5 are wrong-and-never-asked (an offline, no-model count: the old cases were tuned until they
+  passed, so they cannot show the problem). **The order mattered:** the sealed set was written first, before the keyword word lists
+  were opened for this work, and was not screened against the rules (some will route right, some wrong); the development set was
+  written second, with the lists open, aimed at the structural ways the rules go wrong. **Sealed set, `SEALED_ROUND_TWO` (41 cases,
+  `s2`, run with `--sealed`, not in `CASES`):** 7 prices, 6 news and mood, 6 stored figures, 6 filings (guards: legitimate research
+  that must not be declined or rerouted), 10 traps (outside topics, writing, an unknown name, advice, a prediction, a false premise, an
+  unstored ratio) and 6 follow-ups. **Development set, `ROUND_SL` (37 cases, `sl`, in `CASES`):** 3 price questions that carry a news
+  word ("lately"), 9 filings questions that carry a price or mood word ("falling demand", "closed", "volatility", "optimistic",
+  "bullish", "mood"), 5 money wordings, 2 cause wordings the rules may not know, 2 news wordings, 8 controls the keywords should
+  already route right, and 8 follow-ups ("Run the same numbers for Microsoft", "Lay Amazon alongside it"). **Overlap check by script**
+  (every string literal in every `.py` file, the web tests' questions, and the two new sets against each other): the first pass found
+  8 near-copies of older cases or test strings (including one sealed question that was almost word for word an older case), all
+  reworded; the highest remaining similarity is 0.80 (a shared template, "What was X's ... over the last twelve months?"), and the
+  sealed and development sets are at most 0.65 from each other. This is a looser measure than the one used for the earlier sets, so
+  the numbers are not comparable. **What the keywords do on the development set, offline with no model (29 cases without history):
+  12 right, 4 wrong but the router would be asked, 13 wrong and never asked.** The 13 are the weak spot made concrete: 3 price
+  questions routed to headlines because of "lately"; 6 filings questions routed to prices because of "falling", "closed", "trading",
+  "volatility", "fell", "rising"; 3 filings questions routed to headlines and mood because of "optimistic", "bullish", "mood"; and
+  "accounts for the tumble" (prices without the headlines a cause question brings). **What this says about the design:** the router
+  today only adds (the advice flag, headlines behind a news word), and a fix for 12 of these 13 has to REMOVE evidence the keywords chose
+  (prices or mood from a filings question, headlines from a price question; only the cause case needs an addition), so a second look needs a rule for when the model may override, which is a new kind of risk and must
+  be measured, not assumed. **Not done:** nothing has been run with a model; the shadow-mode measurement is the next step.
+  **Step 2, the shadow script is built, not yet run (`ai/eval_router_shadow.py`, `tests/test_eval_router_shadow.py`).** It asks the
+  router question only (no answer, no search, no change to the app) for the 302 research cases that have no follow-up and expect no
+  refusal made in code, `--repeat` times, and saves the router's raw reply per case (`--run --out FILE`); five policies are then scored
+  offline from the recording, so a changed rule is re-scored without the model (`--score FILE`). When the keywords found nothing the
+  model decides, as now, in every policy; the policies differ only when the keywords chose something specific: `today` (never second-guess),
+  `replace` (the model overrules), `replace-to-filings` (overrule only to send it to the filings), `intersect-else-router` and
+  `intersect-else-keywords` (keep only what both chose; if nothing is shared, the model or the keywords). The existing guards hold in
+  every policy (a named filing, a quarter, "why", dividends, "sales", an unstored ratio, advice, a failed call, and the model's "outside"
+  and "writing" verdicts all keep the keyword route). A case passes when the kinds of evidence equal the expected ones, the evaluation's
+  own primary check; no answer is read. There is no option for the sealed set and any sealed case is dropped. **Found while building:** one
+  older case name ("filings only") is used twice and scores are keyed by name, so a repeat silently dropped a case and shifted the group
+  totals by one (the plan showed 28 development cases instead of 29); repeated names now get " (2)". **Offline, no model:** the keywords
+  alone get 12 of 29 development cases and 248 of 273 older ones. **Tests:** 66, with a fake model, plus 33 deliberate breakages, all
+  caught except one rewrite that gives the same list (an intersection written in the other order). The full suite passed (2133); one run
+  failed `test_search.py::test_latest_only_drops_older_filings_of_the_same_form` with nothing else using the database, and it passed alone
+  three times and in the next full run, which looks like the known dead-index flakiness but was not investigated.
+  **Step 2, the shadow run, 2026-10-17 (302 cases x 3, the real model, 554 s, 0 router failures; the recording is not kept in the repo).**
+  Passes out of 906 case-runs (development 87, older 819): `today` 829 (39 of 87 development, 790 of 819 older), `replace` 686 (54, 632),
+  `replace-to-filings` 835 (57, 778), `intersect-else-router` 832 (66, 766), `intersect-else-keywords` 817 (42, 775). **The router is stable
+  (only 2 of 302 cases changed between repeats).** The keywords chose something specific in 177 of the 302 cases, and a further 65 are
+  held by a guard; on the specific ones the router differed from the keywords in 72 cases, and **the router was right in 10, the keywords
+  in 58, neither in 4.** All 10 router wins are cases written to expose a keyword error (9 development, plus "climbing or sliding"); the 58
+  keyword wins are mostly cases the keywords were tuned to pass, so neither side of that count is a fair rate (the sealed set is the
+  referee). **What the router gets wrong when it differs:** it adds prices to a stored-figure question (33 of the 58: P/E, market value, EPS,
+  margin), adds sentiment to a news question (8), says "price only" to a cause or "how is X doing" question that carries headlines by
+  design (4), and says "filings" to a mood or news question ("Any recent announcements", "kind or harsh", "turned on", 3) or to a price
+  prediction (1). **What it gets right:** a price word inside a filings question ("falling demand", "closed on schedule", "trading
+  restrictions", "volatility in lithium costs", "rising wafer prices": the keywords say prices, the model says filings, 5 of 5, three of
+  three repeats), "optimistic about factory" (mood words in a filings question), and a price question carrying "lately" (4 of 4).
+  **Reading the policies:** `replace` is plainly wrong (a loss of 58 cases) because of the first error above. `replace-to-filings` gains the 6
+  filings cases and loses 4 older ones (net +6 case-runs overall, but +18 on the cases written to find the problem and -12 on the older
+  ones). The intersect policies are safe against the most common model error (an extra price or sentiment is simply dropped) but remove
+  headlines the rules attach to cause and "how is X doing" questions on purpose (4 cases), and `intersect-else-router` sends a mood or news
+  question to the filings when the two share nothing (2 more). **No policy beats `today` on the older cases** (every one loses 12 to 24
+  case-runs there), and every gain is on cases written for it, so this does NOT show that a second look helps in general; it shows where it
+  could. **Not decided; nothing in the app changed.**
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

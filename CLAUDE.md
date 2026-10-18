@@ -136,8 +136,11 @@ them (the owner hasn't confirmed the order):
    owner decides whether to turn it on by default (a one-line change plus a test; the switch back is `COPILOT_ROUTER=off`); "clear
    in profit" is covered by the router when it is on (a fresh set will tell). The router does not fix a question the keywords route wrongly, or a follow-up whose
    rewrite lost its topic. Every keyword list so far has missed on the next wording, so write a new sealed set (`SEALED`, `--sealed`)
-   before the next fair comparison. All earlier fresh cases are in `CASES` (359 market, 51 follow-up resolution), so `HELD_OUT` and
-   `SEALED` are empty.
+   before the next fair comparison. All earlier fresh cases are in `CASES` (359 market, plus the 37-case development set `ROUND_SL`
+   = 396; 51 follow-up resolution), so `HELD_OUT` is empty. **`SEALED` now holds 41 UNRUN cases (`SEALED_ROUND_TWO`, written
+   2026-10-17 on `feature/router-second-look`, DECISIONS: "Router second look, step 1") for the next fair comparison: run it once
+   with `--sealed`, at the end, and never tune on it.** An offline check on the development set found 13 of 29 non-follow-up cases
+   routed wrongly by the keywords and never put to the router; 12 of them need evidence REMOVED, which the router does not do.
 
 ## Working with the owner
 
