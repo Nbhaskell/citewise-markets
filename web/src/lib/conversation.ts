@@ -58,6 +58,7 @@ function isResult(x: unknown): x is CopilotResponse {
     isStrings(x.unverified_numbers) &&
     isStrings(x.cautions) &&
     isKinds(x.evidence_kinds) &&
+    isKinds(x.model_route) &&
     Array.isArray(x.sources) &&
     x.sources.every(isSource)
   );
@@ -80,7 +81,10 @@ function upgradeSaved(x: unknown): unknown {
   });
   return {
     ...x,
-    result: { ...r, sources, cautions: r.cautions ?? [], evidence_kinds: r.evidence_kinds ?? (r.refused ? [] : ["filing"]) },
+    result: {
+      ...r, sources, cautions: r.cautions ?? [], evidence_kinds: r.evidence_kinds ?? (r.refused ? [] : ["filing"]),
+      model_route: r.model_route === undefined ? [] : r.model_route, // saved before the app said what the model chose (null is damage, not old)
+    },
   };
 }
 

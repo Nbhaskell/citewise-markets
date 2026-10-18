@@ -144,6 +144,7 @@ class CopilotResponse(BaseModel):
     grounded: bool = Field(description="True when the answer cites at least one real source")
     companies: list[str]
     evidence_kinds: list[SourceKind] = Field(description="The kinds of source the model was shown (not only the ones it cited), so the screen can say what was looked at")
+    model_route: list[SourceKind] = Field(description="The kinds of data the local model chose to look at, because the keyword rules found no specific kind for this question. Empty when the keyword rules decided, the model was not asked, or it chose the same as the keywords. It says what the model chose, not what was found: evidence_kinds says what the answer was written from")
     unverified_numbers: list[str] = Field(description="Figures in the answer that are not in the cited sources, a minus sign the sources don't have, or a price move described in the wrong direction. Show a warning if non-empty")
     cautions: list[str] = Field(description="Plain-language warnings to show with the answer, for example when it may suggest a reason for a price move that the data cannot show, or when a financial figure it quotes can mislead (a P/E flattered by investment gains)")
     sources: list[Source]

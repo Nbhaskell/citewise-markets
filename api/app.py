@@ -261,6 +261,7 @@ def copilot(
         "grounded": ans.grounded,
         "companies": ans.symbols,
         "evidence_kinds": sorted({kind_of(r) for r in ans.retrieved}, key=KIND_ORDER.index),
+        "model_route": ans.model_route,
         "unverified_numbers": ans.unverified_numbers,
         "cautions": ans.cautions,
         "searches": ans.queries,

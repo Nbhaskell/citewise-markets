@@ -75,6 +75,7 @@ export const copilotAnswer = (over: Partial<CopilotResponse> = {}): CopilotRespo
   grounded: true,
   companies: ["NVDA"],
   evidence_kinds: ["filing"],
+  model_route: [],
   unverified_numbers: [],
   cautions: [],
   searches: ["How many employees does NVIDIA have?"],

@@ -1450,6 +1450,33 @@ benchmarks.
   router was used; "Understood as" is unchanged. (8) The development 39 and the 38 sealed cases are in `CASES` now (359 in all).
   **Recommendation:** merge, and turn it on by default with `COPILOT_ROUTER=off` as the switch back, because the rule is met; this
   is the owner's call (it adds a model call to every question the keywords send to the filings by default, and changes what some questions retrieve).
+- **Router visibility: the answer says when the local model chose the evidence, 2026-10-17** (branch
+  `feature/router-visibility`; no change to `SYSTEM_PROMPT`, the rewrite prompt, the router prompt or any routing rule; the default is
+  unchanged: the router is still off). **Why:** weak spot (7) of the routing experiment: with the router on, a question could retrieve
+  different data than the keyword rules would have chosen and nothing said so. **Decision: not in "Understood as".** That line means "I
+  rewrote your follow-up" (the web tests assert it is absent otherwise), and the router does not rewrite anything, so mixing the two would
+  make both unclear. **Built:** `Answer.model_route` (`ai/copilot.py`), the kinds of evidence the model chose, in the API's order (price,
+  fundamentals, sentiment, headline, filing); `ai/router.py` `evidence_kinds` and `changed_kinds`. It is empty when the router was off,
+  not asked (the keywords found a route, or a guard held it back, or code had already declined the question), failed, or chose the same
+  kinds as the keyword route (filings only is the keyword default, so "the model chose the filings" says nothing). It is the set after
+  the code-side guards, so a news verdict that had no news word in the question is not reported. The advice flag and which figures were
+  chosen are not kinds: the buy/sell notice and the figures themselves show those. A refusal carries it too: a question the model sent to
+  the prices with no company named gets "tell me which company", and the note says why. **API:** `model_route` on `POST /api/copilot`
+  (a required list, `[]` when empty; types regenerated). **Web:** a muted line under "Looked at ..." ("The app's keyword rules found no
+  specific kind of data for this question, so the local model chose: prices and headlines."), shown only when the list is not empty; it
+  says what the model chose, and "Looked at" still says what the answer was written from. Answers saved in the browser before this change
+  load with an empty list; a saved value that is not a list of known kinds drops the saved exchange like any other damaged field (`null`
+  counts as damage, not as old). The command line prints "chosen by the local model, not the keyword rules: ...". **Tests first:** 29
+  Python (`tests/test_router_visibility.py`: the function for every kind, the order, every case where nothing should be said, the
+  refusal, the command line; and two in `tests/test_api.py`) and 7 web; 2067 Python and 260 web tests pass. **Deliberate breakages: 26**
+  (the comparison, each kind's mapping, the order, the wiring in `answer_question` and in `refuse`, the API field, every web condition,
+  the validation and the upgrade of old saves) plus the command-line line: all caught. **In a real browser** (live data, router on):
+  "Has Apple pulled back from its high this year?" showed "Looked at prices for AAPL" and the note; "How has Microsoft stock done this
+  month?" (keywords) showed no note; saved answers with the field removed still loaded after a reload; the note wrapped at 375 px with no
+  horizontal overflow. Not checked in a browser: light mode, and a refusal with a note (tests only). **Weak spots:** (1) The note is shown
+  only when the model's kinds differ from the keyword route's, so a question the model looked at and left on the filings looks the same
+  as one it never saw. (2) It reports the model's choice, not whether the model was right. (3) The wording is fixed and long for five
+  kinds. (4) The default is still off: turning it on is the owner's call, to be made at the end of this branch.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

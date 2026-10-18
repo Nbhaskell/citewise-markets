@@ -39,6 +39,13 @@ function lookedAt(result: CopilotResponse): string {
   return where ? `Looked at ${what} for ${where}` : `Looked at ${what}`;
 }
 
+/** Said only when the keyword rules found no specific kind of data and the local model picked it instead. */
+function modelChose(result: CopilotResponse): string | null {
+  if (result.model_route.length === 0) return null;
+  const what = joinWords(result.model_route.map((k) => LOOKED_AT[k]));
+  return `The app's keyword rules found no specific kind of data for this question, so the local model chose: ${what}.`;
+}
+
 /**
  * One copilot answer: the text with clickable citations, warnings, and the numbered sources.
  * It owns its own "which source is highlighted" state and unique element ids, so many answers can sit on one page.
@@ -59,6 +66,7 @@ export function AnswerView({ result }: { result: CopilotResponse }) {
   return (
     <div className="result">
       <p className="muted small">{lookedAt(result)}</p>
+      {modelChose(result) && <p className="muted small">{modelChose(result)}</p>}
 
       <AnswerText text={result.answer} onCite={showSource} />
 
