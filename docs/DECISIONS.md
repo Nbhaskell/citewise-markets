@@ -1520,6 +1520,26 @@ benchmarks.
   caught except one rewrite that gives the same list (an intersection written in the other order). The full suite passed (2133); one run
   failed `test_search.py::test_latest_only_drops_older_filings_of_the_same_form` with nothing else using the database, and it passed alone
   three times and in the next full run, which looks like the known dead-index flakiness but was not investigated.
+  **Step 2, the shadow run, 2026-10-17 (302 cases x 3, the real model, 554 s, 0 router failures; the recording is not kept in the repo).**
+  Passes out of 906 case-runs (development 87, older 819): `today` 829 (39 of 87 development, 790 of 819 older), `replace` 686 (54, 632),
+  `replace-to-filings` 835 (57, 778), `intersect-else-router` 832 (66, 766), `intersect-else-keywords` 817 (42, 775). **The router is stable
+  (only 2 of 302 cases changed between repeats).** The keywords chose something specific in 177 of the 302 cases, and a further 65 are
+  held by a guard; on the specific ones the router differed from the keywords in 72 cases, and **the router was right in 10, the keywords
+  in 58, neither in 4.** All 10 router wins are cases written to expose a keyword error (9 development, plus "climbing or sliding"); the 58
+  keyword wins are mostly cases the keywords were tuned to pass, so neither side of that count is a fair rate (the sealed set is the
+  referee). **What the router gets wrong when it differs:** it adds prices to a stored-figure question (33 of the 58: P/E, market value, EPS,
+  margin), adds sentiment to a news question (8), says "price only" to a cause or "how is X doing" question that carries headlines by
+  design (4), and says "filings" to a mood or news question ("Any recent announcements", "kind or harsh", "turned on", 3) or to a price
+  prediction (1). **What it gets right:** a price word inside a filings question ("falling demand", "closed on schedule", "trading
+  restrictions", "volatility in lithium costs", "rising wafer prices": the keywords say prices, the model says filings, 5 of 5, three of
+  three repeats), "optimistic about factory" (mood words in a filings question), and a price question carrying "lately" (4 of 4).
+  **Reading the policies:** `replace` is plainly wrong (a loss of 58 cases) because of the first error above. `replace-to-filings` gains the 6
+  filings cases and loses 4 older ones (net +6 case-runs overall, but +18 on the cases written to find the problem and -12 on the older
+  ones). The intersect policies are safe against the most common model error (an extra price or sentiment is simply dropped) but remove
+  headlines the rules attach to cause and "how is X doing" questions on purpose (4 cases), and `intersect-else-router` sends a mood or news
+  question to the filings when the two share nothing (2 more). **No policy beats `today` on the older cases** (every one loses 12 to 24
+  case-runs there), and every gain is on cases written for it, so this does NOT show that a second look helps in general; it shows where it
+  could. **Not decided; nothing in the app changed.**
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
