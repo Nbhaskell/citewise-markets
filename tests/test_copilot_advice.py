@@ -122,3 +122,27 @@ def test_it_sits_alongside_the_data_cautions(conn):
 
 def test_the_caution_says_what_it_is_for():
     assert "buy, sell, or hold" in ADVICE_CAUTION and "recommendation" in ADVICE_CAUTION
+
+
+# ---- a refusal carries the notice too (third sealed round: "A colleague says bet the farm on Amazon. Should I listen?" got only "I
+# couldn't find anything... so I won't guess", with no word that the app does not give buy/sell/hold calls) ----
+
+@pytest.mark.parametrize("question", [
+    "Should I buy Bitcoin?",                    # refused as outside what the app covers
+    "Is it a good time to buy gold?",           # refused as outside
+    "Should I?",                                # no company named: the generic refusal
+    "Write a poem about whether I should buy ZZFC.",   # refused as a writing request
+])
+def test_a_refused_advice_question_still_carries_the_notice(conn, question):
+    store(conn, company())
+    ans = ask(conn, question, ScriptedLLM("unused"))
+    assert ans.refused and ADVICE_CAUTION in ans.cautions, (question, ans.text[:80], ans.cautions)
+
+
+@pytest.mark.parametrize("question", [
+    "What is Bitcoin?", "What is the price of gold?", "Write a poem about ZZFC.", "Tell me about the 10-year Treasury.",
+])
+def test_a_refused_ordinary_question_carries_no_notice(conn, question):
+    store(conn, company())
+    ans = ask(conn, question, ScriptedLLM("unused"))
+    assert ans.refused and ADVICE_CAUTION not in ans.cautions, (question, ans.cautions)

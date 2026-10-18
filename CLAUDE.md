@@ -142,7 +142,12 @@ them (the owner hasn't confirmed the order):
    (DECISIONS: "Third sealed round"): keywords only 25 of 43 (58%), router on 30 of 43 (70%), no case lost. Worst misses, all
    keyword-side: advice ("go all in on AMD. Should I?" got no notice), a writing request with a company named ("LinkedIn update on
    Amazon's quarter" answered), a false "market value not available", and speaker verbs not on the list ("warn"). Write
-   `SEALED_ROUND_FOUR` before the next fair comparison.** A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
+   `SEALED_ROUND_FOUR` before the next fair comparison.** **The advice and writing misses are fixed in code on the same branch
+   (2026-10-18, DECISIONS: "Advice and writing misses"):** the reader's own "go all in" / "bet big" / "put everything in" and a bare
+   "Should I?" carry the notice, "LinkedIn update", "status update", "blurb", "slogan" and similar are declined as writing requests
+   (the update/blurb/bio words only after a writing verb), and a refused advice question carries the notice too. 14 fresh cases 9 to
+   33 of 42; 72 of 2,623 routes change and all are new questions; 2501 Python tests pass. Still open: speaker verbs not on the list
+   ("warn"), a false "market value not available" ("what all its shares are worth"), "papers" as a news word. A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
    "Router second look, step 2") found no policy for "the model second-guesses a specific keyword route" that beats today on the older
    cases (the router is right in 10 of 72 disagreements, all on cases written to find keyword mistakes; it adds prices to figures
    questions), so **there is no second look; the router is still asked only when the keywords find no route.** **The "lately" rule is

@@ -422,7 +422,12 @@ ADVICE_ASK_RE = re.compile(
         \b(?:smart|wise|sensible|sound|safe|prudent|good|great|solid)\b.{0,60}?\bfor\s+(?:me|us)\b|
         (?:put|putting|park|parking)\s+(?:(?:any|some|a\s+little|a\s+lot\s+of)\s+)?(?:money|cash|savings)\s+(?:in|into|with)\b|
         (?:good|right|best|smart|wise)\s+(?:point|level|price|entry\s+point)\s+to\s+(?:buy|enter|get\s+in|add|sell|exit)\b|
-        (?:one|something|stocks?)\s+to\s+(?:buy|sell|hold|own|keep|avoid)\b
+        (?:one|something|stocks?)\s+to\s+(?:buy|sell|hold|own|keep|avoid)\b|
+        # "Should I?" with the trade left unsaid, and the common ways to finish it (third sealed round)
+        should\s+(?:i|we)\s*[?!.]*\s*$|
+        should\s+(?:i|we)\s+(?:do\s+it|go\s+for\s+it|take\s+the\s+(?:plunge|leap|bet))\b|
+        should\s+(?:i|we)\s+(?:join(?:\s+(?:in|them|him|her))?|listen(?:\s+to\s+(?:him|her|them|it|that))?)\s*[?!.]*\s*$|
+        should\s+(?:i|we)\s+(?:follow|take|heed|trust|listen\s+to)\s+(?:[\w'’]+\s+){0,3}?(?:advice|tips?|suggestions?|recommendations?|hunch(?:es)?)\b
     )""",
     re.IGNORECASE | re.VERBOSE,
 )
@@ -437,7 +442,13 @@ TRADE_WORD_RE = re.compile(
     r"lock(?:ing)?\s+in\s+(?:my\s+|our\s+|some\s+|the\s+)?(?:gains?|profits?)|cut(?:ting)?\s+(?:my\s+|our\s+)?losses|"
     r"bail(?:ing)?\s+out|unload\w*+(?!\s+(?:its|their)\b)|offload\w*+(?!\s+(?:its|their)\b)|"
     r"ride\s+(?:it|this|that|them|[\w.&-]+)\s+out|hang(?:ing)?\s+on(?:to)?\b(?:\s+to\b)?+(?!\s+(?:its|their)\b)|go(?:ing)?\s+(?:long|short)\b|"
-    r"add(?:ing)?\s+(?:[\w.&-]+\s+){1,2}to\s+(?:the|my|our|a|your)\s+(?:portfolio|holdings|watchlist))\b",
+    r"add(?:ing)?\s+(?:[\w.&-]+\s+){1,2}to\s+(?:the|my|our|a|your)\s+(?:portfolio|holdings|watchlist)|"
+    # The reader's own all-in (third sealed round: "My cousin says to go all in on AMD. Should I?" carried no notice). A company's own
+    # "going all in on autonomy" still needs a decision cue beside it, like every other trade word.
+    r"go(?:ing)?\s+all[-\s]?in\b|(?:be|being)\s+all[-\s]?in\b|all[-\s]in\s+on\b|"
+    r"bet(?:ting)?\s+(?:big|heavy|heavily|everything|it\s+all|the\s+(?:farm|house))|go(?:ing)?\s+(?:big|heavy)\s+on|"
+    r"put(?:ting)?\s+everything\s+(?:in|into|on)|pull(?:ing)?\s+the\s+trigger|back(?:ing)?\s+up\s+the\s+truck|"
+    r"throw(?:ing)?\s+money\s+at)\b",
     re.IGNORECASE,
 )
 DECISION_CUE_RE = re.compile(
@@ -593,13 +604,21 @@ _WRITE_VERB = (
 _WRITE_THING = (
     r"(?:e-?mails?|letters?|memos?|messages?|tweets?|captions?|scripts?|slides?|decks?|presentations?|resumes?|cvs?|"
     r"press\s+releases?|newsletters?|toasts?|essays?|speeches|speech|poems?|songs?|haikus?|limericks?|jokes?|raps?|riddles?|"
-    r"(?:linkedin|blog|facebook|instagram|reddit|twitter|social\s+media)\s+posts?|blog|thank-?\s?you\s+notes?|notes?\s+to\b)"
+    # a platform "update" was added after the third sealed round ("Put together a short LinkedIn update on Amazon's quarter." was answered)
+    r"(?:linkedin|blog|facebook|instagram|reddit|twitter|social\s+media)\s+(?:posts?|updates?)|blog|thank-?\s?you\s+notes?|notes?\s+to\b)"
+)
+# Things that are a writing request only after a WRITING verb: "Draft a status update" asks for text, but "Give me a status update on
+# Tesla's recall" or "Give me a bio of the CEO" asks for information. "An announcement" counts only when it is for the reader's own
+# people: "Did Apple make an announcement?" is research.
+_WRITE_ONLY_THING = (
+    r"(?:(?:status|team|weekly|monthly|progress)\s+updates?|blurbs?|slogans?|taglines?|jingles?|bios?|"
+    r"announcements?(?=\s+(?:for|to)\s+(?:my|our)\b))"
 )
 # Up to three words between the verb and the thing ("a short poem", "a cover letter"), none of them a preposition: "Write a
 # summary of Apple's letter to shareholders" is research.
 _BETWEEN = r"(?:(?!of\b|about\b|on\b|from\b|regarding\b|for\b)[\w'’-]+\s+){0,3}?"
 WRITING_REQUEST_RE = re.compile(
-    rf"\b{_WRITE_VERB}\s+{_BETWEEN}{_WRITE_THING}\b|"
+    rf"\b{_WRITE_VERB}\s+{_BETWEEN}(?:{_WRITE_THING}|{_WRITE_ONLY_THING})\b|"
     rf"\b(?:give|get|show)\s+me\s+(?:a|an|some)\s+{_BETWEEN}{_WRITE_THING}\b|"
     r"\b(?:e-?mail|text|message|dm)\s+(?:my|our|the|a)\s+\w+\s+(?:about|the|that|with)\b|"
     r"\b(?:write|code|build|program|script)\s+(?:me\s+)?(?:a|an|some)\s+(?:[\w-]+\s+){0,3}"

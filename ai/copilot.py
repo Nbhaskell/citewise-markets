@@ -936,6 +936,8 @@ def answer_question(
         return Answer(
             question, text, symbols, list(found), queries=list(queries), interpreted_question=interpreted, refused=True,
             model_route=model_route,
+            # a refusal says nothing about buying or selling, so the notice is what tells the reader why no call was given
+            cautions=[ADVICE_CAUTION] if intent.advice else [],
         )
 
     tracked = [r[0] for r in conn.execute("SELECT symbol FROM instruments WHERE active ORDER BY symbol")]

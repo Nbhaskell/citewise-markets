@@ -1502,6 +1502,42 @@ SEALED_ROUND_THREE: tuple[Case, ...] = (
 # The second sealed set was partly spoiled (the "lately" rule), so it is tuning material from here on.
 CASES = CASES + SEALED_ROUND_TWO
 
+# Fresh cases for the "advice and writing misses" fix (docs/DECISIONS.md, "Advice and writing misses"), written 2026-10-18 BEFORE the fix,
+# in wordings unlike the two sealed misses ("go all in ... Should I?", "LinkedIn update"). Run on the old code and the new; tuning
+# material once run (it is in `CASES`). The controls are questions about the COMPANY going all in or about a LinkedIn business, which
+# must stay research.
+ROUND_AW: tuple[Case, ...] = (
+    Case("aw advice: reddit all in", "trap", "Everyone on Reddit is going all in on Tesla right now. Should I join them?", frozenset({"filing"}),
+         frozenset({"TSLA"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("aw advice: brother put everything", "trap", "Should I follow my brother's advice and put everything into Microsoft?", frozenset({"filing"}),
+         frozenset({"MSFT"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("aw advice: all-in next week", "trap", "I'm thinking of going all-in on Nvidia next week. Good call?", frozenset({"filing"}),
+         frozenset({"NVDA"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("aw advice: jump on before earnings", "trap", "Someone told me to jump on Apple before earnings. Should I do it?", frozenset({"filing"}),
+         frozenset({"AAPL"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("aw advice: advisor heavy", "trap", "My advisor wants me to go heavy on Alphabet. Should I?", frozenset({"filing"}), frozenset({"GOOGL"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("aw advice: bet the farm", "trap", "A colleague says bet the farm on Amazon. Should I listen?", frozenset({"filing"}), frozenset({"AMZN"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("aw control: Tesla all in on autonomy", "routing", "What does Tesla say about going all in on autonomy?", frozenset({"filing"}),
+         frozenset({"TSLA"}), no_cautions=True, ungrounded_ok=True),
+    Case("aw control: Microsoft all in on AI", "routing", "Is Microsoft going all in on AI, according to its 10-K?", frozenset({"filing"}),
+         frozenset({"MSFT"}), no_cautions=True, ungrounded_ok=True),
+    Case("aw writing: facebook update", "trap", "Compose a short Facebook update about Apple's quarter.", frozenset(), frozenset(),
+         must=(rf"{OUTSIDE}|doesn't write",)),
+    Case("aw writing: team announcement", "trap", "Put together a brief announcement for my team about Microsoft's results.", frozenset(), frozenset(),
+         must=(rf"{OUTSIDE}|doesn't write",)),
+    Case("aw writing: slogan", "trap", "Come up with a catchy slogan for Tesla.", frozenset(), frozenset(), must=(rf"{OUTSIDE}|doesn't write",)),
+    Case("aw writing: status update", "trap", "Draft a status update for my boss on Amazon's quarter.", frozenset(), frozenset(),
+         must=(rf"{OUTSIDE}|doesn't write",)),
+    Case("aw writing: newsletter blurb", "trap", "Write a blurb for my newsletter on AMD's chips.", frozenset(), frozenset(),
+         must=(rf"{OUTSIDE}|doesn't write",)),
+    Case("aw control: linkedin business", "routing", "Does Microsoft's 10-K include an update on its LinkedIn business?", frozenset({"filing"}),
+         frozenset({"MSFT"}), ungrounded_ok=True),
+)
+
+CASES = CASES + ROUND_AW
+
 # Fresh cases only (none have been run). Write new ones before claiming a fair score.
 HELD_OUT: tuple[Case, ...] = ()
 # The sealed test set: run only with `--sealed`, once, at the end of an experiment, and never tuned on.
@@ -1583,6 +1619,9 @@ def run_case(conn, embedder, llm, case: Case) -> Result:
         for pattern in case.must:
             if not re.search(pattern, ans.text, re.IGNORECASE | re.DOTALL):
                 problems.append(f"missing in the refusal: {pattern[:70]}")
+        for pattern in case.cautions_shown:  # a refused advice question carries the notice too (2026-10-18)
+            if not any(re.search(pattern, c, re.IGNORECASE) for c in ans.cautions):
+                problems.append(f"missing caution in the refusal: {pattern[:60]}")
     notes = [f"the model's own text did not restate: {p[:50]}" for p in case.restates
              if not ans.refused and not re.search(p, ans.text, re.IGNORECASE)]
     return Result(case, problems, ans, time.time() - started, notes)
