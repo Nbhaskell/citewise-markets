@@ -5,7 +5,7 @@ Usage: python -m ai.copilot "What are Nvidia's biggest risks?" [--symbol NVDA] [
 import argparse
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 
 import psycopg
@@ -19,6 +19,7 @@ from .market import (
     CAUSE_RE,
     FILING_RE,
     STOCK_WORD_RE,
+    Intent,
     MarketEvidence,
     detect_intent,
     gather_market_evidence,
@@ -656,6 +657,45 @@ def points_back_without_a_topic(question: str, rewrite: str) -> bool:
     return bool(POINTS_BACK_RE.search(question)) and not names_a_topic(question) and not routes_somewhere(rewrite)
 
 
+# "What does Apple say about falling demand in China?", "Does Tesla sound optimistic about its factory expansion?": a price or mood word
+# inside a question about what the COMPANY says. When a tracked company, its management (executives, leadership, CEO, CFO) or its
+# 10-K, 10-Q, annual report or filings is the one speaking, the question is about the filings, not the stock (DECISIONS: "Filings
+# questions with price or mood words"). The test is who speaks, not which price word appears, so a new price word needs no new entry.
+# Each verb and each speaker needs a question of its own.
+SPEAKER_VERB = r"(?:say|says|said|describe[sd]?|discuss(?:es|ed)?|disclose[sd]?|mention(?:s|ed)?|state[sd]?|explain(?:s|ed)?|convey(?:s|ed)?|sound(?:s)?)"
+SPEAKER_STAFF = r"(?:management|executives?|leadership|ceo|cfo)"
+SPEAKER_DOC = r"(?:10-?k|10-?q|annual\s+report|filings?)"
+# what may follow the company's name: its staff or documents, a small word, then a speaking verb ("Apple's 10-K says", "Tesla also said")
+AFTER_COMPANY_RE = re.compile(
+    rf"\A(?:['’]s\s+(?:{SPEAKER_STAFF}|{SPEAKER_DOC}))?\s+(?:(?:also|ever|really|actually)\s+)?{SPEAKER_VERB}\b", re.IGNORECASE
+)
+COMPANY_STAFF_RE = re.compile(rf"\A['’]s\s+{SPEAKER_STAFF}\b", re.IGNORECASE)  # "How bullish is Nvidia's management about ...": no verb needed
+DOCUMENT_SPEAKS_RE = re.compile(rf"\b{SPEAKER_DOC}\s+{SPEAKER_VERB}\b", re.IGNORECASE)  # "What does the 10-K say ...": no company needed
+# The press named: "Has Apple said anything in the headlines today?" is still about the headlines.
+PRESS_NAMED_RE = re.compile(r"\b(?:news|headlines?|press|coverage|stor(?:y|ies)|articles?|reporters?|media|journalists?)\b", re.IGNORECASE)
+
+
+def company_is_speaking(conn: psycopg.Connection, text: str) -> bool:
+    """Is a tracked company, its staff or its documents the one saying, describing or sounding something? (Not analysts, investors,
+    "you", "the market" or a news story.)"""
+    if DOCUMENT_SPEAKS_RE.search(text):
+        return True
+    for matches in company_mentions(conn, text).values():
+        for m in matches:
+            tail = text[m.end():]
+            if COMPANY_STAFF_RE.match(tail) or AFTER_COMPANY_RE.match(tail):
+                return True
+    return False
+
+
+def route_by_speaker(conn: psycopg.Connection, text: str, intent: Intent) -> Intent:
+    """The intent after the speaker rule: prices, headlines and mood off and the filings on, when the company is the speaker and the press
+    is not named. The stored figures are not touched. Returns `intent` itself when nothing changes."""
+    if not (intent.prices or intent.headlines) or PRESS_NAMED_RE.search(text) or not company_is_speaking(conn, text):  # (mood comes with headlines)
+        return intent
+    return replace(intent, prices=False, headlines=False, sentiment=False, filings=True)
+
+
 def _is_bare_switch(text: str, mentions: dict[str, list[re.Match]]) -> bool:
     """Only company names and filler words: "What about Tesla?", "And Tesla's?". Nothing says what to ask about it."""
     rest = text
@@ -887,7 +927,9 @@ def answer_question(
     the answer itself is written from the retrieved sources alone, so earlier answers can never be used as evidence.
     `today` is only for tests (it dates the freshness notes and cautions)."""
     search_question, symbols, interpreted = resolve_question(conn, llm, question, symbols, history)
-    intent = detect_intent(search_question)
+    first_intent = detect_intent(search_question)
+    intent = route_by_speaker(conn, search_question, first_intent)  # "What does Apple say about falling demand?": the filings, not the price
+    decided_by_speaker = intent is not first_intent  # a deliberate filings route: the router is not asked to second-guess it
     model_route: list[str] = []  # set below when the router picked the evidence; every answer, refusals too, carries it
 
     def refuse(text: str, found=(), queries=()) -> Answer:
@@ -906,7 +948,7 @@ def answer_question(
     if not symbols and (name := unknown_name(conn, search_question)):  # a name the stored text has never seen
         return refuse(outside_scope_message("unknown", name, tracked))
     router_says_outside = False
-    if router_enabled(router) and needs_router(intent, search_question):  # no specific route found: ask the model what kind of question this is
+    if router_enabled(router) and not decided_by_speaker and needs_router(intent, search_question):  # no specific route found: ask the model what kind of question this is
         keyword_intent = intent
         intent, verdict = apply_route(intent, ask_router(llm, search_question), has_company=bool(symbols), question=search_question)
         model_route = changed_kinds(keyword_intent, intent)

@@ -1366,6 +1366,47 @@ ROUND_FU: tuple[Case, ...] = (
 
 CASES = CASES + ROUND_FU
 
+# Written 2026-10-18 on `feature/filings-price-words`, in new wording, BEFORE the rule was written (docs/DECISIONS.md, "Filings questions
+# with price or mood words"): questions where a company, its management or its 10-K is the one speaking and a price or mood word appears
+# ("What does Apple say about falling demand?"), which must go to the filings only (8), and controls that must keep their market route
+# (6): analysts or "you" as the speaker, the press named, a stored figure. Run once on the old code (14 of 42 runs) and once on the new
+# (38 of 42), so they are tuning material now and are folded into CASES below. One control, "analysts saying", fails on both: it routes
+# to the prices correctly, but the model says analyst comments are not stored, so the case's quoted-price check fails (not loosened).
+ROUND_FP: tuple[Case, ...] = (
+    # the company is the speaker: the filings
+    Case("fp speaks: slumping PC demand", "routing", "Does Microsoft say anything about slumping PC demand?", frozenset({"filing"}),
+         frozenset({"MSFT"}), ungrounded_ok=True),
+    Case("fp speaks: management plunging ad rates", "routing", "How does Alphabet's management talk about plunging ad rates?",
+         frozenset({"filing"}), frozenset({"GOOGL"}), ungrounded_ok=True),
+    Case("fp speaks: 10-Q rally in freight", "routing", "Did Amazon's 10-Q mention any rally in freight costs?", frozenset({"filing"}),
+         frozenset({"AMZN"}), ungrounded_ok=True),
+    Case("fp speaks: disclose demand surged", "routing", "What does Nvidia disclose about how demand surged last year?",
+         frozenset({"filing"}), frozenset({"NVDA"}), ungrounded_ok=True),
+    Case("fp speaks: executives bearish", "routing", "Do Apple's executives sound bearish on iPhone demand?", frozenset({"filing"}),
+         frozenset({"AAPL"}), ungrounded_ok=True),
+    Case("fp speaks: annual report falling ad prices", "routing", "What did Google's annual report state about falling ad prices?",
+         frozenset({"filing"}), frozenset({"GOOGL"}), ungrounded_ok=True),
+    Case("fp speaks: explain backlog dropped", "routing", "Did AMD explain why its backlog dropped?", frozenset({"filing"}),
+         frozenset({"AMD"}), ungrounded_ok=True),
+    Case("fp speaks: crash in battery prices", "routing", "Does Tesla say anything about a crash in battery prices?", frozenset({"filing"}),
+         frozenset({"TSLA"}), ungrounded_ok=True),
+    # controls: someone else is the speaker, the press is named, or it asks for a stored figure
+    Case("fp control: analysts saying", "routing", "What are analysts saying about Apple's falling stock price?", frozenset({"price"}),
+         frozenset({"AAPL"}), must=(PRICE_DIGITS,)),
+    Case("fp control: said in the headlines", "routing", "Has Nvidia said anything in the headlines today?", frozenset({"headline"}),
+         frozenset({"NVDA"})),
+    Case("fp control: would you say sliding", "routing", "Would you say Tesla's stock is sliding?", frozenset({"price"}), frozenset({"TSLA"}),
+         must=(PRICE_DIGITS,)),
+    Case("fp control: why tumble after call", "routing", "Why did Amazon shares tumble after the earnings call?", frozenset({"price", "headline"}),
+         frozenset({"AMZN"}), must=(PRICE_DIGITS,), must_not=(CAUSAL,)),
+    Case("fp control: press kind to management", "routing", "Is the press kind to Microsoft's management lately?",
+         frozenset({"headline", "sentiment"}), frozenset({"MSFT"})),
+    Case("fp control: said its eps came to", "routing", "What did Nvidia say its earnings per share came to?",
+         frozenset({"fundamentals"}), frozenset({"NVDA"}), figures=("NVDA:eps",)),
+)
+
+CASES = CASES + ROUND_FP
+
 # Fresh cases only (none have been run). Write new ones before claiming a fair score.
 HELD_OUT: tuple[Case, ...] = ()
 # The sealed test set: run only with `--sealed`, once, at the end of an experiment, and never tuned on.

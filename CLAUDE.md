@@ -146,13 +146,18 @@ them (the owner hasn't confirmed the order):
    built on `feature/lately-price-rule` (DECISIONS: "Router second look, 'lately'"):** "lately" brings headlines only when the question is
    not already a price question, a company + a movement word (climbing, sliding, drifting...) + a recency word is a price question, and a
    cause question about a "slide" or "jump" counts "lately" as the period; 4 of 11 fresh cases on the old code, 10 of 11 on the new.
-   Still open: a price or mood word inside a filings question ("falling demand", "optimistic") goes to prices or headlines; the model
-   was right on all 6 tried, and a narrow "model may send it to the filings" policy is the candidate if wanted.
-   **Follow-up topic carry is built on `feature/followup-topic-carry` (2026-10-18, DECISIONS: "Follow-up topic carry"):** a follow-up that
-   points back without naming a topic gets the earlier question's topic in code (a new company swapped in, a comparison "..., compared with
-   X", or a cause question appended to an earlier price question). On 61 follow-up cases, old against new, answers: 138 to 177 of 183;
-   the 16 fresh ones 34 to 45 of 48; `ai.eval_followups` 50/51 to 51/51. Still failing: "Where does Tesla land on that scale?". It is
-   a word list again, and a rebuilt comparison replaces the user's own comparison wording.
+   **Follow-up topic carry is merged (PR #47, 2026-10-18, DECISIONS: "Follow-up topic carry"):** a follow-up that points back without
+   naming a topic gets the earlier question's topic in code (a new company swapped in, a comparison "..., compared with X", or a cause
+   question appended to an earlier price question). On 61 follow-up cases, old against new, answers: 138 to 177 of 183; the 16 fresh ones
+   34 to 45 of 48; `ai.eval_followups` 50/51 to 51/51. Still failing: "Where does Tesla land on that scale?". It is a word list again, and a
+   rebuilt comparison replaces the user's own comparison wording.
+   **Filings questions with price or mood words are fixed in code on `feature/filings-price-words` (2026-10-18, DECISIONS: "Filings
+   questions with price or mood words"):** when a tracked company, its management or its 10-K is the one saying or describing something
+   ("What does Apple say about falling demand in China?", "Does Tesla sound optimistic...?"), prices, headlines and mood are switched off and
+   the question goes to the filings, unless the press is named; the stored figures are untouched, and the router is not asked about such a
+   question (`company_is_speaking`, `route_by_speaker`). 8 development cases 0 to 24 of 24 runs; 14 fresh cases 14 to 38 of 42; 25 routes
+   change on 1,786 questions, all intended. Still open: a price word in a question with no speaker ("Was Microsoft's Activision acquisition
+   closed on schedule?"), a speaker verb not on the list, and a new sealed set for the next fair comparison.
 
 ## Working with the owner
 
@@ -186,7 +191,7 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-18 (on `feature/followup-topic-carry`, after PRs #44 to #46 merged): 2300 Python tests, 260 web tests, all
+- Baseline as of 2026-10-18 (on `feature/filings-price-words`, after PRs #44 to #47 merged): 2388 Python tests, 260 web tests, all
   passing (the web count last run on 2026-10-17; nothing in `web/` changed since). `tests/test_search.py` fails one or two tests in
   about half of the full runs, always the first run after the database was used by other runs, and passes alone and on the rerun:
   rerun before assuming a break (not investigated). A full test run can fail one or two vector-search tests while an evaluation shares the database;
