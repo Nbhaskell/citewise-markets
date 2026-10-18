@@ -1108,6 +1108,9 @@ CASES = CASES + ROUND_FM + SEALED_ROUND_ONE
 # right, some wrong, which is the point). It is the TEST set for the "second look" experiment (docs/DECISIONS.md, "Router second look"):
 # whether the router should also be asked about questions the keywords route to something specific. RUN ONCE with `--sealed`, at the end,
 # and never tune on it. Not in `CASES` on purpose: it joins them only after it has been run and looked at.
+# PARTLY SPOILED (2026-10-17): the "lately" keyword rule (DECISIONS: "Router second look, 'lately'") was written knowing this set holds
+# "How choppy has Amazon's stock been lately?" and "Has Microsoft been grinding higher or drifting lower recently?"; the first now routes
+# right because of it. A fair later comparison needs a new sealed set.
 SEALED_ROUND_TWO: tuple[Case, ...] = (
     # prices
     Case("s2 price: compare with a month ago", "routing", "How does Tesla's stock compare with where it stood this time last month?",
@@ -1281,6 +1284,38 @@ ROUND_SL: tuple[Case, ...] = (
 )
 
 CASES = CASES + ROUND_SL
+
+# Written 2026-10-17 on `feature/lately-price-rule`, in new wording, BEFORE the rule was written (docs/DECISIONS.md, "Router second
+# look, 'lately'"): price questions that say "lately" or "recently" and must not bring headlines, questions where "lately" really is a
+# news cue and must keep them, and cause questions that bring both. Run once on the old code (4 of 11) and once on the new (10 of 11,
+# the miss being fixed afterwards), so they are tuning material now and are folded into CASES below.
+ROUND_LATELY: tuple[Case, ...] = (
+    # a price question worded with a movement word and a recency word
+    Case("ll price: slipping again these days", "routing", "Has Tesla been slipping again these days?", frozenset({"price"}),
+         frozenset({"TSLA"}), must=(PRICE_DIGITS,)),
+    Case("ll price: stock value holding firm", "routing", "Is Microsoft's stock value holding firm lately?", frozenset({"price"}),
+         frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
+    Case("ll price: dipping a bit", "routing", "Has Amazon been dipping a bit lately?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(PRICE_DIGITS,)),
+    Case("ll price: where stock sitting", "routing", "Where has Apple's stock been sitting lately?", frozenset({"price"}), frozenset({"AAPL"}),
+         must=(PRICE_DIGITS,)),
+    Case("ll price: trending lower recently", "routing", "Is Nvidia trending lower recently?", frozenset({"price"}), frozenset({"NVDA"}),
+         must=(PRICE_DIGITS,)),
+    # "lately" really is the news cue here: the headlines must stay
+    Case("ll news: written about lately", "routing", "What's been written about AMD lately?", frozenset({"headline"}), frozenset({"AMD"})),
+    Case("ll news: noteworthy come out of", "routing", "Has anything noteworthy come out of Google lately?", frozenset({"headline"}),
+         frozenset({"GOOGL"})),
+    Case("ll news: how people reacted", "routing", "How have people reacted to Tesla's announcement lately?", frozenset({"headline"}),
+         frozenset({"TSLA"})),
+    Case("ll news: chatter lately", "routing", "Is there any chatter about Amazon lately?", frozenset({"headline"}), frozenset({"AMZN"})),
+    # a cause question brings both, as before
+    Case("ll cause: why sliding lately", "routing", "Why has Nvidia been sliding lately?", frozenset({"price", "headline"}),
+         frozenset({"NVDA"}), must=(PRICE_DIGITS,), must_not=(CAUSAL,)),
+    Case("ll cause: behind the slide lately", "routing", "What's behind Apple's slide lately?", frozenset({"price", "headline"}),
+         frozenset({"AAPL"}), must=(PRICE_DIGITS,), must_not=(CAUSAL,)),
+)
+
+CASES = CASES + ROUND_LATELY
 
 # Fresh cases only (none have been run). Write new ones before claiming a fair score.
 HELD_OUT: tuple[Case, ...] = ()
