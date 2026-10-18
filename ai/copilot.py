@@ -662,7 +662,12 @@ def points_back_without_a_topic(question: str, rewrite: str) -> bool:
 # 10-K, 10-Q, annual report or filings is the one speaking, the question is about the filings, not the stock (DECISIONS: "Filings
 # questions with price or mood words"). The test is who speaks, not which price word appears, so a new price word needs no new entry.
 # Each verb and each speaker needs a question of its own.
-SPEAKER_VERB = r"(?:say|says|said|describe[sd]?|discuss(?:es|ed)?|disclose[sd]?|mention(?:s|ed)?|state[sd]?|explain(?:s|ed)?|convey(?:s|ed)?|sound(?:s)?)"
+SPEAKER_VERB = (
+    r"(?:say|says|said|describe[sd]?|discuss(?:es|ed)?|disclose[sd]?|mention(?:s|ed)?|state[sd]?|explain(?:s|ed)?|convey(?:s|ed)?|sound(?:s)?|"
+    # added after the third sealed round ("Did Alphabet warn that ad prices were dropping?" went to the stock prices)
+    r"warn(?:s|ed)?|caution(?:s|ed)?|admit(?:s|ted)?|acknowledge[sd]?|concede[sd]?|signal(?:s|ed|led)?|indicate[sd]?|flag(?:s|ged)?|"
+    r"note[sd]?|talk(?:s|ed)?|tell|tells|told)"
+)
 SPEAKER_STAFF = r"(?:management|executives?|leadership|ceo|cfo)"
 SPEAKER_DOC = r"(?:10-?k|10-?q|annual\s+report|filings?)"
 # what may follow the company's name: its staff or documents, a small word, then a speaking verb ("Apple's 10-K says", "Tesla also said")
@@ -682,6 +687,8 @@ def company_is_speaking(conn: psycopg.Connection, text: str) -> bool:
         return True
     for matches in company_mentions(conn, text).values():
         for m in matches:
+            if re.search(r"\bthe\s+\Z", text[:m.start()], re.IGNORECASE):  # "the Tesla signal": the name describes a noun, it is not speaking
+                continue
             tail = text[m.end():]
             if COMPANY_STAFF_RE.match(tail) or AFTER_COMPANY_RE.match(tail):
                 return True

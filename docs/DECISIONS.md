@@ -1740,6 +1740,48 @@ benchmarks.
   decision cue sits beside the company's own all-in ("Should Microsoft go all in on AI?" is flagged). (4) "Did Tesla create a new slogan?"
   would be declined as a writing request (the write verb rule has never looked at tense). (5) `ROUND_AW` has 14 cases; one run of three.
   (6) Web tests were not run (nothing in `web/` changed).
+- **Routing misses of the third sealed round, 2026-10-18** (branch `feature/sealed-misses-routing`; no prompt change, no model call).
+  **The problem:** five confident "I don't have that" answers from the sealed round, each because a keyword rule did not know a wording.
+  "How big is Apple, in terms of what all its shares are worth?" went to the prices and was told market value is not available; "Show me
+  what the papers are printing about Amazon." went to the filings, which have no headlines; "Give me Nvidia's highest and lowest close of
+  the past quarter." and "How wild have Alphabet's swings been since spring?" were told the prices do not cover it; "Did Alphabet warn that
+  ad prices were dropping?" went to the stock prices because "warn" is not a speaker verb. **Built:** (1) `MARKET_VALUE_PATTERN` knows "all its /
+  their / X's shares are worth / add up to", "combined / total / overall / aggregate / collective worth or value of all / every / each ...
+  share or stock", "how much is the whole / entire (of) X worth" and "add up all / every / each ... share". (2) `NEWS_VOICE_RE`: a news
+  source (newspapers, "the papers", columnists, tabloids, journalists, reporters, pundits, commentators, bloggers, "the press" but not "the press
+  release", "the media") followed within three words by what it does (saying, writing, printing, publishing, reporting, covering, running...), or
+  that act "by" / "in" the source ("published by the papers", "ran in the papers"), routes to the headlines. Structure, not one phrase per
+  wording; "papers" counts only as "the papers". (3) `CLOSE_EXTREME_RE`: highest / lowest / best / worst / top / peak / bottom + "close(s)"
+  (not "close call / partners / relationships / competitors / competition") and "close highest / lowest" are price questions. (4) `SWINGS_RE`: a
+  capitalised company's `'s swings` is a price question, unless it is "swings in" something other than the stock. (5) `SPEAKER_VERB` in
+  `ai/copilot.py` gained warn, caution, admit, acknowledge, concede, signal, indicate, flag, note, talk, tell / told, and a company name right after
+  "the" ("the Tesla signal") no longer counts as speaking. **Tests first: 136 new (`tests/test_routing_misses_round_three.py`); the first run
+  had 85 failures; full suite 2637 passed.** The tests' first run also showed that the speaker verbs "signal" and "flag" are nouns after a
+  company name, which is why the "the <Company>" guard exists. **Deliberate breakages: about 110, all caught except one equivalent mutant
+  (dropping the optional "of" in "the whole of X worth", which the two-word name slot matches anyway), on a baseline verified green.** The
+  first pass had 12 survivors that were real gaps (no test for "overall", "collective", "said", "written", "running", "bottom", the press-release
+  guard, the singular "swing", "swings in price / shares", the lowercase-subject guard), so tests were added, and the "at its highest" form,
+  an optional "closing close" and six rare guard words were deleted instead of tested (they were either already covered by the old
+  `CLOSE_NOUN_RE` or never in a real question). One more finding: a heredoc wrote a backspace character into a regex (`\b` in a non-raw
+  Python string); the tests caught it, and the editor tool or a script file is the safe way to write regexes (already in CLAUDE.md).
+  **Evidence, old code against new code (a `git worktree` of the parent commit, router off):** (a) **offline on 2,780 distinct questions**
+  (every evaluation case and history turn, every string literal in the `.py` files that reads like a question, the web tests' questions):
+  68 routes change; 63 are questions written for this fix, 2 are sentences from the app's own answers that the script collected, and 3 are
+  existing speaker-rule questions ("What are journalists saying about what Marketco disclosed on falling shares?") that now also bring the
+  headlines, which is the intended reading; **no evaluation case changed**; (b) **18 fresh cases written before the fix (`ROUND_RM`, in
+  `CASES`), 3 runs each: 3 of 54 on the old code, 46 of 54 on the new.** The 8 left: "swings this year" 1 of 3 (the model computed a price
+  range, 96.83, that is in no source, and the numbers check flagged it; not loosened), "What did Tesla admit about falling margins?" 0 of 3
+  (the answer is from the filings and the stored margins; the case demanded filings only, so the expectation was too strict), and the control
+  "Did analysts warn that Tesla's stock was falling?" 0 of 3 on both codes (routes to the prices correctly; the model says analyst comments
+  are not stored and the case wants a quoted price). **Weak spots:** (1) word lists again: named outlets ("What does the Wall Street Journal
+  say about Apple?"), "the papers" without "the", and any new press noun still miss. (2) "Marketco shares fell after Marketco warned about demand"
+  still goes to the filings, because any later mention of the company followed by a speaker verb turns the prices off; this already held for
+  "said" and now holds for more verbs. (3) "tell", "note" and "talk" are common words; the company-name-then-verb requirement keeps them
+  narrow, but "Apple notes payable rose" would be read as "Apple notes". (4) "since spring" is still not a period the app reads; the question now
+  reaches the prices and the code-side caution says the period was not read. (5) Not touched: "Does Tesla make money from running the
+  business itself?" (filings, arguably fine), "Which of these companies is getting the best press right now?" (no company named), and the
+  gap between "good" and "bad" press words. (6) `tests/test_search.py` failed one or two tests in 3 of 6 full runs, with and without the
+  new test file and on the clean code, and passed alone each time: the known flakiness, not investigated.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

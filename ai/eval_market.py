@@ -1538,6 +1538,52 @@ ROUND_AW: tuple[Case, ...] = (
 
 CASES = CASES + ROUND_AW
 
+# Fresh cases for the "routing misses of the third sealed round" fix (docs/DECISIONS.md, "Routing misses of the third sealed round"),
+# written 2026-10-18 BEFORE the fix in wordings unlike the sealed misses ("what all its shares are worth", "the papers are printing",
+# "highest and lowest close", "swings since spring", "warn that ad prices were dropping"). Run on the old code and the new; tuning
+# material once run (they are in `CASES`).
+ROUND_RM: tuple[Case, ...] = (
+    # a company's total value, worded around its shares
+    Case("rm value: every share added up", "routing", "What do all of Tesla's shares add up to in value?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), figures=("TSLA:market_value",)),
+    Case("rm value: combined worth of shares", "routing", "What is the combined worth of every Microsoft share?", frozenset({"fundamentals"}),
+         frozenset({"MSFT"}), figures=("MSFT:market_value",)),
+    Case("rm value: whole company on the market", "routing", "How much is the whole of AMD worth on the stock market?", frozenset({"fundamentals"}),
+         frozenset({"AMD"}), figures=("AMD:market_value",)),
+    # the press worded with a noun the news rules do not list
+    Case("rm news: newspapers saying", "routing", "What are the newspapers saying about Microsoft?", frozenset({"headline"}), frozenset({"MSFT"})),
+    Case("rm news: columnists writing", "routing", "What are columnists writing about Nvidia?", frozenset({"headline"}), frozenset({"NVDA"})),
+    Case("rm news: papers covering", "routing", "Have the papers been covering AMD much?", frozenset({"headline"}), frozenset({"AMD"})),
+    Case("rm news: journalists printing", "routing", "What are journalists printing about Alphabet right now?", frozenset({"headline"}),
+         frozenset({"GOOGL"})),
+    # a best or worst close, and swings
+    Case("rm price: best closing price", "routing", "What was Microsoft's best closing price over the past six months?", frozenset({"price"}),
+         frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
+    Case("rm price: lowest close in three months", "routing", "What's the lowest close Apple has had in the last three months?", frozenset({"price"}),
+         frozenset({"AAPL"}), must=(PRICE_DIGITS,)),
+    Case("rm price: which day closed highest", "routing", "Which day did Nvidia close highest in the past month?", frozenset({"price"}),
+         frozenset({"NVDA"}), must=(PRICE_DIGITS,)),
+    Case("rm price: swings this quarter", "routing", "How big have AMD's swings been over the past quarter?", frozenset({"price"}), frozenset({"AMD"}),
+         must=(PRICE_DIGITS,)),
+    Case("rm price: swings this year", "routing", "How big have Apple's swings been this year?", frozenset({"price"}), frozenset({"AAPL"}),
+         must=(PRICE_DIGITS,)),
+    # the company speaking, in verbs that are not on the speaker list
+    Case("rm filing: warn cloud prices", "routing", "Did Microsoft warn that cloud prices were falling?", frozenset({"filing"}), frozenset({"MSFT"}),
+         ungrounded_ok=True),
+    Case("rm filing: cautioned shipping prices", "routing", "Has Amazon cautioned about rising shipping prices?", frozenset({"filing"}),
+         frozenset({"AMZN"}), ungrounded_ok=True),
+    Case("rm filing: concede demand", "routing", "Did Nvidia concede that demand was dropping?", frozenset({"filing"}), frozenset({"NVDA"}),
+         ungrounded_ok=True),
+    Case("rm filing: admit falling margins", "routing", "What did Tesla admit about falling margins?", frozenset({"filing"}), frozenset({"TSLA"}),
+         ungrounded_ok=True),
+    Case("rm filing: signaled slump", "routing", "Has AMD signaled a slump in PC demand?", frozenset({"filing"}), frozenset({"AMD"}),
+         ungrounded_ok=True),
+    Case("rm control: analysts warn stock falling", "routing", "Did analysts warn that Tesla's stock was falling?", frozenset({"price"}),
+         frozenset({"TSLA"}), must=(PRICE_DIGITS,)),
+)
+
+CASES = CASES + ROUND_RM
+
 # Fresh cases only (none have been run). Write new ones before claiming a fair score.
 HELD_OUT: tuple[Case, ...] = ()
 # The sealed test set: run only with `--sealed`, once, at the end of an experiment, and never tuned on.
