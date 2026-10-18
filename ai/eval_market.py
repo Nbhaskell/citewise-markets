@@ -1407,10 +1407,105 @@ ROUND_FP: tuple[Case, ...] = (
 
 CASES = CASES + ROUND_FP
 
+# SEALED, third set. Written 2026-10-18 on `feature/sealed-round-three`, in a session that had NOT opened `ai/market.py` or the router
+# (only this file's older cases and DECISIONS), so the wording is not shaped by what the rules catch and it was not screened against
+# them. It is the fair comparison after PRs #43 to #48 (router off by default, topic carry, the speaker rule). RUN ONCE with `--sealed`
+# (router off, then `COPILOT_ROUTER=model`, one data snapshot), then read every answer; it joins `CASES` only after that and is
+# tuning material from then on. `SEALED_ROUND_TWO` was partly spoiled by the "lately" rule, so it joins `CASES` now, unrun as a set.
+SEALED_ROUND_THREE: tuple[Case, ...] = (
+    # prices
+    Case("s3 price: end of last week", "routing", "Did Microsoft end last week higher than it began?", frozenset({"price"}), frozenset({"MSFT"}),
+         must=(PRICE_DIGITS,)),
+    Case("s3 price: high and low of the quarter", "routing", "Give me Nvidia's highest and lowest close of the past quarter.",
+         frozenset({"price"}), frozenset({"NVDA"}), must=(PRICE_DIGITS,)),
+    Case("s3 price: cheaper than new year", "routing", "Is Tesla's stock cheaper now than it was at New Year?", frozenset({"price"}),
+         frozenset({"TSLA"}), must=(PRICE_DIGITS,)),
+    Case("s3 price: moved since september", "routing", "By how much has Amazon moved since the start of September?", frozenset({"price"}),
+         frozenset({"AMZN"}), must=(PRICE_DIGITS,)),
+    Case("s3 price: where did it finish", "routing", "Where did AMD finish on the most recent trading day?", frozenset({"price"}),
+         frozenset({"AMD"}), must=(PRICE_DIGITS,)),
+    Case("s3 price: winning streak", "routing", "Has Apple been on a winning streak this fortnight?", frozenset({"price"}), frozenset({"AAPL"}),
+         must=(PRICE_DIGITS,)),
+    Case("s3 price stretch: wild swings since spring", "routing", "How wild have Alphabet's swings been since spring?", frozenset({"price"}),
+         frozenset({"GOOGL"}), must=(PRICE_DIGITS,)),
+    Case("s3 price: two companies over sixty days", "routing", "Compare Nvidia and AMD over the last 60 days.", frozenset({"price"}),
+         frozenset({"NVDA", "AMD"}), must=(PRICE_DIGITS,)),
+    # news and mood
+    Case("s3 news: buzz today", "routing", "What's the buzz about Microsoft today?", frozenset({"headline"}), frozenset({"MSFT"})),
+    Case("s3 news: stories turning sour", "routing", "Are the stories about Tesla turning sour?", frozenset({"headline", "sentiment"}),
+         frozenset({"TSLA"})),
+    Case("s3 news: what the papers print", "routing", "Show me what the papers are printing about Amazon.", frozenset({"headline"}),
+         frozenset({"AMZN"})),
+    Case("s3 news: tone brighter than last week", "routing", "Is the tone around AMD brighter than it was last week?",
+         frozenset({"headline", "sentiment"}), frozenset({"AMD"})),
+    Case("s3 news: best press of the group", "routing", "Which of these companies is getting the best press right now?",
+         frozenset({"headline", "sentiment"})),
+    Case("s3 news: bad press this month", "routing", "Any bad press for Alphabet this month?", frozenset({"headline"}), frozenset({"GOOGL"})),
+    Case("s3 news: commentators on products", "routing", "How do commentators feel about Apple's new products?", frozenset({"headline", "sentiment"}),
+         frozenset({"AAPL"})),
+    # the stored figures
+    Case("s3 fund: profit kept per sales dollar", "routing", "Out of every dollar Amazon takes in, how many cents are left after all its costs?", frozenset({"fundamentals"}),
+         frozenset({"AMZN"}), figures=("AMZN:net_margin",)),
+    Case("s3 fund: what all the shares are worth", "routing", "How big is Apple, in terms of what all its shares are worth?",
+         frozenset({"fundamentals"}), frozenset({"AAPL"}), figures=("AAPL:market_value",)),
+    Case("s3 fund: sales growth on a year earlier", "routing", "How fast have Microsoft's sales grown compared with a year earlier?",
+         frozenset({"fundamentals"}), frozenset({"MSFT"}), figures=("MSFT:revenue_growth",)),
+    Case("s3 fund: gross margin", "routing", "What's AMD's gross margin?", frozenset({"fundamentals"}), frozenset({"AMD"}),
+         figures=("AMD:gross_margin",)),
+    Case("s3 fund: earned per share", "routing", "Per share, what did Alphabet earn?", frozenset({"fundamentals"}), frozenset({"GOOGL"}),
+         figures=("GOOGL:eps",)),
+    Case("s3 fund: operating profit", "routing", "Does Tesla make money from running the business itself?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"})),
+    # filings (the company speaking, in verbs nobody has listed)
+    Case("s3 filing: admit about customer concentration", "routing", "What does Nvidia's latest 10-K admit about customer concentration?",
+         frozenset({"filing"}), frozenset({"NVDA"}), ungrounded_ok=True),
+    Case("s3 filing: flagged cybersecurity", "routing", "Has Microsoft flagged anything about cybersecurity incidents?", frozenset({"filing"}),
+         frozenset({"MSFT"}), ungrounded_ok=True),
+    Case("s3 filing: where supply chain is mentioned", "routing", "Where does Apple mention supply chain disruptions?", frozenset({"filing"}),
+         frozenset({"AAPL"}), ungrounded_ok=True),
+    Case("s3 filing: talk about warehouse workforce", "routing", "How does Amazon talk about its warehouse workforce?", frozenset({"filing"}),
+         frozenset({"AMZN"}), ungrounded_ok=True),
+    Case("s3 filing: warn about falling ad prices", "routing", "Did Alphabet warn that ad prices were dropping?", frozenset({"filing"}),
+         frozenset({"GOOGL"}), ungrounded_ok=True),
+    Case("s3 filing: dangers investors are warned of", "routing", "What dangers does Tesla warn investors about?", frozenset({"filing"}),
+         frozenset({"TSLA"}), ungrounded_ok=True),
+    Case("s3 filing: export-control exposure", "routing", "Does AMD's filing discuss any export-control exposure?", frozenset({"filing"}),
+         frozenset({"AMD"}), ungrounded_ok=True),
+    # outside the app, writing, an unknown name, a prediction, a false premise, an unstored ratio, advice
+    Case("s3 outside: treasury yield", "trap", "What is the yield on the 10-year Treasury?", frozenset(), frozenset(), must=(OUTSIDE,)),
+    Case("s3 outside: Nasdaq today", "trap", "Where did the Nasdaq Composite close yesterday?", frozenset(), frozenset(), must=(OUTSIDE,)),
+    Case("s3 outside: euro and yen", "trap", "What's the exchange rate between the euro and the yen?", frozenset(), frozenset(), must=(OUTSIDE,)),
+    Case("s3 writing: limerick", "trap", "Compose a limerick about Nvidia's results.", frozenset(), frozenset(), must=(rf"{OUTSIDE}|doesn't write",)),
+    Case("s3 writing: linkedin update", "trap", "Put together a short LinkedIn update on Amazon's quarter.", frozenset(), frozenset(),
+         must=(rf"{OUTSIDE}|doesn't write",)),
+    Case("s3 unknown name: Palantir", "trap", "Does Palantir's contract backlog look healthy?", frozenset(), frozenset(), must=(r"Palantir",)),
+    Case("s3 predict: new high by christmas", "trap", "Will Microsoft hit a new high by Christmas?", frozenset({"price"}), frozenset({"MSFT"}),
+         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("s3 premise: roughly tripled", "trap", "Nvidia roughly tripled over the last week, correct?", frozenset({"price"}), frozenset({"NVDA"}),
+         cautions_shown=(r"You mention that NVDA",)),
+    Case("s3 unstored: return on equity", "trap", "Can you give me Apple's ROE?", frozenset(), frozenset(), must=(NOT_CALCULATED,)),
+    Case("s3 advice: cousin says go all in", "trap", "My cousin says to go all in on AMD. Should I?", frozenset({"filing"}), frozenset({"AMD"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    # follow-ups
+    Case("s3 follow: swap in Alphabet", "routing", "Swap in Alphabet.", frozenset({"fundamentals"}), frozenset({"GOOGL"}),
+         history=(AAPL_REV,), figures=("GOOGL:revenue",)),
+    Case("s3 follow: same front for Nvidia", "routing", "How about Nvidia on the same front?", frozenset({"headline"}), frozenset({"NVDA"}),
+         history=(TSLA_NEWS,)),
+    Case("s3 follow: Microsoft keep pace", "routing", "Did Microsoft keep pace?", frozenset({"price"}), frozenset({"GOOGL", "MSFT"}),
+         history=(GOOGL_PRICE,), must=(PRICE_DIGITS,)),
+    Case("s3 follow: and Nvidia's", "routing", "And Nvidia's?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
+         history=(AMZN_PE,), figures=("NVDA:pe",)),
+    Case("s3 follow: what is behind that", "routing", "What's behind that?", frozenset({"price", "headline"}), frozenset({"AMD"}),
+         history=(AMD_PRICE,), must=(PRICE_DIGITS,), must_not=(CAUSAL,)),
+)
+
+# The second sealed set was partly spoiled (the "lately" rule), so it is tuning material from here on.
+CASES = CASES + SEALED_ROUND_TWO
+
 # Fresh cases only (none have been run). Write new ones before claiming a fair score.
 HELD_OUT: tuple[Case, ...] = ()
 # The sealed test set: run only with `--sealed`, once, at the end of an experiment, and never tuned on.
-SEALED: tuple[Case, ...] = SEALED_ROUND_TWO
+SEALED: tuple[Case, ...] = SEALED_ROUND_THREE
 
 
 def expected_figure(conn, spec: str) -> str:
