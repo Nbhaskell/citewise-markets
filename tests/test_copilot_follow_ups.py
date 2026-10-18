@@ -129,12 +129,13 @@ def test_a_comparison_with_the_company_just_discussed_is_not_a_comparison_with_i
 
 
 def test_a_comparison_wording_outside_the_filler_list_still_keeps_both_companies(conn):
-    """"Wider" is not on the list of comparison words, so the question counts as having a topic of its own: the old topic
-    is not carried, but both companies are, and the note says so."""
-    q = "Is that wider than Omegaware?"
+    """"Wider" is not on the list of comparison words and "revenue" names a topic of its own: the old topic is not carried, but both
+    companies are, and the note says so. (Without a topic word, "Is that wider than Omegaware?" now carries the earlier topic:
+    DECISIONS, "Follow-up topic carry", and tests/test_followup_topic_carry.py.)"""
+    q = "Is that wider than Omegaware's revenue?"
     ans, _ = ask(conn, RoutingLLM(rewrite=q), q)
     assert sorted(ans.symbols) == ["ZZCA", "ZZCB"]
-    assert ans.interpreted_question == "Is that wider than Omegaware? (comparing ZZCA and ZZCB)"
+    assert ans.interpreted_question == "Is that wider than Omegaware's revenue? (comparing ZZCA and ZZCB)"
 
 
 # ---- wordings found by the fresh cases written for this step (they missed on the first run; see DECISIONS) ----

@@ -1585,6 +1585,55 @@ benchmarks.
   `test_latest_only_drops_older_filings_of_the_same_form`) with nothing else using the database; they pass alone and in the next full
   run, which matches the known vector-index flakiness, but it has now happened three times with no evaluation running and has not been
   investigated.
+- **Follow-up topic carry: a follow-up that points back without saying what about, 2026-10-18** (branch
+  `feature/followup-topic-carry`; no change to `CONDENSE_PROMPT`, `SYSTEM_PROMPT` or the router). **What the investigation showed:**
+  `ai.eval_followups` scored 50 of 51 (stable; the miss was the "roster" stretch) and could not show the problem, because every case in
+  it was tuned. Running the real `resolve_question` (the rewrite step plus the code rules) on the 45 follow-ups with history in `CASES`,
+  3 repeats, found **9 that miss on every run** (36 right): 8 keep the company and **lose the topic**, and one searches the wrong
+  companies. The rewrite keeps a vague phrase the app cannot read ("Do the matching calculation for Alphabet.", "Take the same window for
+  Alphabet.", "Lay Amazon alongside Nvidia.", "Has Amazon held up better over that stretch than AMD?", "So what was behind that move?"),
+  so the standalone question routes to the filings default. `carry_topic` and `carry_comparison` rebuild the earlier question, but only
+  when the follow-up is nothing except company names and words from a closed filler list ("matching", "calculation", "equivalent",
+  "stretch", "rosier" are not on it). **Built, in `ai/copilot.py`:** when all of these hold, the earlier *question* (never its answer) is
+  reused and "Understood as" shows it: no company is chosen in the page; the user's own words contain a pointing-back word (`POINTS_BACK_RE`:
+  that, those, same, matching, equivalent, counterpart, likewise, alongside, comparable, by comparison, as much, just did); the user's words
+  name no topic (`names_a_topic`: a market route, an unstored ratio, advice, a stock word, a filing noun, a 10-K or quarter) and the rewrite
+  routes nowhere (`routes_somewhere`: the same without the stock word); and the nearest earlier question that is not a bare switch does name
+  one. **Three compositions:** a new company is swapped into the earlier question (`carry_topic(pointing=True)`); a comparison (a
+  comparison word, `POINTING_COMPARE_RE`, "anything like that", or **a rewrite that names the earlier company the user did not**) becomes
+  "<earlier question>, compared with X" (`carry_comparison(pointing=True)`); and a cause question that names no company, after a price
+  question, is appended to it ("..., and what explains that?", `carry_cause`). **Two flaws the evaluation found in my first version, both
+  fixed with tests first:** (1) the swap overrode good rewrites that named both companies and dropped the earlier one ("Do Alphabet's
+  worries overlap with those?", "Is Tesla in the same boat?" went from passing to failing), so a rewrite that names the earlier company now
+  means a comparison; (2) a bare stock word in the rewrite ("that move in Nvidia's stock") counted as a topic although it still routes to the
+  filings, so only the user's own words get that exemption. **One deliberate change to an earlier decision:** a closed list of comparison
+  words used to keep the model's wording for "Is that wider than Omegaware?" because "wider" might be a topic the app cannot see; with no
+  topic word at all that question now carries the earlier topic ("How many employees does Zetacorp have, compared with Omegaware?", a test
+  pins it, and the older test now uses a wording with a topic word). **Tests first: 76 new (`tests/test_followup_topic_carry.py`), 2300
+  Python tests pass. Deliberate breakages: 59, all caught, on a baseline verified green. My first breakage run reported all 53 caught while
+  an older test was failing on the unmutated code, so none of it meant anything; the script now refuses to run unless the unmutated code
+  passes, and the real first pass found 11 survivors (7 missing tests, 2 redundant guards that were removed, 1 narrowness now pinned).**
+  **Evidence, old code against new code (a separate `git worktree`, router off, one data snapshot, 3 repeats, answers):** all 61 follow-up
+  cases (the 45 with history in `CASES` plus 16 fresh, in new wording and with new earlier turns, written before the rule and
+  overlap-checked by script: 11 that need the topic carried, 5 controls): **138 of 183 (75%) to 177 of 183 (97%)**; the **fresh 16: 34 of 48
+  (71%) to 45 of 48 (94%)** (the old code already passed 7 of the 11 carry cases and all 5 controls); the routing probe on the 45:
+  36 to 44; `ai.eval_followups` 50/51 to 51/51. Nothing that passed before fails now. I read the changed answers: for example "Do the
+  matching calculation for Google." is understood as "What's Google's P/E ratio?", "Lay Amazon alongside it." as "How has Nvidia stock done
+  this month, compared with Amazon?", and "So what was behind that move?" as the earlier price question plus the cause question, with the
+  answer saying the stored data does not show the cause. **Still failing:** "Where does Tesla land on that scale?" (it searches Tesla, not
+  Apple too; I call that expectation arguable) and, on the fresh set, "Did Microsoft climb as much over that period?", which routes right
+  ("Did Microsoft's stock climb as much as AMD's over that period?") but whose answers quote percentages, not a price, so the check for
+  a quoted price fails; I did not loosen it. **Weak spots:** (1) It is a word list again: the pointing-back words and the comparison cues
+  are finite, and a follow-up with none of them ("Do the equivalent" is covered; "Same deal for Google" is, "Go again with Google" is not)
+  is left to the rewrite. (2) The topic test is the app's own detectors, so a real topic they cannot see ("wildfire exposure") next to a
+  pointing-back word gets the earlier topic bolted on, visibly, under "Understood as". (3) A rebuilt comparison replaces the user's own
+  comparison wording: "Is Tesla in the same boat?" now searches "What are Microsoft's biggest risks, compared with Tesla?"; both companies
+  and the filings route are right, but I cannot say the answers are better than the model's "...in the same boat as Microsoft?". (4) The
+  cause carry needs no company in the question and an earlier price question; "What explains that move in Zetacorp?" is left as written
+  (a test pins it). (5) The alternative "the rewrite names a company that was in the earlier turn" cannot be tested for the part that checks
+  the company was in the earlier turn, because the fixtures have only two companies. (6) `ai.eval_followups` got no new cases and the 6
+  follow-ups in the sealed set (partly spoiled already, see "lately") were not touched. (7) `tests/test_search.py` failed one or two
+  tests in 2 of the last 4 full runs, always the first run after the database had been used by other runs, and passed on the rerun.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

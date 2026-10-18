@@ -1317,6 +1317,55 @@ ROUND_LATELY: tuple[Case, ...] = (
 
 CASES = CASES + ROUND_LATELY
 
+# Written 2026-10-18 on `feature/followup-topic-carry`, in new wording and with new earlier turns, BEFORE the rule was written (docs/
+# DECISIONS.md, "Follow-up topic carry"). The follow-ups the probe found failing (the rewrite keeps the company and loses the topic:
+# "Do the matching calculation for Google") are in `CASES`; these are different words for the same shape (11), and controls (5) that
+# must not be touched: a new topic that contains "same" or "that", and a follow-up the existing rules already handle. Run once on the
+# old code (34 of 48 runs) and once on the new (45 of 48), so they are tuning material now and are folded into CASES below.
+GOOGL_PRICE = turn("How has Alphabet's stock moved over the last three months?", "Alphabet's stock rose over the last three months.", "GOOGL")
+AMZN_PE = turn("What is Amazon's price-to-earnings ratio?", "Amazon's P/E ratio is 31.", "AMZN")
+MSFT_NEWS = turn("What's the mood of the news on Microsoft this week?", "Coverage of Microsoft was mostly neutral.", "MSFT")
+TSLA_RISKS = turn("What does Tesla say about its biggest legal risks?", "Tesla cites product liability and regulatory proceedings.", "TSLA")
+AAPL_REV = turn("How much revenue did Apple bring in over the last twelve months?", "Apple's revenue was about 435 billion dollars.", "AAPL")
+ROUND_FU: tuple[Case, ...] = (
+    # a follow-up that points back without saying what about
+    Case("fu carry: repeat that calculation", "routing", "Repeat that calculation for Nvidia.", frozenset({"fundamentals"}), frozenset({"NVDA"}),
+         history=(AMZN_PE,), figures=("NVDA:pe",)),
+    Case("fu carry: same three months", "routing", "Put Tesla through the same three months.", frozenset({"price"}), frozenset({"TSLA"}),
+         history=(GOOGL_PRICE,), must=(PRICE_DIGITS,)),
+    Case("fu carry: same check on Amazon", "routing", "Do the same check on Amazon.", frozenset({"headline", "sentiment"}), frozenset({"AMZN"}),
+         history=(MSFT_NEWS,)),
+    Case("fu carry: version of that", "routing", "Microsoft's version of that, please.", frozenset({"fundamentals"}), frozenset({"MSFT"}),
+         history=(AAPL_REV,), figures=("MSFT:revenue",)),
+    Case("fu carry: comparable issues", "routing", "Is Nvidia dealing with comparable issues?", frozenset({"filing"}), frozenset({"TSLA", "NVDA"}),
+         history=(TSLA_RISKS,), ungrounded_ok=True),
+    Case("fu carry: climb as much", "routing", "Did Microsoft climb as much over that period?", frozenset({"price"}), frozenset({"AMD", "MSFT"}),
+         history=(AMD_PRICE,), must=(PRICE_DIGITS,)),
+    Case("fu carry: weaker across that span", "routing", "Was Alphabet's showing any weaker across that span?", frozenset({"price"}),
+         frozenset({"NVDA", "GOOGL"}), history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
+    Case("fu carry: anything comparable", "routing", "Anything comparable about Tesla?", frozenset({"headline"}), frozenset({"AAPL", "TSLA"}),
+         history=(AAPL_NEWS,)),
+    Case("fu carry: what explains that", "routing", "What explains that?", frozenset({"price", "headline"}), frozenset({"NVDA"}),
+         history=(NVDA_PRICE,), must=(PRICE_DIGITS,), must_not=(CAUSAL,)),
+    Case("fu carry: likewise for Alphabet", "routing", "Likewise for Alphabet.", frozenset({"headline"}), frozenset({"GOOGL"}),
+         history=(TSLA_NEWS,)),
+    Case("fu carry: counterpart", "routing", "Give me Amazon's counterpart.", frozenset({"fundamentals"}), frozenset({"AMZN"}),
+         history=(AAPL_REV,), figures=("AMZN:revenue",)),
+    # controls: a topic of its own, or a follow-up the existing rules already handle
+    Case("fu control: same risks as", "routing", "Does Tesla describe the same risks as Nvidia?", frozenset({"filing"}), frozenset({"TSLA", "NVDA"}),
+         history=(AMZN_PE,), ungrounded_ok=True),
+    Case("fu control: dependence on suppliers", "routing", "What does Microsoft say about relying on a handful of suppliers?",
+         frozenset({"filing"}), frozenset({"MSFT"}), history=(GOOGL_PRICE,), ungrounded_ok=True),
+    Case("fu control: how many people employ", "routing", "How big is Tesla's workforce?", frozenset({"filing"}), frozenset({"TSLA"}),
+         history=(AAPL_REV,), ungrounded_ok=True),
+    Case("fu control: legal risks in that company", "routing", "What are the main legal risks in that company's filings?", frozenset({"filing"}),
+         frozenset({"GOOGL"}), history=(GOOGL_PRICE,), ungrounded_ok=True),
+    Case("fu control: and Tesla's", "routing", "And Tesla's?", frozenset({"fundamentals"}), frozenset({"TSLA"}), history=(AAPL_REV,),
+         figures=("TSLA:revenue",)),
+)
+
+CASES = CASES + ROUND_FU
+
 # Fresh cases only (none have been run). Write new ones before claiming a fair score.
 HELD_OUT: tuple[Case, ...] = ()
 # The sealed test set: run only with `--sealed`, once, at the end of an experiment, and never tuned on.
