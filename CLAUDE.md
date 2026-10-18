@@ -146,8 +146,13 @@ them (the owner hasn't confirmed the order):
    (2026-10-18, DECISIONS: "Advice and writing misses"):** the reader's own "go all in" / "bet big" / "put everything in" and a bare
    "Should I?" carry the notice, "LinkedIn update", "status update", "blurb", "slogan" and similar are declined as writing requests
    (the update/blurb/bio words only after a writing verb), and a refused advice question carries the notice too. 14 fresh cases 9 to
-   33 of 42; 72 of 2,623 routes change and all are new questions; 2501 Python tests pass. Still open: speaker verbs not on the list
-   ("warn"), a false "market value not available" ("what all its shares are worth"), "papers" as a news word. A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
+   33 of 42; 72 of 2,623 routes change and all are new questions; 2501 Python tests pass. **The routing misses of the sealed round are fixed on
+   `feature/sealed-misses-routing` (2026-10-18, DECISIONS: "Routing misses of the third sealed round"):** "what all its shares are worth"
+   goes to the market value, a news source doing something ("the papers are printing", "columnists writing") to the headlines, "highest and
+   lowest close" and "X's swings" to the prices, and warn / admit / concede / signal / indicate / flag / note / talk / tell are speaker
+   verbs. 18 fresh cases 3 to 46 of 54; 2637 Python tests pass. Still open: named outlets ("the Wall Street Journal"), "since spring" as a
+   period, a company's later mention turning the prices off ("shares fell after Marketco warned"), and a new sealed set
+   (`SEALED_ROUND_FOUR`) for the next fair comparison. A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
    "Router second look, step 2") found no policy for "the model second-guesses a specific keyword route" that beats today on the older
    cases (the router is right in 10 of 72 disagreements, all on cases written to find keyword mistakes; it adds prices to figures
    questions), so **there is no second look; the router is still asked only when the keywords find no route.** **The "lately" rule is

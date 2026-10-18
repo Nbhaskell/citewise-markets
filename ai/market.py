@@ -72,6 +72,20 @@ NEWS_RE = re.compile(
     r"(?:recent|latest|new|newest|top|breaking|any|some|few|more|other)\s+stories|(?:latest|top|breaking|newest|recent)\s+story)\b",
     re.IGNORECASE,
 )
+# A news source doing something with the news (third sealed round: "Show me what the papers are printing about Amazon." went to the
+# filings, which have no headlines, and the answer said there were none). Structure, not one phrase per wording: the source, then within
+# a few words what it does ("the newspapers saying", "columnists write", "the papers have been covering"), or the act "by" / "in" the source
+# ("published by the papers", "ran in the papers"). "Papers" counts only as "the papers"; a source with no act ("How many reporters does
+# Amazon employ?") and "the press" in "the press release process" are not the news.
+_PRESS_VOICE = r"(?:newspapers?|the\s+papers|columnists?|tabloids?|journalists?|reporters?|pundits?|commentators?|bloggers?|the\s+press(?!\s+releases?\b)|the\s+media)"
+_PRESS_ACT = (
+    r"(?:saying|says?|said|writ(?:ing|es?)|wrote|written|print(?:ing|s|ed)?|publish(?:ing|es|ed)?|report(?:ing|s|ed)?|"
+    r"cover(?:ing|s|ed)?|runs?|running|ran)"
+)
+NEWS_VOICE_RE = re.compile(
+    rf"\b{_PRESS_VOICE}\s+(?:[\w'’-]+\s+){{0,3}}?{_PRESS_ACT}\b|\b{_PRESS_ACT}\s+(?:by|in)\s+{_PRESS_VOICE}\b",
+    re.IGNORECASE,
+)
 # "Google doubled this month", "Why did Nvidia triple this year?": a company's stock moving by a multiple or collapsing. Only a
 # capitalised company name counts as the subject ("Tesla's deliveries doubled", "revenue doubled" are not), a verb with an object
 # is not ("doubled its dividend", "doubled down on", "doubled in size"), and the caller needs a named period or a stock word.
@@ -108,6 +122,21 @@ CLOSE_NOUN_RE = re.compile(
     r"|\bwhere\s+did\s+[\w.&-]+\s+close\b(?!\s+(?:its|their|the|a|an|down|out|off|to)\b)"
     rf"|\b(?:what\s+)?did\s+[\w.&-]+\s+close\s+(?:at|higher|lower|flat|today|yesterday|on\s+{_WEEKDAY})\b",
     re.IGNORECASE,
+)
+# A best or worst close ("Give me Nvidia's highest and lowest close of the past quarter.", "Which day did Nvidia close highest?"): the
+# noun needs "close" after the extreme, the verb needs the extreme right after it, so "close call", "close partner", "close the highest
+# number of stores" and "close its plant" stay filings questions.
+_EXTREME = r"(?:high(?:est)?|low(?:est)?|best|worst|top|peak|bottom)"
+CLOSE_EXTREME_RE = re.compile(
+    rf"\b{_EXTREME}\s+closes?\b(?!\s+(?:call|partners?|relationships?|competitors?|competition)\b)"
+    r"|\bclose\s+(?:highest|lowest)\b",
+    re.IGNORECASE,
+)
+# "How big have AMD's swings been over the past quarter?": a company's own swings are the stock's. The name is capitalised and followed
+# by 's, so "the swings in Apple's revenue" is not caught, and "swings in" anything but the stock ("Apple's swings in operating expenses")
+# is not either.
+SWINGS_RE = re.compile(
+    r"(?-i:\b[A-Z][\w.&-]*)['’]s\s+(?:[a-z]+\s+)?swings?\b(?!\s+in\s+(?!(?:the\s+)?(?:stock|shares?|price)\b))", re.IGNORECASE
 )
 # "How much higher is Nvidia than it was a year ago?", "Is AMD lower than where it was a month ago?": the stock against its
 # own past. The subject is one bare name, so "Apple's revenue" and "Tesla's headcount" are not caught; the caller also needs a
@@ -277,7 +306,14 @@ MARKET_VALUE_PATTERN = (
     rf"\b(?:what(?:'s|\s+is|\s+are)|how\s+much\s+(?:is|are))\s+{_SUBJ}\s+worth\b(?!\s+(?:buying|selling|investing|holding|owning|it\b|the\b|a\b|an\b|to\b))|"
     rf"\bwhat(?:'s|\s+is|\s+was)\s+{_SUBJ}\s+valued\s+at\b|"
     r"\b(?:total|combined|overall|aggregate)\s+value\s+of\s+(?:all\s+of\s+)?[\w.&'’ -]{0,30}?\b(?:shares|stock|equity)\b|"
-    r"\bcompany['’]?s?\s+value\b|\bcost\s+to\s+(?:buy|purchase|acquire)\s+(?:all\s+of|the\s+(?:whole|entire))\b"
+    r"\bcompany['’]?s?\s+value\b|\bcost\s+to\s+(?:buy|purchase|acquire)\s+(?:all\s+of|the\s+(?:whole|entire))\b|"
+    # a company's total value worded around its shares (third sealed round: "How big is Apple, in terms of what all its shares are
+    # worth?" went to the prices and was told market value is not available)
+    r"\ball\s+(?:of\s+)?(?:its|their|[\w.&-]+['’]s)\s+shares\s+(?:(?:are\s+)?worth|add\s+up\s+to)\b|"
+    r"\b(?:combined|total|overall|aggregate|collective)\s+(?:worth|value)\s+of\s+(?:all|every|each)\s+(?:of\s+)?(?:the\s+)?"
+    r"(?:[\w.&'’-]+\s+){1,2}?(?:shares?|stock)\b|"
+    r"\bhow\s+much\s+(?:is|are)\s+(?:the\s+)?(?:whole|entire)\s+(?:of\s+)?(?:[\w.&-]+\s+){0,2}?worth\b|"
+    r"\badd(?:ed|ing)?\s+up\s+(?:all|every|each)\s+(?:of\s+)?(?:the\s+)?(?:[\w.&'’-]+\s+){0,2}?shares?\b"
 )
 _SPECIFIC_TOPICS = (
     ("pe", r"\bp\s?/\s?e\b|\bpe\s+(?:ratio|multiple)\b|\bprice[-\s]to[-\s]earnings\b|\bearnings\s+multiple\b"),
@@ -722,6 +758,8 @@ def detect_intent(question: str) -> Intent:
         or (bool(PERIOD_MOVE_RE.search(question)) and parse_window(question).explicit)
         or year_start_comparison(question)
         or bool(CLOSE_NOUN_RE.search(question))
+        or bool(CLOSE_EXTREME_RE.search(question))
+        or bool(SWINGS_RE.search(question))
         or bool(PRICE_PREDICTION_RE.search(question))
         or (
             bool(PRICE_MOVE_NOUN_RE.search(question)) and bool(CAUSE_RE.search(question))
@@ -734,7 +772,8 @@ def detect_intent(question: str) -> Intent:
     sentiment = bool(SENTIMENT_RE.search(question))
     general = bool(GENERAL_RE.search(question)) and not STOCK_WORD_RE.search(question)  # "How's Nvidia doing?" wants both
     headlines = (
-        bool(NEWS_RE.search(question)) or sentiment or general or (prices and bool(CAUSE_RE.search(question)))
+        bool(NEWS_RE.search(question)) or bool(NEWS_VOICE_RE.search(question)) or sentiment or general
+        or (prices and bool(CAUSE_RE.search(question)))
         or (bool(LATELY_RE.search(question)) and not prices)  # "lately" is a news cue only when it is not already a price question
     )
     if share_count:
