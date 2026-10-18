@@ -1634,6 +1634,48 @@ benchmarks.
   the company was in the earlier turn, because the fixtures have only two companies. (6) `ai.eval_followups` got no new cases and the 6
   follow-ups in the sealed set (partly spoiled already, see "lately") were not touched. (7) `tests/test_search.py` failed one or two
   tests in 2 of the last 4 full runs, always the first run after the database had been used by other runs, and passed on the rerun.
+- **Filings questions with price or mood words: the company is the speaker, 2026-10-18** (branch `feature/filings-price-words`; no
+  prompt change, no model call). **The problem:** "What does Apple say about falling demand in China?" went to the stock PRICES
+  ("falling"), and "Does Tesla sound optimistic about its factory expansion?" to the headlines and their mood ("optimistic"): the word
+  that sounded like the market won, although the question is about what the COMPANY says. It was 9 of the 13 mistakes the shadow run
+  found that the router is never asked about, and the model had been right on all 6 it was tried on, but the shadow run's "model may
+  send it to the filings" policy also lost 4 older cases, so a code rule was tried first. **What the data showed before any code
+  (offline, no model):** of 1,679 distinct questions in the repo, 19 route to prices, headlines or mood AND contain a speaking cue
+  (say, describe, management, 10-K...); 8 are exactly the filings cases above, the other 11 want the market ("being said about Apple in
+  the press", "Would you say the sentiment...", "Can you explain why Nvidia shares fell"), and in all 11 the speaker is not the company.
+  A stand-in rule keyed on who speaks matched 82 questions, and only 9 of those had a market route, all 9 wanting the filings.
+  **Built, in `ai/copilot.py`:** `company_is_speaking` (a tracked company, its management, executives, leadership, CEO or CFO, or its 10-K,
+  10-Q, annual report or filings, followed by say, say(s), said, describe, discuss, disclose, mention, state, explain, convey or sound, with
+  also/ever/really/actually allowed between; the company's staff alone count without a verb ("How bullish is Nvidia's management..."); a
+  document as the subject counts with no company named ("What does the 10-K say...")) and `route_by_speaker`: prices, headlines and mood off
+  and the filings on, **unless the press is named** (news, headlines, press, coverage, story, articles, reporters, media, journalists: "Has
+  Nvidia said anything in the headlines today?" is still headlines) and **the stored figures are not touched**. It runs in
+  `answer_question` right after the keywords, and the router is **not asked** about a question this rule decided. The test is who speaks,
+  not which price word appears, so the next price word needs no new entry. **Tests first: 88 new (`tests/test_company_speaking.py`; 2388
+  Python tests pass).** Every verb form, every speaker, every small word, every press word, and the non-speakers (analysts, investors,
+  "the market", "you", "everyone", a Reuters story) have a question of their own. **Deliberate breakages: 67, all caught, on a baseline
+  verified green; the first pass had 3 survivors: no test started with a mood flag set (added), no test for a headlines-only question
+  with the company speaking (added), and a check of the mood flag that is redundant because mood always comes with the headlines
+  (removed).** **Evidence, old code against new code (a separate `git worktree`, router off, one data snapshot, 3 repeats, answers):**
+  (a) **offline on 1,786 distinct questions** (every evaluation case, every question quoted in a test or the web tests): 25 routes
+  change, and every one is intended (the 8 development cases, the 8 fresh speaker cases written for this, my test questions and
+  "What did Apple's 10-K say about falling demand?"); **no older evaluation case and no other question changed**; (b) **the 8
+  development filings cases: 0 of 24 runs on the old code, 24 of 24 on the new**; (c) **14 fresh cases in new wording, written before the
+  rule (8 speaker questions, 6 controls): 14 of 42 runs on the old code, 38 of 42 on the new**: the 8 speaker cases 0 of 24 to 24 of 24, the
+  controls 14 of 18 on both. I read the answers: they come from the filings, several say honestly that the filing does not mention the thing
+  ("Apple does not explicitly mention falling demand in China"), and none invents a price story. The two non-perfect controls: "What
+  are analysts saying about Apple's falling stock price?" routes to the prices correctly but fails on both codes because the model says
+  analyst comments are not stored (the case demanded a quoted price; not loosened), and "Why did Amazon shares tumble after the earnings
+  call?" is 2 of 3 on both (a number the answer quoted was not in its sources). **Weak spots:** (1) The speaker verbs are a finite list
+  ("talk", "tell", "note", "report" are not on it; "How does Alphabet's management talk about..." works only because of "management").
+  (2) A question that names no speaker ("Was Microsoft's Activision acquisition closed on schedule?" still goes to prices because of
+  "closed") and one about the business that is not a statement ("Has Tesla been slipping on its delivery targets lately?") are untouched.
+  (3) The rule trusts the company mention: "What does Tesla say about its stock price?" now goes to the filings, which is the more
+  defensible reading but is a change. (4) It is checked on `search_question` (the standalone rewrite), so a rewrite that adds or drops
+  the company's name changes the result. (5) The router is not consulted when the rule fires; with the router on, the model had been
+  right on all 6 questions it was shown, so nothing is lost on the evidence, but it is a place where the keyword rule has the last word.
+  (6) The 6 controls are few, and one is a case whose own check is too tight. (7) `tests/test_search.py` failed one or two tests in the
+  first full run after the evaluations and breakage runs again, and passed on the rerun (known flakiness; a session was proposed for it).
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
