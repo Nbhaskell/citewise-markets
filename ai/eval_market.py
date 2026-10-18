@@ -1505,6 +1505,9 @@ CASES = CASES + SEALED_ROUND_TWO
 # Fresh cases only (none have been run). Write new ones before claiming a fair score.
 HELD_OUT: tuple[Case, ...] = ()
 # The sealed test set: run only with `--sealed`, once, at the end of an experiment, and never tuned on.
+# SEALED_ROUND_THREE was RUN once on 2026-10-18 (keywords 25 of 43, router on 30 of 43; docs/DECISIONS.md, "Third sealed round") and every
+# answer was read, so it is SPENT: it is development material now and no longer a fair test. It stays here (not in `CASES`, so the full-run
+# score does not mix in, and out of the router shadow run) until a new set replaces it: write SEALED_ROUND_FOUR before the next fair comparison.
 SEALED: tuple[Case, ...] = SEALED_ROUND_THREE
 
 

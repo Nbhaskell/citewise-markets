@@ -137,9 +137,12 @@ them (the owner hasn't confirmed the order):
    in profit" is covered by the router when it is on (a fresh set will tell). The router does not fix a question the keywords route wrongly, or a follow-up whose
    rewrite lost its topic. Every keyword list so far has missed on the next wording, so write a new sealed set (`SEALED`, `--sealed`)
    before the next fair comparison. All earlier fresh cases are in `CASES` (359 market, plus the 37-case development set `ROUND_SL`
-   = 396, plus the 11 of the "lately" rule = 407; 51 follow-up resolution), so `HELD_OUT` is empty. **`SEALED` holds 41 UNRUN cases
-   (`SEALED_ROUND_TWO`, written 2026-10-17, DECISIONS: "Router second look, step 1"), but it is PARTLY SPOILED by the "lately" rule
-   below, so write a new one before the next fair comparison.** A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
+   = 396, plus the 11 of the "lately" rule = 407; 51 follow-up resolution), so `HELD_OUT` is empty. **`SEALED_ROUND_TWO` (41 cases) joined `CASES`
+   on 2026-10-18 (partly spoiled by the "lately" rule). `SEALED` is `SEALED_ROUND_THREE` (43 cases), RUN ONCE on 2026-10-18 and spent
+   (DECISIONS: "Third sealed round"): keywords only 25 of 43 (58%), router on 30 of 43 (70%), no case lost. Worst misses, all
+   keyword-side: advice ("go all in on AMD. Should I?" got no notice), a writing request with a company named ("LinkedIn update on
+   Amazon's quarter" answered), a false "market value not available", and speaker verbs not on the list ("warn"). Write
+   `SEALED_ROUND_FOUR` before the next fair comparison.** A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
    "Router second look, step 2") found no policy for "the model second-guesses a specific keyword route" that beats today on the older
    cases (the router is right in 10 of 72 disagreements, all on cases written to find keyword mistakes; it adds prices to figures
    questions), so **there is no second look; the router is still asked only when the keywords find no route.** **The "lately" rule is

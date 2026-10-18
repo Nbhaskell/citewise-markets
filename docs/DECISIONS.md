@@ -1676,6 +1676,37 @@ benchmarks.
   right on all 6 questions it was shown, so nothing is lost on the evidence, but it is a place where the keyword rule has the last word.
   (6) The 6 controls are few, and one is a case whose own check is too tight. (7) `tests/test_search.py` failed one or two tests in the
   first full run after the evaluations and breakage runs again, and passed on the rerun (known flakiness; a session was proposed for it).
+- **Third sealed round: a fair score after PRs #43 to #48, 2026-10-18** (branch `feature/sealed-round-three`; no product code changed,
+  only `ai/eval_market.py`). **Method:** 43 new cases (`SEALED_ROUND_THREE`, `s3`) were written without opening `ai/market.py` or the
+  router (only the older cases and these notes), checked by script against every string in the repo (4 near-copies reworded before the
+  run), committed unrun (ad9fd25), then run **once** with `--sealed --show` on one data snapshot, router off and then `COPILOT_ROUTER=model`.
+  Mix: 8 prices, 7 news and mood, 6 stored figures, 7 filings (the company speaking, in verbs nobody listed: "admit", "flagged", "talk",
+  "warn"), 10 traps, 5 follow-ups. **Score (case passes, one run each): keywords only 25 of 43 (58%); router on 30 of 43 (70%).** The router
+  turned 5 failures into passes and lost none: "end of last week", "winning streak this fortnight", "Nvidia and AMD over 60 days",
+  "tone brighter than last week", and the false premise "Nvidia roughly tripled" (the answer now says it fell 6.61%). **I read every answer.**
+  Of the 13 failures with the router on, 4 are arguable (my checker or expectation, not the app): "since the start of September" is
+  answered correctly (-1.93%) but the check wanted a price; "cents left after all costs" is answered correctly (17.4%) but price was
+  also shown; "Did Microsoft keep pace?" answers from the past month, not the earlier period, and only the check complains about digits;
+  "bad press" also showed mood. So roughly 34 of 43 on a looser reading, which I do not use as the score. **The wrong answers that
+  matter, in order:** (1) **Advice missed on both runs:** "My cousin says to go all in on AMD. Should I?" got no notice and a risk
+  list (`asks_for_advice` does not know "go all in" or a bare "Should I?" after a statement). (2) **A writing request answered when a company
+  was named:** "Put together a short LinkedIn update on Amazon's quarter" was answered from the filings on the router run (mixing a six-month
+  total with a three-month one and calling it the quarter) and, with the router off, invented a Q2 2024 post (the numbers check flagged six
+  figures, but the text was shown). (3) **A false "no data"/"not available":** "How big is Apple, in terms of what all its shares are
+  worth?" went to prices and said market value is not available (it is stored); "Show me what the papers are printing about Amazon" went
+  to the filings and said there are no headlines; "Highest and lowest close of the past quarter" and "wild swings since spring" said the
+  prices do not cover it (router on fixed neither; the wording is not read as a period). (4) **The speaker rule's known gap:** "Did Alphabet
+  warn that ad prices were dropping?" still goes to prices ("warn" is not a speaker verb); "Does Tesla make money from running the business
+  itself?" went to the filings and answered from operating cash flow, not the profit figure. (5) **Period said wrong but passing:** with the
+  router off, "Is Tesla's stock cheaper now than at New Year?" compared with 2025-10-15 and called it "the New Year close" (the check did
+  not catch it). "Has Apple been on a winning streak" answers "yes" from the two end points only. **Unchanged by the router:** it is asked
+  only when the keywords find no route, and the cases it fixed are those; the cases where a keyword rule chose wrongly stay wrong (advice,
+  speaker, "papers", market value). **Decision for the owner:** the router did no harm on a set it never saw and added 5 passes, which meets
+  the rule set beforehand for turning it on by default; this round does not turn it on (one line plus a test; switch back with
+  `COPILOT_ROUTER=off`). **State of the set:** spent. `SEALED_ROUND_THREE` stays in `SEALED` (not in `CASES`, so full-run scores do not
+  mix in; the shadow run still excludes it) and `SEALED_ROUND_TWO` joined `CASES` unrun as a set, since the "lately" rule spoiled it.
+  The next fair comparison needs `SEALED_ROUND_FOUR`. **Weak spots of this measurement:** one run per configuration (a swing of two is
+  normal), 43 cases, my expectations for 4 cases were arguable, and `tests/test_search.py` was not run.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
