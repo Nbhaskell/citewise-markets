@@ -137,10 +137,17 @@ them (the owner hasn't confirmed the order):
    in profit" is covered by the router when it is on (a fresh set will tell). The router does not fix a question the keywords route wrongly, or a follow-up whose
    rewrite lost its topic. Every keyword list so far has missed on the next wording, so write a new sealed set (`SEALED`, `--sealed`)
    before the next fair comparison. All earlier fresh cases are in `CASES` (359 market, plus the 37-case development set `ROUND_SL`
-   = 396; 51 follow-up resolution), so `HELD_OUT` is empty. **`SEALED` now holds 41 UNRUN cases (`SEALED_ROUND_TWO`, written
-   2026-10-17 on `feature/router-second-look`, DECISIONS: "Router second look, step 1") for the next fair comparison: run it once
-   with `--sealed`, at the end, and never tune on it.** An offline check on the development set found 13 of 29 non-follow-up cases
-   routed wrongly by the keywords and never put to the router; 12 of them need evidence REMOVED, which the router does not do.
+   = 396, plus the 11 of the "lately" rule = 407; 51 follow-up resolution), so `HELD_OUT` is empty. **`SEALED` holds 41 UNRUN cases
+   (`SEALED_ROUND_TWO`, written 2026-10-17, DECISIONS: "Router second look, step 1"), but it is PARTLY SPOILED by the "lately" rule
+   below, so write a new one before the next fair comparison.** A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
+   "Router second look, step 2") found no policy for "the model second-guesses a specific keyword route" that beats today on the older
+   cases (the router is right in 10 of 72 disagreements, all on cases written to find keyword mistakes; it adds prices to figures
+   questions), so **there is no second look; the router is still asked only when the keywords find no route.** **The "lately" rule is
+   built on `feature/lately-price-rule` (DECISIONS: "Router second look, 'lately'"):** "lately" brings headlines only when the question is
+   not already a price question, a company + a movement word (climbing, sliding, drifting...) + a recency word is a price question, and a
+   cause question about a "slide" or "jump" counts "lately" as the period; 4 of 11 fresh cases on the old code, 10 of 11 on the new.
+   Still open: a price or mood word inside a filings question ("falling demand", "optimistic") goes to prices or headlines; the model
+   was right on all 6 tried, and a narrow "model may send it to the filings" policy is the candidate if wanted.
 
 ## Working with the owner
 
@@ -174,8 +181,10 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-17 (on `feature/router-visibility`, after PR #43's 2038 and 253): 2067 Python tests, 260 web tests,
-  all passing. A full test run can fail one or two vector-search tests while an evaluation shares the database;
+- Baseline as of 2026-10-17 (on `feature/lately-price-rule`, which stacks the router-visibility and router-second-look branches on
+  PR #43's 2038 and 253): 2224 Python tests, 260 web tests, all passing (the web count last run on the visibility branch; nothing in
+  `web/` changed since). `tests/test_search.py` has failed one or two tests in 3 of about 5 full runs with no evaluation running and
+  passes alone: rerun before assuming a break. A full test run can fail one or two vector-search tests while an evaluation shares the database;
   run the suite when no evaluation is running. Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
   refresh ran at 3pm on 2026-10-16 (success, 0 problems).
 

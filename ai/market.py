@@ -66,7 +66,7 @@ PRICE_RE = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 NEWS_RE = re.compile(
-    r"\b(?:news|headlines?|announce\w*|lately|happening|going\s+on|what\s+happened|buzz|chatter|in\s+the\s+press|"
+    r"\b(?:news|headlines?|announce\w*|happening|going\s+on|what\s+happened|buzz|chatter|in\s+the\s+press|"
     r"(?:press|media|news)\s+coverage|coverage\s+of|"
     # "stories" only after a word that makes it the news ("customer success stories" is a filings topic)
     r"(?:recent|latest|new|newest|top|breaking|any|some|few|more|other)\s+stories|(?:latest|top|breaking|newest|recent)\s+story)\b",
@@ -145,6 +145,22 @@ PERIOD_MOVE_RE = re.compile(
     r"(?!\s+(?:its|their|the|a|an|to|into|from|out|on)\b)",
     re.IGNORECASE,
 )
+# "Has Apple been climbing or sliding lately?", "Is Amazon's share value holding steady lately?": a company (or its stock, shares, share
+# or stock value, quote), a word for how a price is moving, and (checked in `detect_intent`) a recency word or a named period. No "stock"
+# or price verb is needed. The movement word must be followed by nothing, a direction or a joiner, never an object, so "climbing the
+# ranks", "slipping on iPhone sales", "sliding into", "drifting from its mission" and "sinking money into AI" are not caught; "Microsoft's
+# market share sliding" is not either (the possessive may only name the stock). The subject is not a figure ("Is revenue climbing lately
+# for Tesla?"): `_NOT_A_COMPANY`, as in the claim rule. "up" and "down" are not listed: "been sliding down" is a price question already.
+_MOVING = r"(?:climbing|sliding|slipping|drifting|sagging|trending|sinking|dipping|holding\s+(?:steady|firm|flat))"
+RECENT_MOVE_RE = re.compile(
+    rf"\b(?:has|is|was|were)\s+(?!(?:{_NOT_A_COMPANY})\b){_BARE_NAME}(?:['’]s\s+(?:stock|shares?|share\s+value|stock\s+value|quote))?\s+(?:been\s+)?"
+    rf"{_MOVING}\b(?=\s*[?,]|\s*$|\s+(?:higher|lower|sideways|again|steadily|slowly|a\s+bit|or|and|lately|recently|these|of|this|over|since|today)\b)",
+    re.IGNORECASE,
+)
+RECENCY_RE = re.compile(r"\b(?:lately|recently|these\s+days|of\s+late)\b", re.IGNORECASE)
+LATELY_RE = re.compile(r"\blately\b", re.IGNORECASE)  # a news cue ("What are people saying about Microsoft lately?") unless it is a price question
+
+
 @lru_cache(maxsize=4)
 def _year_start_re(year: int) -> re.Pattern:
     """"Is Amazon above where it started 2026?": a comparison with where the stock stood at the start of THIS year. Only the
@@ -690,14 +706,18 @@ def detect_intent(question: str) -> Intent:
         or bool(PRICE_PREDICTION_RE.search(question))
         or (
             bool(PRICE_MOVE_NOUN_RE.search(question)) and bool(CAUSE_RE.search(question))
-            and (parse_window(question).explicit or bool(STOCK_NOUN_RE.search(question)))
+            and (parse_window(question).explicit or bool(STOCK_NOUN_RE.search(question)) or bool(RECENCY_RE.search(question)))
         )
         or (bool(PRICE_CLAIM_RE.search(question)) and (parse_window(question).explicit or bool(STOCK_NOUN_RE.search(question))))
         or (bool(PERIOD_COMPARE_RE.search(question)) and not topics and parse_window(question).explicit)  # not "revenue than a year ago"
+        or (bool(RECENT_MOVE_RE.search(question)) and (bool(RECENCY_RE.search(question)) or parse_window(question).explicit))
     )
     sentiment = bool(SENTIMENT_RE.search(question))
     general = bool(GENERAL_RE.search(question)) and not STOCK_WORD_RE.search(question)  # "How's Nvidia doing?" wants both
-    headlines = bool(NEWS_RE.search(question)) or sentiment or general or (prices and bool(CAUSE_RE.search(question)))
+    headlines = (
+        bool(NEWS_RE.search(question)) or sentiment or general or (prices and bool(CAUSE_RE.search(question)))
+        or (bool(LATELY_RE.search(question)) and not prices)  # "lately" is a news cue only when it is not already a price question
+    )
     if share_count:
         topics = topics | {"shares"}
     market = prices or headlines or sentiment or bool(topics)

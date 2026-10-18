@@ -1540,6 +1540,51 @@ benchmarks.
   question to the filings when the two share nothing (2 more). **No policy beats `today` on the older cases** (every one loses 12 to 24
   case-runs there), and every gain is on cases written for it, so this does NOT show that a second look helps in general; it shows where it
   could. **Not decided; nothing in the app changed.**
+- **Router second look, "lately": no general second look; a keyword fix instead, 2026-10-17** (branch `feature/lately-price-rule`, cut
+  from `feature/router-second-look`). **Decision (the owner's):** do not build a model second look for questions the keywords route to
+  something specific; fix the one mistake the model was right about 4 times in 4 with a keyword rule; the sealed run was skipped.
+  **What "lately" did wrong** (checked by running each question with and without the word): it was a news word everywhere, so (1) a
+  question the price rules already read got headlines it did not ask for ("Has Nvidia been trending up or sagging lately?",
+  "How choppy has Amazon's stock been lately?") and (2) a price question with no word the price rules knew went to the headlines ALONE
+  ("Is Amazon's share value holding steady lately?", "Has Alphabet's quote been drifting lately?", "Has Apple been climbing or sliding
+  lately?"). Its other use is right and stays: "What are people saying about Microsoft lately?", "What has Tesla been up to lately?",
+  "Anything new with Amazon lately?" depend on it. **Built, in `ai/market.py` (no prompt change):** (1) "lately" brings headlines only
+  when the question is not already a price question (`LATELY_RE`, out of `NEWS_RE`); (2) `RECENT_MOVE_RE`: has/is/was/were, a bare
+  company (or its stock, shares, share or stock value, quote), an optional "been", one of climbing, sliding, slipping, drifting,
+  sagging, trending, sinking, dipping, holding steady/firm/flat, followed by nothing, a comma or question mark, a direction or a joiner
+  (higher, lower, sideways, again, steadily, slowly, a bit, or, and, a recency word, these, of, this, over, since, today), and a recency
+  word (`RECENCY_RE`: lately, recently, these days, of late) or a named period, is a price question; (3) a cause question about a
+  company's slide or jump counts "lately" and its siblings as the period ("What's behind Apple's slide lately?" got headlines and no
+  prices, and the model described a slide with no price data). **Guards, each with a question of its own:** the movement word may not take
+  an object ("climbing the ranks", "slipping on iPhone sales", "sliding into", "drifting from its mission", "sinking money into AI"),
+  the subject may not be a figure ("Is revenue climbing lately for Tesla?": found by reading the rule, six such questions went to the
+  prices before `_NOT_A_COMPANY` was added to the subject), the possessive may name only the stock ("Microsoft's market share sliding"
+  is not caught), and without a recency word or period the rule does not fire. **Tests first: 91 new (`tests/test_lately_wording.py`;
+  45 of the first 72 failed on the old code), 2224 Python tests pass. Deliberate breakages: 57, every alternative of every list, both
+  `detect_intent` clauses, the guards and the optional "been"; the first pass found two surviving alternatives (`have`, `are`: the
+  questions I wrote were already caught by the old rules, so the alternatives did nothing and were removed) and the figure-subject hole
+  above.** The shadow-script tests used two "lately" mistakes as their examples of a wrongly routed question; they now use stand-ins.
+  **Evidence, old code against new code back to back (a separate `git worktree`, router off, one data snapshot):** (a) **offline, on
+  1,640 distinct questions** (every evaluation case, every question quoted in a test, the web tests): 12 change route besides the
+  new tests, all intended (10 price questions, 2 cause questions), and **no older case and no other test question changed**; (b) **11
+  fresh cases in new wording, written before the rule (`ROUND_LATELY`, now in `CASES`): 4 of 11 on the old code, 10 of 11 on the new
+  (12 of 33 runs against 30 of 33)**, the one miss being the cause wording of (3), fixed afterwards, so that case is tuning material
+  now; (c) the 4 older cases whose route changed plus the 11, three repeats, after (3): 45 of 45. I read the answers: the price
+  questions are answered from the stored closes, and where the premise is false ("dipping", "trending lower") the model says the prices
+  rose; the news questions still list headlines. **Weak spots:** (1) It is a word list again: another movement word ("grinding",
+  "edging", "wobbling") or another recency word ("of recent days") misses until added; the tracked-company subject is any bare word that
+  is not a figure. (2) "Is demand sliding lately?"-style questions with no figure word on the list would be read as prices; with a
+  company named elsewhere the old route was headlines anyway. (3) Without a recency word or period the rule stays silent ("Has Tesla
+  been climbing?" still goes to the filings). (4) The default window is still "past month", so "lately" is answered over a month. (5)
+  **The larger class is untouched:** a price or mood word inside a filings question ("What does Apple say about falling demand in
+  China?", "Does Tesla sound optimistic about its factory expansion?"): 9 of the 13 never-asked mistakes; the model was right on all 6
+  tried, and a narrow "model may send it to the filings" policy is the candidate if that is wanted later. (6) **The sealed set of
+  2026-10-17 is partly spoiled**: this rule was written knowing it holds "How choppy has Amazon's stock been lately?" (now routed
+  right because of the rule) and "Has Microsoft been grinding higher or drifting lower recently?" (unchanged); a fair later comparison
+  needs a new sealed set. (7) Two full-suite runs of five failed `tests/test_search.py` tests (`test_symbol_and_form_filters_and_limit`,
+  `test_latest_only_drops_older_filings_of_the_same_form`) with nothing else using the database; they pass alone and in the next full
+  run, which matches the known vector-index flakiness, but it has now happened three times with no evaluation running and has not been
+  investigated.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

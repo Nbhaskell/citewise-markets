@@ -21,9 +21,11 @@ FILINGS = route(filings=True)
 PRICE = route(price=True)
 
 FALLING = "What does Apple say about falling demand in China?"             # the keywords say prices; it is a filings question
-LATELY = "Has Nvidia been trending up or sagging lately?"                   # the keywords say headlines and prices; prices only
+# The two questions below used to be keyword mistakes about "lately" (fixed in DECISIONS: "Router second look, 'lately'"), so they are
+# stand-ins now: the keywords' route is real, and the tests only pretend the expected evidence is the one named in each comment.
+LATELY = "How's Nvidia been performing recently?"                           # the keywords say prices and headlines; pretend: prices only
 FILINGS_DEFAULT = "Has Apple pulled back from its high this year?"          # no keyword route: the filings default
-STEADY = "Is Amazon's share value holding steady lately?"                   # the keywords say headlines only; it is a price question
+STEADY = "What are people saying about Amazon lately?"                      # the keywords say headlines only; pretend: a price question
 
 
 def kw(question):
