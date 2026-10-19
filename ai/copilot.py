@@ -194,10 +194,11 @@ def lowercase_ticker_ok(symbol: str) -> bool:
     return len(symbol) >= 3 and symbol.lower() not in LOWERCASE_TICKER_BLOCKLIST
 
 
-def company_mentions(conn: psycopg.Connection, text: str) -> dict[str, list[re.Match]]:
-    """Every tracked company the text names (by ticker, first word of its name, or alias), with where it does so."""
+def company_mentions(conn: psycopg.Connection, text: str, include_removed: bool = False) -> dict[str, list[re.Match]]:
+    """Every tracked company the text names (by ticker, first word of its name, or alias), with where it does so. A removed
+    company (switched off, data still stored) is found only with `include_removed`: it is not tracked, so it is not answered."""
     found: dict[str, list[re.Match]] = {}
-    for symbol, name in conn.execute("SELECT symbol, name FROM instruments ORDER BY symbol"):
+    for symbol, name in conn.execute(f"SELECT symbol, name FROM instruments {'' if include_removed else 'WHERE active '}ORDER BY symbol"):
         patterns = [(rf"\b{re.escape(symbol)}\b", re.IGNORECASE if lowercase_ticker_ok(symbol) else 0)]
         first = re.match(r"[A-Za-z]+", name or "")
         if first and len(first.group()) >= 4:
@@ -211,6 +212,15 @@ def company_mentions(conn: psycopg.Connection, text: str) -> dict[str, list[re.M
 
 def detect_symbols(conn: psycopg.Connection, question: str) -> list[str]:
     return list(company_mentions(conn, question))
+
+
+def removed_company_named(conn: psycopg.Connection, text: str) -> str | None:
+    """The words of the text that name a company that was removed (as written in the question), or None. Its filings and
+    prices are still stored, so without this a question about it would be answered from other companies' filings."""
+    named = company_mentions(conn, text, include_removed=True)
+    active = company_mentions(conn, text)
+    gone = sorted((m for sym, ms in named.items() if sym not in active for m in ms), key=lambda m: m.start())
+    return gone[0].group() if gone else None
 
 
 def passage_block(number: int, r: SearchResult | MarketEvidence) -> str:
@@ -964,6 +974,8 @@ def answer_question(
         return refuse(outside_scope_message("writing", "", tracked))
     if intent.unstored_only:
         return refuse(not_calculated(intent.unstored))
+    if not symbols and (gone := removed_company_named(conn, search_question)):  # switched off by "remove": its data is kept, but it is not tracked
+        return refuse(outside_scope_message("company", gone, tracked))
     if not symbols and (outside := outside_scope(search_question)):  # before the generic refusal: it says what is missing
         return refuse(outside_scope_message(outside[0], outside[1], tracked))
     if not symbols and (name := unknown_name(conn, search_question)):  # a name the stored text has never seen

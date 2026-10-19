@@ -1339,6 +1339,86 @@
         "title": "PriceSeries",
         "type": "object"
       },
+      "RemoveIn": {
+        "properties": {
+          "ticker": {
+            "description": "Ticker of a tracked company, e.g. TSLA",
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker"
+        ],
+        "title": "RemoveIn",
+        "type": "object"
+      },
+      "RemoveKept": {
+        "properties": {
+          "figures": {
+            "title": "Figures",
+            "type": "integer"
+          },
+          "filings": {
+            "title": "Filings",
+            "type": "integer"
+          },
+          "headlines": {
+            "title": "Headlines",
+            "type": "integer"
+          },
+          "prices": {
+            "title": "Prices",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "prices",
+          "filings",
+          "headlines",
+          "figures"
+        ],
+        "title": "RemoveKept",
+        "type": "object"
+      },
+      "RemoveOut": {
+        "properties": {
+          "kept": {
+            "$ref": "#/components/schemas/RemoveKept",
+            "description": "What stays stored. Removing stops tracking a company; it deletes nothing"
+          },
+          "message": {
+            "description": "Plain-language note for the page, including how to track the company again",
+            "title": "Message",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "kept",
+          "message"
+        ],
+        "title": "RemoveOut",
+        "type": "object"
+      },
       "ReportCompany": {
         "properties": {
           "lines": {
@@ -2533,6 +2613,48 @@
         "summary": "News Feed",
         "tags": [
           "news"
+        ]
+      }
+    },
+    "/api/remove-company": {
+      "post": {
+        "description": "Stop tracking a company. Nothing is deleted: it is switched off, and adding it again brings it back with its history.",
+        "operationId": "remove_company_endpoint_api_remove_company_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Company Endpoint",
+        "tags": [
+          "remove company"
         ]
       }
     },

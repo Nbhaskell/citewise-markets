@@ -20,6 +20,7 @@ SELECT c.id, c.accession_number, f.symbol, f.form, f.filed_at, f.period_of_repor
        c.section, c.text, 1 - (c.embedding <=> %(q)s::vector) AS score
 FROM filing_chunks c
 JOIN filings f ON f.accession_number = c.accession_number
+JOIN instruments i ON i.symbol = f.symbol AND i.active
 WHERE (%(symbols)s::text[] IS NULL OR f.symbol = ANY(%(symbols)s))
   AND (%(forms)s::text[] IS NULL OR f.form = ANY(%(forms)s))
   AND (NOT %(latest)s OR f.filed_at = (

@@ -244,8 +244,8 @@ def build_changes(
     `mood_counts(n)` returns per-company label counts for the last n days (`ai.sentiment.label_counts`, passed in so
     this layer doesn't depend on the AI layer)."""
     days = max(1, min(days, MAX_DAYS))
-    if symbols is None:
-        symbols = [r[0] for r in conn.execute("SELECT symbol FROM instruments WHERE active ORDER BY symbol")]
+    active = [r[0] for r in conn.execute("SELECT symbol FROM instruments WHERE active ORDER BY symbol")]
+    symbols = active if symbols is None else [s for s in symbols if s in active]  # a removed company is never listed, even when named
     names = dict(conn.execute("SELECT symbol, name FROM instruments WHERE symbol = ANY(%s)", (symbols,)).fetchall())
 
     latest = conn.execute("SELECT max(ts) FROM prices_daily WHERE symbol = ANY(%s)", (symbols,)).fetchone()[0]

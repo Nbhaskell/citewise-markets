@@ -140,6 +140,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/remove-company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove Company Endpoint
+         * @description Stop tracking a company. Nothing is deleted: it is switched off, and adding it again brings it back with its history.
+         */
+        post: operations["remove_company_endpoint_api_remove_company_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -819,6 +839,39 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** RemoveIn */
+        RemoveIn: {
+            /**
+             * Ticker
+             * @description Ticker of a tracked company, e.g. TSLA
+             */
+            ticker: string;
+        };
+        /** RemoveKept */
+        RemoveKept: {
+            /** Figures */
+            figures: number;
+            /** Filings */
+            filings: number;
+            /** Headlines */
+            headlines: number;
+            /** Prices */
+            prices: number;
+        };
+        /** RemoveOut */
+        RemoveOut: {
+            /** @description What stays stored. Removing stops tracking a company; it deletes nothing */
+            kept: components["schemas"]["RemoveKept"];
+            /**
+             * Message
+             * @description Plain-language note for the page, including how to track the company again
+             */
+            message: string;
+            /** Name */
+            name: string | null;
+            /** Symbol */
+            symbol: string;
+        };
         /** ReportCompany */
         ReportCompany: {
             /** Lines */
@@ -1297,6 +1350,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NewsFeedItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_company_endpoint_api_remove_company_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoveOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,12 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
+import type { RemoveOut } from "../api/types";
 import { CopilotBox } from "../components/CopilotBox";
 import { FilingsList } from "../components/FilingsList";
 import { Fundamentals } from "../components/Fundamentals";
 import { KeyStats } from "../components/KeyStats";
 import { NewsPanel } from "../components/NewsPanel";
 import { PriceHistory } from "../components/PriceHistory";
+import { RemoveCompany } from "../components/RemoveCompany";
 import { useApi } from "../hooks/useApi";
 import { directionOf, formatChangePct, formatPrice } from "../lib/format";
 
@@ -41,6 +43,7 @@ export function StockPage() {
 
 function StockDetailView({ symbol }: { symbol: string }) {
   const detail = useApi((signal) => api.stock(symbol, signal), [symbol]);
+  const [removed, setRemoved] = useState<RemoveOut | null>(null);
 
   useEffect(() => {
     document.title = `${symbol} · stockMarket`;
@@ -54,6 +57,16 @@ function StockDetailView({ symbol }: { symbol: string }) {
       <Missing
         title={`${symbol} isn't a tracked company`}
         hint={`Add it from the dashboard's "Add a company" box, or with: python -m jobs.add_company ${symbol}. The nightly refresh keeps it current after that.`}
+      />
+    );
+  }
+
+  if (removed) {
+    const { kept } = removed;
+    return (
+      <Missing
+        title={`${symbol} is no longer tracked`}
+        hint={`${removed.message} Still stored: ${kept.prices.toLocaleString()} daily prices, ${kept.filings.toLocaleString()} filings, ${kept.headlines.toLocaleString()} headlines, ${kept.figures.toLocaleString()} financial figures.`}
       />
     );
   }
@@ -95,6 +108,7 @@ function StockDetailView({ symbol }: { symbol: string }) {
           <NewsPanel symbol={symbol} />
         </div>
       </div>
+      {stock && <RemoveCompany symbol={symbol} name={stock.name} onRemoved={setRemoved} />}
     </>
   );
 }
