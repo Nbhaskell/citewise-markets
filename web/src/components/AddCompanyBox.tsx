@@ -110,7 +110,8 @@ export function AddCompanyBox() {
       <h2 id="add-company-title">Add a company</h2>
       <p className="muted small">
         Adds prices, filings, headlines, and figures for a US-listed company. It can take a few minutes. To stop tracking
-        a company later, open it and use "Stop tracking" at the bottom of its page; nothing is deleted.
+        one later, use the switch next to it in the watchlist (or in its page header). Nothing is deleted, and you can
+        switch it back on from the "Not tracked" list.
       </p>
 
       {(state.kind === "idle" || state.kind === "looking") && (

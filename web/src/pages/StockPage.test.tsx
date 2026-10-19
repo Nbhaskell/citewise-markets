@@ -88,7 +88,7 @@ describe("StockPage", () => {
     renderPage("/stocks/AAPL");
     await screen.findByText("Apple Inc.");
 
-    await userEvent.click(screen.getByRole("button", { name: "Stop tracking AAPL" }));
+    await userEvent.click(screen.getByRole("switch", { name: "AAPL: tracked" })); // the switch in the page header
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false); // asked first
     await userEvent.click(screen.getByRole("button", { name: "Yes, stop tracking AAPL" }));
 
@@ -98,11 +98,11 @@ describe("StockPage", () => {
     expect(screen.getByRole("link", { name: "Back to the dashboard" })).toHaveAttribute("href", "/");
   });
 
-  it("offers no remove button for a company that isn't tracked", async () => {
+  it("offers no tracking switch for a company that isn't tracked", async () => {
     mockApi({ ...detailRoutes(), "GET /api/stocks/ZZZ": json({ detail: "ZZZ is not a tracked company" }, 404) });
     renderPage("/stocks/ZZZ");
     await screen.findByRole("heading", { name: "ZZZ isn't a tracked company" });
-    expect(screen.queryByRole("button", { name: /Stop tracking/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   });
 
   it("rejects an address that isn't a ticker without calling the API", async () => {
@@ -132,5 +132,26 @@ describe("StockPage", () => {
     expect(alerts.some((a) => a.textContent?.includes("python -m api"))).toBe(true);
     await userEvent.click(within(alerts.find((a) => a.textContent?.includes("python -m api"))!).getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Apple Inc.")).toBeInTheDocument();
+  });
+});
+
+describe("StockPage tracking switch", () => {
+  it("has the switch in the header, next to the name, not at the bottom of the page", async () => {
+    mockApi(detailRoutes());
+    renderPage("/stocks/AAPL");
+    const toggle = await screen.findByRole("switch", { name: "AAPL: tracked" });
+    expect(toggle.closest("header")).toHaveClass("stock-head");
+    expect(screen.queryByRole("heading", { name: /Stop tracking/ })).not.toBeInTheDocument();
+  });
+
+  it("cancelling the question leaves the page as it was and the switch usable", async () => {
+    const fetchMock = mockApi(detailRoutes());
+    renderPage("/stocks/AAPL");
+    await userEvent.click(await screen.findByRole("switch", { name: "AAPL: tracked" }));
+    expect(screen.getByRole("switch", { name: "AAPL: tracked" })).toBeDisabled(); // the question is open
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("switch", { name: "AAPL: tracked" })).toBeEnabled();
+    expect(screen.queryByText(/Stop tracking Apple/)).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
 });

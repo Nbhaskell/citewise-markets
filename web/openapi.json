@@ -1419,6 +1419,31 @@
         "title": "RemoveOut",
         "type": "object"
       },
+      "RemovedCompany": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "name"
+        ],
+        "title": "RemovedCompany",
+        "type": "object"
+      },
       "ReportCompany": {
         "properties": {
           "lines": {
@@ -2653,6 +2678,32 @@
           }
         },
         "summary": "Remove Company Endpoint",
+        "tags": [
+          "remove company"
+        ]
+      }
+    },
+    "/api/removed-companies": {
+      "get": {
+        "description": "Read-only: companies that were removed (not tracked, data kept), so the dashboard can offer to switch one back on.",
+        "operationId": "removed_companies_api_removed_companies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RemovedCompany"
+                  },
+                  "title": "Response Removed Companies Api Removed Companies Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Removed Companies",
         "tags": [
           "remove company"
         ]

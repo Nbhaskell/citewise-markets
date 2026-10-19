@@ -231,6 +231,11 @@ class RemoveIn(BaseModel):
     ticker: str = Field(min_length=1, max_length=12, description="Ticker of a tracked company, e.g. TSLA")
 
 
+class RemovedCompany(BaseModel):
+    symbol: str
+    name: Optional[str]
+
+
 class RemoveKept(BaseModel):
     prices: int
     filings: int
