@@ -1723,14 +1723,106 @@ SEALED_ROUND_FOUR: tuple[Case, ...] = (
     Case("s4 follow: now Tesla", "routing", "Now Tesla.", frozenset({"price"}), frozenset({"TSLA"}), history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
 )
 
+# SEALED, fifth set. Written 2026-10-19 on `feature/sealed-round-five`, BEFORE any case was run and BEFORE any rule was changed for it. It
+# is a MEASUREMENT: nothing is tuned on it. Same honest limit as the fourth set (the writer has read the rules); to compensate, none of the
+# wordings below is taken from a list, a test or an earlier case (checked by script against every string in the repo), and the questions are
+# written as a daily researcher would type them. The stopping rule agreed with the owner: the router-on score at or above 85 to 90 percent on
+# two rounds in a row, or most failures being arguable or model-quality rather than routing (DECISIONS: "Fourth sealed round"). RUN ONCE with
+# `--sealed` (router off with `COPILOT_ROUTER=off`, then on), read every answer; it joins `CASES` only after that.
+SEALED_ROUND_FIVE: tuple[Case, ...] = (
+    # prices
+    Case("s5 price: added since first of year", "routing", "How much has Microsoft's stock added since the first of the year?", frozenset({"price"}),
+         frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
+    Case("s5 price: close in the green yesterday", "routing", "Did AMD close the day in the green yesterday?", frozenset({"price"}),
+         frozenset({"AMD"}), must=(PRICE_DIGITS,)),
+    Case("s5 price: spread best and worst day", "routing", "What's the spread between Nvidia's best and worst day this month?", frozenset({"price"}),
+         frozenset({"NVDA"}), must=(PRICE_DIGITS,)),
+    Case("s5 price: bounced back after dip", "routing", "Has Tesla's stock bounced back after last week's dip?", frozenset({"price"}),
+         frozenset({"TSLA"}), must=(PRICE_DIGITS,)),
+    Case("s5 price: multi-month low", "routing", "Are Amazon shares sitting at a multi-month low?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(PRICE_DIGITS,)),
+    Case("s5 price: today against monday", "routing", "How does Google's stock today stack up against Monday?", frozenset({"price"}),
+         frozenset({"GOOGL"}), must=(PRICE_DIGITS,)),
+    Case("s5 price: biggest one-day jump", "routing", "What was the biggest one-day jump in Apple's stock over the last quarter?", frozenset({"price"}),
+         frozenset({"AAPL"}), must=(PRICE_DIGITS,)),
+    Case("s5 price: better level than july", "routing", "Is Microsoft stock at a better level than it was in July?", frozenset({"price"}),
+         frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
+    # news and mood
+    Case("s5 news: street on chip launch", "routing", "What are people on the street saying about Nvidia's latest chip launch?", frozenset({"headline"}),
+         frozenset({"NVDA"})),
+    Case("s5 news: media turned against", "routing", "Has the media turned against Tesla?", frozenset({"headline", "sentiment"}), frozenset({"TSLA"})),
+    Case("s5 news: quick rundown of coverage", "routing", "Give me a quick rundown of Alphabet's recent coverage.", frozenset({"headline"}), frozenset({"GOOGL"})),
+    Case("s5 news: talk of an acquisition", "routing", "Is there talk of an AMD acquisition?", frozenset({"headline"}), frozenset({"AMD"})),
+    Case("s5 news: critical piece lately", "routing", "Did any outlet run a critical piece on Apple lately?", frozenset({"headline"}), frozenset({"AAPL"})),
+    Case("s5 news: feeling toward after earnings", "routing", "How's the feeling toward Microsoft after its last earnings?", frozenset({"headline", "sentiment"}),
+         frozenset({"MSFT"})),
+    Case("s5 news: headlines getting kinder", "routing", "Are Nvidia headlines getting kinder?", frozenset({"headline", "sentiment"}), frozenset({"NVDA"})),
+    # the stored figures
+    Case("s5 fund: multiple of profit changing hands", "routing", "What multiple of profit is Alphabet changing hands at?", frozenset({"fundamentals"}),
+         frozenset({"GOOGL"}), figures=("GOOGL:pe",)),
+    Case("s5 fund: dollar value of all stock", "routing", "What's the total dollar value of all Amazon stock?", frozenset({"fundamentals"}),
+         frozenset({"AMZN"}), figures=("AMZN:market_value",)),
+    Case("s5 fund: dollars brought in annually", "routing", "How many dollars does Tesla bring in annually?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), figures=("TSLA:revenue",)),
+    Case("s5 fund: profit as a slice of sales", "routing", "What's AMD's profit as a slice of sales?", frozenset({"fundamentals"}), frozenset({"AMD"}),
+         figures=("AMD:net_margin",)),
+    Case("s5 fund: earning per share these days", "routing", "What's Microsoft earning per share these days?", frozenset({"fundamentals"}),
+         frozenset({"MSFT"}), figures=("MSFT:eps",)),
+    Case("s5 fund: shares out in the world", "routing", "How many shares of Nvidia are out in the world?", frozenset({"fundamentals"}), frozenset({"NVDA"})),
+    # filings
+    Case("s5 filing: admit could go wrong suppliers", "routing", "What does Apple admit could go wrong with its suppliers?", frozenset({"filing"}),
+         frozenset({"AAPL"}), ungrounded_ok=True),
+    Case("s5 filing: competes hardest", "routing", "Where does Microsoft say it competes hardest?", frozenset({"filing"}), frozenset({"MSFT"}), ungrounded_ok=True),
+    Case("s5 filing: worried about battery costs", "routing", "Is Tesla worried about its battery costs?", frozenset({"filing"}), frozenset({"TSLA"}), ungrounded_ok=True),
+    Case("s5 filing: government investigations", "routing", "What government investigations is Alphabet dealing with?", frozenset({"filing"}),
+         frozenset({"GOOGL"}), ungrounded_ok=True),
+    Case("s5 filing: headcount trend", "routing", "What's the headcount trend at Amazon?", frozenset({"filing"}), frozenset({"AMZN"}), ungrounded_ok=True),
+    Case("s5 filing: who warns about trade restrictions", "routing", "Who among these companies warns about trade restrictions?", frozenset({"filing"}),
+         ungrounded_ok=True),
+    Case("s5 filing: dependence on AI demand", "routing", "How does Nvidia describe its dependence on AI demand?", frozenset({"filing"}), frozenset({"NVDA"}),
+         ungrounded_ok=True),
+    # outside the app, writing, an unknown name, a prediction, a false premise, an unstored ratio, advice
+    Case("s5 outside: capital of australia", "trap", "What's the capital of Australia?", frozenset(), frozenset(),
+         must=(rf"{OUTSIDE}|couldn(?:'|’)t find anything",)),
+    Case("s5 outside: weather in seattle", "trap", "Will it be sunny in Seattle this weekend?", frozenset(), frozenset(),
+         must=(rf"{OUTSIDE}|couldn(?:'|’)t find anything",)),
+    Case("s5 writing: reply to landlord", "trap", "Draft a reply to my landlord about the lease.", frozenset(), frozenset(), must=(rf"{OUTSIDE}|doesn't write",)),
+    Case("s5 writing: investor pitch", "trap", "Compose a short pitch for investors about Nvidia.", frozenset(), frozenset(), must=(rf"{OUTSIDE}|doesn't write",)),
+    Case("s5 unknown name: Zoom", "trap", "How profitable is Zoom these days?", frozenset(), frozenset(), must=(r"Zoom",)),
+    Case("s5 predict: hit 300 by year end", "trap", "Will Amazon's stock hit 300 by year end?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("s5 premise: crash forty percent", "trap", "Why did Nvidia's stock crash 40% this week?", frozenset({"price", "headline"}), frozenset({"NVDA"}),
+         cautions_shown=(r"You mention that NVDA",)),
+    Case("s5 premise: doubled this quarter", "trap", "Apple doubled this quarter, right?", frozenset({"price"}), frozenset({"AAPL"}),
+         cautions_shown=(r"You mention that AAPL",)),
+    Case("s5 unstored: current ratio", "trap", "What's Amazon's current ratio?", frozenset(), frozenset(), must=(NOT_CALCULATED,)),
+    Case("s5 advice: ten thousand saved", "trap", "I have 10k saved. Should it go into AMD?", frozenset({"filing"}), frozenset({"AMD"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("s5 advice: if you were me", "trap", "If you were me, would you load up on Nvidia?", frozenset({"filing"}), frozenset({"NVDA"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("s5 advice: dad says dump", "trap", "My dad says dump Apple. Smart?", frozenset({"filing"}), frozenset({"AAPL"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    # follow-ups
+    Case("s5 follow: what about Tesla", "routing", "What about Tesla?", frozenset({"headline"}), frozenset({"TSLA"}), history=(AAPL_NEWS,)),
+    Case("s5 follow: next to Microsoft", "routing", "Put that next to Microsoft's.", frozenset({"price"}), frozenset({"GOOGL", "MSFT"}),
+         history=(GOOGL_PRICE,), must=(PRICE_DIGITS,)),
+    Case("s5 follow: same ratio for Apple", "routing", "Same ratio for Apple.", frozenset({"fundamentals"}), frozenset({"AAPL"}), history=(AMZN_PE,),
+         figures=("AAPL:pe",)),
+    Case("s5 follow: how does Nvidia handle it", "routing", "And how does Nvidia handle it?", frozenset({"filing"}), history=(TSLA_RISKS,),
+         ungrounded_ok=True),
+    Case("s5 follow: which is the biggest", "routing", "Which of those risks is the biggest?", frozenset({"filing"}), frozenset({"MSFT"}),
+         history=(MSFT_RISKS,), ungrounded_ok=True),
+    Case("s5 follow: is that unusual", "routing", "Is that unusual for it?", frozenset({"price"}), frozenset({"AMD"}), history=(AMD_PRICE,),
+         must=(PRICE_DIGITS,)),
+)
+
 # Fresh cases only (none have been run). Write new ones before claiming a fair score.
 HELD_OUT: tuple[Case, ...] = ()
 # The sealed test set: run only with `--sealed`, once, at the end of an experiment, and never tuned on.
-# SEALED_ROUND_THREE was RUN once on 2026-10-18 and is SPENT (docs/DECISIONS.md, "Third sealed round"): it joins `CASES` below.
-# SEALED_ROUND_FOUR was RUN once on 2026-10-19 (keywords only 31 of 47, router on 37 of 47; DECISIONS: "Fourth sealed round") and every answer
-# was read, so it is SPENT too; it stays here (out of `CASES`, out of the router shadow run) until a SEALED_ROUND_FIVE replaces it.
-CASES = CASES + SEALED_ROUND_THREE
-SEALED: tuple[Case, ...] = SEALED_ROUND_FOUR
+# SEALED_ROUND_THREE and SEALED_ROUND_FOUR were RUN once (2026-10-18 and 2026-10-19; DECISIONS: "Third sealed round", "Fourth sealed round") and
+# every answer was read, so both are SPENT: they join `CASES` below.
+CASES = CASES + SEALED_ROUND_THREE + SEALED_ROUND_FOUR
+SEALED: tuple[Case, ...] = SEALED_ROUND_FIVE
 
 
 def expected_figure(conn, spec: str) -> str:
