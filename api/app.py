@@ -14,6 +14,7 @@ from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from ai.copilot import Turn, answer_question
+from ai.question_log import log_answer
 from ai.embeddings import DEFAULT_MODEL, Embedder
 from ai.llm import LLM
 from ai.market import MarketEvidence
@@ -254,7 +255,7 @@ def copilot(
         ans = answer_question(conn, embedder, llm, req.question, req.symbols, req.limit, history=history)
     except RuntimeError as exc:
         raise HTTPException(502, str(exc)) from exc
-    return {
+    response = {
         "question": ans.question,
         "answer": ans.text,
         "refused": ans.refused,
@@ -269,6 +270,8 @@ def copilot(
         "disclaimer": ans.disclaimer,
         "sources": [source_out(n, r) for n, r in ans.sources],
     }
+    log_answer(response, len(history))  # the local question log (never raises; off with COPILOT_LOG=off)
+    return response
 
 
 KIND_ORDER = ["price", "fundamentals", "sentiment", "headline", "filing"]

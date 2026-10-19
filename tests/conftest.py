@@ -8,6 +8,9 @@ from data.db import database_url
 # The model router is on by default (DECISIONS: "Router on by default"). Tests use scripted models that expect exactly the calls they
 # were written for, so the suite switches it off; tests of the router itself pass `router=True` or set the variable themselves.
 os.environ["COPILOT_ROUTER"] = "off"
+# The question log (DECISIONS: "Question log") is on by default; the suite must never add its test questions to the real file. The tests of
+# the log itself switch it on with a temporary file.
+os.environ["COPILOT_LOG"] = "off"
 
 
 @pytest.fixture(scope="session", autouse=True)
