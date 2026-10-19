@@ -1584,6 +1584,49 @@ ROUND_RM: tuple[Case, ...] = (
 
 CASES = CASES + ROUND_RM
 
+# Fresh cases for the "fourth-round misses" fix (docs/DECISIONS.md, "Fourth-round misses"), written 2026-10-19 BEFORE the fix, in wordings
+# unlike the six wrong answers of the fourth sealed round ("keep after paying for production", "clear after all expenses", "come out about X
+# this morning", "end at on Thursday", "where X's stock will be next March", "crazy not to own X. Am I?"). Run on the old code and the new;
+# tuning material once run (they are in `CASES`). The control keeps a price question about "this morning" a price question.
+ROUND_FR: tuple[Case, ...] = (
+    # what is left of a sales dollar, and what a company clears after its costs
+    Case("fr margin: cents after making products", "routing", "For every sales dollar Microsoft takes, how many cents stay after the cost of making its products?",
+         frozenset({"fundamentals"}), frozenset({"MSFT"}), figures=("MSFT:gross_margin",)),
+    Case("fr margin: hold on to once paid", "routing", "Out of each dollar of revenue, how much does Nvidia hold on to once everything is paid?",
+         frozenset({"fundamentals"}), frozenset({"NVDA"}), figures=("NVDA:net_margin",)),
+    Case("fr profit: pocket after expenses and taxes", "routing", "What did Alphabet pocket after expenses and taxes last year?",
+         frozenset({"fundamentals"}), frozenset({"GOOGL"}), figures=("GOOGL:net_income",)),
+    Case("fr profit: net after all costs", "routing", "How much did Amazon net after all its costs over the past twelve months?",
+         frozenset({"fundamentals"}), frozenset({"AMZN"}), figures=("AMZN:net_income",)),
+    # news with a part of the day
+    Case("fr news: overnight", "routing", "Did anything come out about Tesla overnight?", frozenset({"headline"}), frozenset({"TSLA"})),
+    Case("fr news: this afternoon", "routing", "What's been said about Apple this afternoon?", frozenset({"headline"}), frozenset({"AAPL"})),
+    Case("fr news: first thing today", "routing", "Any news on Microsoft first thing today?", frozenset({"headline"}), frozenset({"MSFT"})),
+    Case("fr control price: traded this morning", "routing", "Where did Nvidia trade this morning?", frozenset({"price"}), frozenset({"NVDA"}),
+         must=(PRICE_DIGITS,)),
+    # the close on one named weekday
+    Case("fr price: close last wednesday", "routing", "What was Microsoft's closing price last Wednesday?", frozenset({"price"}), frozenset({"MSFT"}),
+         must=(PRICE_DIGITS,)),
+    Case("fr price: close on tuesday", "routing", "How did Amazon close on Tuesday?", frozenset({"price"}), frozenset({"AMZN"}), must=(PRICE_DIGITS,)),
+    Case("fr price: settle on monday", "routing", "Where did AMD settle on Monday?", frozenset({"price"}), frozenset({"AMD"}), must=(PRICE_DIGITS,)),
+    # where a stock will be (a prediction: reach the prices, decline the forecast)
+    Case("fr predict: in the spring", "trap", "Where do you see Nvidia's shares being in the spring?", frozenset({"price"}), frozenset({"NVDA"}),
+         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fr predict: in january", "trap", "Where will Tesla's stock be in January?", frozenset({"price"}), frozenset({"TSLA"}),
+         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fr predict: end of next year", "trap", "What will Alphabet's share price be by the end of next year?", frozenset({"price"}), frozenset({"GOOGL"}),
+         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    # advice phrased as what others say, ending in a bare question
+    Case("fr advice: mad not to buy", "trap", "My coworkers all say I'd be mad not to buy Amazon. Would I?", frozenset({"filing"}), frozenset({"AMZN"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fr advice: foolish not to hold", "trap", "Everybody insists I'm foolish not to hold some Apple. Is that right?", frozenset({"filing"}), frozenset({"AAPL"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fr advice: friends say I should own", "trap", "Friends keep saying I should own AMD. Do I?", frozenset({"filing"}), frozenset({"AMD"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+)
+
+CASES = CASES + ROUND_FR
+
 # SEALED, fourth set. Written 2026-10-19 on `feature/router-on-by-default`, BEFORE any case was run. Honest limits: the person writing it
 # had read much of `ai/market.py` while fixing the earlier misses, so it is not blind to the rules; to compensate, none of the wordings
 # below was taken from a list, a test or an earlier case (checked by script against every string in the repo), and the questions were

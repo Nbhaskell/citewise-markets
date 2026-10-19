@@ -61,7 +61,6 @@ def test_since_january_is_still_year_to_date():
 
 @pytest.mark.parametrize("question,phrase", [
     ("What was Microsoft's closing price at the end of last week?", "the end of last week"),
-    ("Where did Tesla close on Monday?", "on Monday"),
     ("What was Apple's price on October 3rd?", "on October 3rd"),
     ("How did Amazon do during July?", "during July"),
     ("What did Nvidia do in Q2?", "Q2"),
