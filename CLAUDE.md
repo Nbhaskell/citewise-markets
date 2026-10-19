@@ -212,7 +212,7 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-19 (on `feature/fourth-round-misses`, after PR #51 merged): 2799 Python tests (260 web tests, typecheck clean, last run
+- Baseline as of 2026-10-19 (on `feature/question-log`, after PR #52 merged): 2883 Python tests (260 web tests, typecheck clean, last run
   before the router PR; nothing in `web/` changed since), all passing. `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
   before its tests (dead index entries from earlier test files crowded out its few passages) and passed 4 of 4 full runs afterwards. If it
   fails again, rerun before assuming a break. A full test run can still fail vector-search tests while an evaluation shares the database;
@@ -260,7 +260,7 @@ The owner is building this step by step and is not a professional developer, so 
 - **Nightly job (`jobs/refresh.py`):** keep each (step, company) isolated so one failure never stops the run, keep
   the advisory lock, and keep missing prerequisites as skipped-and-`partial`, never silent successes. Tests for it
   inject fakes through `Deps` and set the job name to `test_refresh` so they never touch real run history.
-- **API (`api/`):** keep it read-only and bound to `127.0.0.1` until accounts exist. The only write is the add-company start endpoint (approved). Don't add more write endpoints, widen
+- **API (`api/`):** keep it read-only and bound to `127.0.0.1` until accounts exist. The only write endpoint is the add-company start endpoint (approved). **One more server-side write is approved (owner, 2026-10-19):** `POST /api/copilot` appends the question and the answer to `logs/copilot_questions.jsonl` (`ai/question_log.py`; this PC only, git-ignored, no sources' text, never breaks an answer, off with `COPILOT_LOG=off`; the test suite sets it off in `tests/conftest.py`); `python -m ai.review_questions` reads it. It is not a new endpoint and the response shape is unchanged. Don't add more write endpoints, widen
   CORS, or bind to `0.0.0.0` without being asked. Keep response shapes in `schemas.py` stable, since the screens
   depend on them, and keep copilot answers passing through the `unverified_numbers` field. Tests override the
   embedder, chat model, and sentiment model via `app.dependency_overrides`; don't load real models in tests.

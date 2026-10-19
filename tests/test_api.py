@@ -431,3 +431,78 @@ def test_cors_allows_the_local_web_app_only(client):
 def test_openapi_docs_describe_the_endpoints(client):
     paths = client.get("/openapi.json").json()["paths"]
     assert {"/api/stocks", "/api/stocks/{symbol}/prices", "/api/copilot", "/api/filings/search"} <= set(paths)
+
+
+# ---- the question log (DECISIONS: "Question log"): every answer is appended to a local file, and the log never changes the response ----
+
+
+def log_lines(path):
+    return [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
+
+
+@pytest.fixture
+def qlog(tmp_path, monkeypatch):
+    path = tmp_path / "copilot_questions.jsonl"
+    monkeypatch.setenv("COPILOT_LOG", "on")
+    monkeypatch.setenv("COPILOT_LOG_FILE", str(path))
+    return path
+
+
+def test_copilot_an_answer_is_logged_with_the_question_and_the_answer(client, llm, qlog):
+    llm.reply = "Zeta Co closed at 499.00 on 2026-10-09 [1]."
+    body = client.post("/api/copilot", json={"question": "What is the ZZAPI stock price?"}).json()
+    [rec] = log_lines(qlog)
+    assert rec["question"] == "What is the ZZAPI stock price?" and rec["answer"] == body["answer"]
+    assert rec["companies"] == ["ZZAPI"] and rec["evidence_kinds"] == ["price"] and rec["refused"] is False and rec["follow_up"] is False
+
+
+def test_copilot_a_refusal_is_logged_too(client, llm, qlog):
+    client.post("/api/copilot", json={"question": "How is the S&P 500 doing today?"})
+    [rec] = log_lines(qlog)
+    assert rec["refused"] is True and rec["evidence_kinds"] == []
+
+
+def test_copilot_a_follow_up_is_marked_in_the_log(client, llm, qlog):
+    llm.reply = "Zeta Co closed at 499.00 on 2026-10-09 [1]."
+    history = [{"question": "What is the ZZAPI stock price?", "answer": "It closed at 499.00.", "companies": ["ZZAPI"]}]
+    client.post("/api/copilot", json={"question": "And its news?", "history": history})
+    assert log_lines(qlog)[0]["follow_up"] is True
+
+
+def test_copilot_two_questions_make_two_lines(client, llm, qlog):
+    client.post("/api/copilot", json={"question": "What is the ZZAPI stock price?"})
+    client.post("/api/copilot", json={"question": "Any news on ZZAPI?"})
+    assert [r["question"] for r in log_lines(qlog)] == ["What is the ZZAPI stock price?", "Any news on ZZAPI?"]
+
+
+def test_copilot_nothing_is_logged_when_it_is_switched_off(client, llm, qlog, monkeypatch):
+    monkeypatch.setenv("COPILOT_LOG", "off")
+    client.post("/api/copilot", json={"question": "What is the ZZAPI stock price?"})
+    assert not qlog.exists()
+
+
+@pytest.mark.parametrize("payload,status", [
+    ({"question": "What is the ZZAPI stock price?", "symbols": ["NOPE"]}, 404),        # not a tracked company
+    ({"question": "What is the ZZAPI stock price?", "symbols": ["bad symbol!"]}, 422),
+    ({"question": ""}, 422),
+])
+def test_copilot_a_request_that_gets_no_answer_is_not_logged(client, llm, qlog, payload, status):
+    assert client.post("/api/copilot", json=payload).status_code == status
+    assert not qlog.exists()
+
+
+def test_copilot_a_model_that_is_down_is_not_logged(client, llm, qlog):
+    llm.up = False
+    assert client.post("/api/copilot", json={"question": "What is the ZZAPI stock price?"}).status_code == 503
+    assert not qlog.exists()
+
+
+def test_copilot_the_response_is_the_same_when_the_log_cannot_be_written(client, llm, tmp_path, monkeypatch):
+    llm.reply = "Zeta Co closed at 499.00 on 2026-10-09 [1]."
+    q = {"question": "What is the ZZAPI stock price?"}
+    monkeypatch.setenv("COPILOT_LOG", "off")
+    expected = client.post("/api/copilot", json=q).json()
+    monkeypatch.setenv("COPILOT_LOG", "on")
+    monkeypatch.setenv("COPILOT_LOG_FILE", str(tmp_path))                  # a folder: the write fails
+    response = client.post("/api/copilot", json=q)
+    assert response.status_code == 200 and response.json() == expected

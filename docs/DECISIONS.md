@@ -1873,6 +1873,27 @@ benchmarks.
   maker?") now carries the advice notice: one extra notice by design. (4) The weekday reading guesses the most recent such day before today; asked
   on a Monday about "Monday" it is a week back, and the source prints the date it used. (5) `ROUND_FR` has 17 cases and one of them depends on the
   time of day the headlines were last stored.
+- **Question log, phase 1, 2026-10-19** (branch `feature/question-log`; no prompt change, no model call). **Why:** the five sealed rounds show a
+  plateau (router on: 70%, 79%, 78%) that more synthetic rounds cannot move; the owner's real daily questions are the better measure. **The decision:**
+  the owner approved a local log (2026-10-19), as a server-side write that is not a new endpoint (CLAUDE.md, API rules). **Built:** `ai/question_log.py`
+  (`log_answer`, called by `POST /api/copilot` after the answer is built, so tests and evaluations that call `answer_question` directly never log):
+  one JSON line per answered question in `logs/copilot_questions.jsonl` with the time (UTC), the question as typed, "understood as", whether it was a
+  follow-up, companies, kinds of data looked at, the router's route and whether the router was on, refused, grounded, unverified numbers, cautions, the
+  number of sources (not their text) and the answer. Not logged: a request that got no answer (404, 422, model down). It never raises (a failed write
+  goes to stderr), it is switched off with `COPILOT_LOG=off` (also `0`, `false`, `no`, `none`; a blank or unrecognised value keeps it on, like the router),
+  and `COPILOT_LOG_FILE` moves it. `ai/review_questions.py` (`python -m ai.review_questions [--last N] [--since DATE] [--flagged] [--full]`) lists the
+  questions with signals: **flags** are refused, "gave up" (the answer says the sources/data/information/filing do not provide, include, contain,
+  mention, cover, address, specify, show or have it, or "not possible / not available" or "cannot determine"), uncited, and unverified numbers; "router
+  chose" and "caution shown" are noted but are not flags. **Tests first: 84 new (74 in `tests/test_question_log.py`, 10 in `tests/test_api.py`); the suite is
+  2883 passed.** **Deliberate breakages: 83, all caught except one equivalent mutant (`records[-0:]` is the whole list in Python), after one added
+  test (the `--since` boundary at exactly midnight).** A real check against the running API: two questions were logged, the review command showed
+  "Has the media turned against Tesla?" as `gave up`, and I removed my two test lines from the real file afterwards. **A lesson from the breakage run:**
+  two mutations (ignore `COPILOT_LOG_FILE`, move the default path) made the tests write one test question into the real log; the suite is safe
+  as it is (conftest sets `COPILOT_LOG=off`), and I deleted the stray line. **Privacy:** the file holds the owner's questions and answers, which can contain
+  personal context; it stays in the git-ignored `logs/` folder, is not in the database backups, and can be switched off. **Not built (phase 2, needs
+  its own approval):** a "this looked wrong" button on the page (a second write), turning flagged questions into evaluation cases automatically, and
+  rotating or trimming the file (a year of daily use is a few megabytes). **Weak spots:** the signals are a first filter, not a verdict (a refusal can
+  be right; a wrong answer with a citation has no signal at all); times are shown in UTC.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

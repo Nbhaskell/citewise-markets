@@ -142,6 +142,19 @@ Remove it with `powershell -File scripts\unregister_nightly_task.ps1`. The task 
 and if the PC was off at the scheduled time it runs when you next log in. **Docker Desktop and Ollama must be running**
 at that time. If Docker is down the run exits with code 2, and if Ollama is down only the sentiment step is skipped.
 
+## Your questions
+
+Every question you ask the copilot in the web app is appended, with its answer, to `logs/copilot_questions.jsonl` on this PC
+(git-ignored; it is not sent anywhere, is not in the database backups, and keeps no source text). Questions can contain personal
+context, so `COPILOT_LOG=off` in `.env` turns it off. To read it and see which answers look like misses (refused, "the sources do
+not provide", nothing cited, unverified numbers):
+
+```bash
+.venv\Scripts\python -m ai.review_questions                 # the last 20
+.venv\Scripts\python -m ai.review_questions --flagged       # only the ones that look like misses
+.venv\Scripts\python -m ai.review_questions --since 2026-10-19 --full
+```
+
 ## Backups
 
 Everything lives in one Docker volume, and nothing else keeps a copy. Prices and filings can be downloaded again, but
