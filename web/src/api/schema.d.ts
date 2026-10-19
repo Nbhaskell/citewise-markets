@@ -160,6 +160,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/removed-companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Removed Companies
+         * @description Read-only: companies that were removed (not tracked, data kept), so the dashboard can offer to switch one back on.
+         */
+        get: operations["removed_companies_api_removed_companies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -872,6 +892,13 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** RemovedCompany */
+        RemovedCompany: {
+            /** Name */
+            name: string | null;
+            /** Symbol */
+            symbol: string;
+        };
         /** ReportCompany */
         ReportCompany: {
             /** Lines */
@@ -1392,6 +1419,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    removed_companies_api_removed_companies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemovedCompany"][];
                 };
             };
         };

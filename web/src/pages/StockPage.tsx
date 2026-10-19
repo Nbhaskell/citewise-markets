@@ -8,7 +8,8 @@ import { Fundamentals } from "../components/Fundamentals";
 import { KeyStats } from "../components/KeyStats";
 import { NewsPanel } from "../components/NewsPanel";
 import { PriceHistory } from "../components/PriceHistory";
-import { RemoveCompany } from "../components/RemoveCompany";
+import { StopTrackingConfirm } from "../components/StopTrackingConfirm";
+import { TrackingSwitch } from "../components/TrackingSwitch";
 import { useApi } from "../hooks/useApi";
 import { directionOf, formatChangePct, formatPrice } from "../lib/format";
 
@@ -44,6 +45,7 @@ export function StockPage() {
 function StockDetailView({ symbol }: { symbol: string }) {
   const detail = useApi((signal) => api.stock(symbol, signal), [symbol]);
   const [removed, setRemoved] = useState<RemoveOut | null>(null);
+  const [asking, setAsking] = useState(false); // the "Stop tracking?" question is open
 
   useEffect(() => {
     document.title = `${symbol} · stockMarket`;
@@ -56,7 +58,7 @@ function StockDetailView({ symbol }: { symbol: string }) {
     return (
       <Missing
         title={`${symbol} isn't a tracked company`}
-        hint={`Add it from the dashboard's "Add a company" box, or with: python -m jobs.add_company ${symbol}. The nightly refresh keeps it current after that.`}
+        hint={`Add it from the dashboard's "Add a company" box, or with: python -m jobs.add_company ${symbol}. If you removed it earlier, switch it back on from the "Not tracked" list on the dashboard. The nightly refresh keeps it current after that.`}
       />
     );
   }
@@ -82,6 +84,7 @@ function StockDetailView({ symbol }: { symbol: string }) {
         <div>
           <h1 className="page-title">{symbol}</h1>
           <p className="muted">{stock?.name ?? (detail.loading ? "Loading…" : "")}</p>
+          {stock && <TrackingSwitch symbol={symbol} tracked disabled={asking} onToggle={() => setAsking(true)} />}
         </div>
         {stock && (
           <div className="stock-price">
@@ -90,6 +93,11 @@ function StockDetailView({ symbol }: { symbol: string }) {
           </div>
         )}
       </header>
+      {asking && stock && (
+        <section className="card">
+          <StopTrackingConfirm symbol={symbol} name={stock.name} onRemoved={setRemoved} onCancel={() => setAsking(false)} />
+        </section>
+      )}
       {detail.error && (
         <p role="alert" className="error">
           {detail.error} <button onClick={detail.reload}>Try again</button>
@@ -108,7 +116,6 @@ function StockDetailView({ symbol }: { symbol: string }) {
           <NewsPanel symbol={symbol} />
         </div>
       </div>
-      {stock && <RemoveCompany symbol={symbol} name={stock.name} onRemoved={setRemoved} />}
     </>
   );
 }

@@ -120,6 +120,12 @@ def start_add_company(body: schemas.AddJobIn, conn: Conn, launch: Launcher_):
     return adding.job_out(conn, job_id)
 
 
+@app.get("/api/removed-companies", response_model=list[schemas.RemovedCompany], tags=["remove company"])
+def removed_companies(conn: Conn):
+    """Read-only: companies that were removed (not tracked, data kept), so the dashboard can offer to switch one back on."""
+    return queries.removed_companies(conn)
+
+
 @app.post("/api/remove-company", response_model=schemas.RemoveOut, tags=["remove company"],
           dependencies=[Depends(_local_write_check)])
 def remove_company_endpoint(body: schemas.RemoveIn, conn: Conn):
@@ -137,7 +143,7 @@ def remove_company_endpoint(body: schemas.RemoveIn, conn: Conn):
     label = f"{removal.symbol} ({removal.name})" if removal.name else removal.symbol
     return {
         "symbol": removal.symbol, "name": removal.name, "kept": removal.kept,
-        "message": f"{label} is no longer tracked. Its stored data was kept; add it again from \"Add a company\" to track it again.",
+        "message": f"{label} is no longer tracked. Its stored data was kept; switch it back on from the \"Not tracked\" list on the dashboard to track it again.",
     }
 
 

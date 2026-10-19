@@ -88,6 +88,7 @@ export const copilotAnswer = (over: Partial<CopilotResponse> = {}): CopilotRespo
 
 export const defaultRoutes = (): Record<string, Handler> => ({
   "GET /api/stocks": stocks,
+  "GET /api/removed-companies": [],
   "GET /api/stocks/AAPL/prices": prices("AAPL"),
   "GET /api/stocks/NVDA/prices": prices("NVDA", [110, 100, 90]),
   "GET /api/stocks/TSLA/prices": prices("TSLA", []),

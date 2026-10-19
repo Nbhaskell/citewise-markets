@@ -216,3 +216,70 @@ details summary { cursor: pointer; color: var(--muted); }
 /* What changed */
 .changes h3 { margin: 14px 0 0; font-size: 1rem; }
 .changes .news-list .news-list { margin: 4px 0 0 14px; }
+
+/* Tracking switch (on/off for "is this company tracked"), the questions that go with it, and the Not tracked list */
+.tracking-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 2px 8px 2px 2px;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+.tracking-switch:disabled { cursor: not-allowed; opacity: 0.55; }
+.switch-track {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 24px;
+  border-radius: 999px;
+  border: 2px solid var(--flat);
+  background: var(--flat-bg);
+  flex: none;
+}
+.switch-knob {
+  position: absolute;
+  top: 1px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: left 0.15s;
+}
+.switch-mark { position: absolute; top: 0; font-size: 0.8rem; font-weight: 700; line-height: 20px; }
+.tracking-switch.on .switch-track { border-color: var(--up); background: var(--up-bg); }
+.tracking-switch.on .switch-knob { left: 23px; }
+.tracking-switch.on .switch-mark { left: 6px; color: var(--up); }
+.tracking-switch.off .switch-track { border-color: var(--down); background: var(--down-bg); }
+.tracking-switch.off .switch-knob { left: 1px; }
+.tracking-switch.off .switch-mark { right: 6px; color: var(--down); }
+.switch-word { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .switch-knob { transition: none; } }
+
+.stock-head .tracking-switch { margin-top: 8px; }
+.confirm-box { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.confirm-box p { margin: 0 0 8px; }
+.confirm-box.warning { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-text); }
+.confirm-row td { background: var(--surface); }
+
+.not-tracked { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border); }
+.not-tracked h3 { margin: 0 0 4px; font-size: 1rem; }
+.not-tracked ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.removed-item { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.removed-item:last-child { border-bottom: 0; }
+.removed-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.removed-line .symbol { opacity: 0.7; margin-right: 0; }
+.removed-line .muted { flex: 1 1 8rem; opacity: 0.85; }
+.removed-line .tracking-switch { margin-top: 0; }
+.removed-item .confirm-box { margin-top: 8px; }
+
+/* The question under a watchlist row: the table can be wider than the card (it scrolls sideways), so the box keeps the card's visible width */
+.table-wrap { container-type: inline-size; }
+.confirm-row td { padding: 8px 0; }
+.confirm-row .confirm-box { position: sticky; left: 0; width: 100cqw; max-width: 100cqw; }

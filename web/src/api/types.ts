@@ -22,6 +22,7 @@ export type AddLookupOut = S["AddLookupOut"];
 export type AddJobOut = S["AddJobOut"];
 export type ReportCompany = S["ReportCompany"];
 export type RemoveOut = S["RemoveOut"];
+export type RemovedCompany = S["RemovedCompany"];
 export type ChangesOut = S["ChangesOut"];
 export type ChangeMove = S["ChangeMove"];
 export type ChangeFiling = S["ChangeFiling"];

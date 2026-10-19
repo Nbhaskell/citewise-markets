@@ -124,7 +124,9 @@ same lock as the nightly job, so it refuses to run while a refresh is in progres
 `job_runs` as `add_company`, not in `--status`. Same exit codes as above, except 1 also means "added with gaps".
 (`python -m data.ingest TICKER` still works for prices alone.)
 
-**Remove a company** (stop tracking it) with a command, or with the "Stop tracking" button at the bottom of its page:
+**Remove a company** (stop tracking it) with a command, or with the on/off switch beside it in the dashboard's watchlist (or in
+its page header), which asks "Are you sure?" first. A removed company moves to a dimmed "Not tracked" list under the watchlist;
+switching it back on there runs the same update as the Add box (a few minutes) and moves it back:
 
 ```bash
 .venv\Scripts\python -m jobs.remove_company TSM

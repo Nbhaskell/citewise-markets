@@ -221,7 +221,7 @@ def test_the_endpoint_removes_the_company_and_reports_what_was_kept(conn, client
     assert r.json() == {"symbol": GO, "name": "Removia Corp.",
                         "kept": {"prices": 2, "filings": 1, "headlines": 1, "figures": 0},
                         "message": r.json()["message"]}
-    assert GO in r.json()["message"] and "add it again" in r.json()["message"]
+    assert GO in r.json()["message"] and "Not tracked" in r.json()["message"]
     assert active(conn, GO) is False and active(conn, KEEP) is True
     assert GO not in {s["symbol"] for s in client.get("/api/stocks").json()}
     assert client.get(f"/api/stocks/{GO}").status_code == 404
@@ -264,3 +264,26 @@ def test_the_add_box_sees_a_removed_company_as_not_tracked(conn, client):
     assert client.get(f"/api/add-company/lookup?ticker={GO}").json()["tracked"] is True
     rc.remove_company(conn, GO)
     assert client.get(f"/api/add-company/lookup?ticker={GO}").json()["tracked"] is False
+
+
+# --- the "Not tracked" list the dashboard shows, so a removed company can be switched back on -------------------
+
+def test_the_removed_list_shows_only_removed_companies_in_order(conn, client):
+    def listed():
+        return [c for c in client.get("/api/removed-companies").json() if c["symbol"] in SYMS]
+
+    assert listed() == []  # nothing removed yet: both are tracked
+    rc.remove_company(conn, KEEP)
+    rc.remove_company(conn, GO)
+    # removed in the opposite order on purpose: the list is sorted by ticker (ZZRMK before ZZRMV), not by when it was removed
+    assert listed() == [{"symbol": KEEP, "name": "Keepsake Corp."}, {"symbol": GO, "name": "Removia Corp."}]
+    assert [c["symbol"] for c in queries.removed_companies(conn) if c["symbol"] in SYMS] == [KEEP, GO]
+
+
+def test_a_company_switched_back_on_leaves_the_removed_list(conn, client):
+    rc.remove_company(conn, GO)
+    assert GO in {c["symbol"] for c in client.get("/api/removed-companies").json()}
+    conn.execute("UPDATE instruments SET active = true WHERE symbol = %s", (GO,))  # what a finished add does
+    conn.commit()
+    assert GO not in {c["symbol"] for c in client.get("/api/removed-companies").json()}
+    assert GO in {s["symbol"] for s in client.get("/api/stocks").json()}

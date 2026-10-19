@@ -24,9 +24,13 @@ them (the owner hasn't confirmed the order):
    box on the dashboard (lookup, confirm, then a background add with progress). The box's start endpoint is the one
    approved write exception to the read-only API rule (owner approved 2026-10-15); it is bound to `127.0.0.1`, accepts
    only the local web app's origin and JSON, and is refused while another update holds the lock. **Removing a company is
-   built on `feature/remove-company` (owner approved the command and the web button on 2026-10-19; DECISIONS: "Removing a
-   company"):** `python -m jobs.remove_company TICKER` and a "Stop tracking" button (with a confirmation) at the bottom of the
-   stock page, through `POST /api/remove-company`, the second approved write endpoint. It stops tracking and deletes nothing
+   built (PR #56, merged 2026-10-19; owner approved the command and the web button; DECISIONS: "Removing a company"):**
+   `python -m jobs.remove_company TICKER` and, in the web app, an on/off tracking switch (✓ / ✕ and the words "Tracked" / "Not
+   tracked") beside every company in the watchlist and in the stock page header, each with an "Are you sure?" before anything
+   happens (`feature/watchlist-toggle`, DECISIONS: "Tracking switches"). Switching off calls `POST /api/remove-company`, the second
+   approved write endpoint. Removed companies stay in the watchlist card under "Not tracked" (dimmed, from the read-only
+   `GET /api/removed-companies`); switching one back on runs the existing add (a few minutes, progress shown, every switch off
+   meanwhile), so there is no third write endpoint. It stops tracking and deletes nothing
    (`instruments.active = false`; prices, filings, headlines and figures stay, and adding the ticker again switches it back
    on). A removed company is off the dashboard, the nightly refresh, "What changed", the filing search and the copilot's
    company list, and naming it in a question gets the "isn't one of the companies tracked here" reply. A hard delete ("purge")

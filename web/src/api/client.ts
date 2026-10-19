@@ -12,6 +12,7 @@ import type {
   PriceRange,
   PriceSeries,
   RemoveOut,
+  RemovedCompany,
   StatusOut,
   StockDetail,
   StockSummary,
@@ -100,6 +101,7 @@ export const api = {
       signal,
     }),
   addJob: (jobId: number, signal?: AbortSignal) => request<AddJobOut>(`/api/add-company/jobs/${jobId}`, { signal }),
+  removedCompanies: (signal?: AbortSignal) => request<RemovedCompany[]>("/api/removed-companies", { signal }),
   removeCompany: (ticker: string, signal?: AbortSignal) =>
     request<RemoveOut>("/api/remove-company", {
       method: "POST",

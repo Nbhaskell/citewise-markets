@@ -158,6 +158,11 @@ def tracked_symbols(conn: psycopg.Connection) -> set[str]:
     return {r[0] for r in conn.execute("SELECT symbol FROM instruments WHERE active")}
 
 
+def removed_companies(conn: psycopg.Connection) -> list[dict]:
+    """Companies that were removed (switched off). Their data is still stored; the dashboard lists them so one can be switched back on."""
+    return [{"symbol": s, "name": n} for s, n in conn.execute("SELECT symbol, name FROM instruments WHERE NOT active ORDER BY symbol")]
+
+
 def fundamentals(conn: psycopg.Connection, symbol: str) -> dict:
     """The company's figures from its SEC filings, computed in Python (see data/fundamentals.py)."""
     close, close_date = latest_close(conn, symbol)
