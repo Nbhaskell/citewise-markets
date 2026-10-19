@@ -11,6 +11,7 @@ import type {
   NewsLabel,
   PriceRange,
   PriceSeries,
+  RemoveOut,
   StatusOut,
   StockDetail,
   StockSummary,
@@ -99,6 +100,13 @@ export const api = {
       signal,
     }),
   addJob: (jobId: number, signal?: AbortSignal) => request<AddJobOut>(`/api/add-company/jobs/${jobId}`, { signal }),
+  removeCompany: (ticker: string, signal?: AbortSignal) =>
+    request<RemoveOut>("/api/remove-company", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker }),
+      signal,
+    }),
   copilot: (body: CopilotRequest, signal?: AbortSignal) =>
     request<CopilotResponse>("/api/copilot", {
       method: "POST",

@@ -79,6 +79,32 @@ describe("StockPage", () => {
     expect(screen.queryByRole("heading", { name: "Key stats" })).not.toBeInTheDocument();
   });
 
+  it("removes the company after a confirmation, then shows what was kept instead of the page", async () => {
+    const removed = {
+      symbol: "AAPL", name: "Apple Inc.", kept: { prices: 1250, filings: 14, headlines: 310, figures: 900 },
+      message: "AAPL (Apple Inc.) is no longer tracked. Its stored data was kept.",
+    };
+    const fetchMock = mockApi({ ...detailRoutes(), "POST /api/remove-company": removed });
+    renderPage("/stocks/AAPL");
+    await screen.findByText("Apple Inc.");
+
+    await userEvent.click(screen.getByRole("button", { name: "Stop tracking AAPL" }));
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false); // asked first
+    await userEvent.click(screen.getByRole("button", { name: "Yes, stop tracking AAPL" }));
+
+    expect(await screen.findByRole("heading", { name: "AAPL is no longer tracked" })).toBeInTheDocument();
+    expect(screen.getByText(/1,250 daily prices, 14 filings, 310 headlines, 900 financial figures/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Key stats" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to the dashboard" })).toHaveAttribute("href", "/");
+  });
+
+  it("offers no remove button for a company that isn't tracked", async () => {
+    mockApi({ ...detailRoutes(), "GET /api/stocks/ZZZ": json({ detail: "ZZZ is not a tracked company" }, 404) });
+    renderPage("/stocks/ZZZ");
+    await screen.findByRole("heading", { name: "ZZZ isn't a tracked company" });
+    expect(screen.queryByRole("button", { name: /Stop tracking/ })).not.toBeInTheDocument();
+  });
+
   it("rejects an address that isn't a ticker without calling the API", async () => {
     const fetchMock = mockApi(detailRoutes());
     renderPage("/stocks/bad$sym");

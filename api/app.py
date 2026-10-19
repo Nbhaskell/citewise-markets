@@ -20,6 +20,8 @@ from ai.llm import LLM
 from ai.market import MarketEvidence
 from ai.search import SearchResult, search_filings
 from jobs.add_company import normalize_ticker
+from jobs.refresh import AlreadyRunning
+from jobs.remove_company import NotTracked, remove_company
 from jobs.status import freshness, recent_runs
 
 from . import adding, queries, schemas
@@ -60,10 +62,11 @@ app.add_middleware(
 
 
 def _local_write_check(request: Request) -> None:
-    """The one write endpoint. A web page open in the browser can send a request to 127.0.0.1, so require the local
-    web app's origin and a JSON body. CORS alone only stops the page reading the reply, not the request arriving."""
+    """The write endpoints (add a company, remove a company). A web page open in the browser can send a request to
+    127.0.0.1, so require the local web app's origin and a JSON body. CORS alone only stops the page reading the reply,
+    not the request arriving."""
     if request.headers.get("origin") not in cors_origins():
-        raise HTTPException(403, "Adding a company is only allowed from the local web app.")
+        raise HTTPException(403, "Adding or removing a company is only allowed from the local web app.")
     if not request.headers.get("content-type", "").lower().startswith("application/json"):
         raise HTTPException(415, "Send the request as JSON.")
 
@@ -115,6 +118,27 @@ def start_add_company(body: schemas.AddJobIn, conn: Conn, launch: Launcher_):
     except OSError as exc:
         raise HTTPException(500, "The add process could not be started. Check logs/add_company.log, then try again.") from exc
     return adding.job_out(conn, job_id)
+
+
+@app.post("/api/remove-company", response_model=schemas.RemoveOut, tags=["remove company"],
+          dependencies=[Depends(_local_write_check)])
+def remove_company_endpoint(body: schemas.RemoveIn, conn: Conn):
+    """Stop tracking a company. Nothing is deleted: it is switched off, and adding it again brings it back with its history."""
+    try:
+        symbol = normalize_ticker(body.ticker)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    try:
+        removal = remove_company(conn, symbol)
+    except NotTracked as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except AlreadyRunning as exc:
+        raise HTTPException(409, adding.BUSY_MESSAGE) from exc
+    label = f"{removal.symbol} ({removal.name})" if removal.name else removal.symbol
+    return {
+        "symbol": removal.symbol, "name": removal.name, "kept": removal.kept,
+        "message": f"{label} is no longer tracked. Its stored data was kept; add it again from \"Add a company\" to track it again.",
+    }
 
 
 @app.get("/api/add-company/jobs/{job_id}", response_model=schemas.AddJobOut, tags=["add company"])

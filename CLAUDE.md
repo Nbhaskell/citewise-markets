@@ -6,7 +6,7 @@ history see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md]
 ## What this is
 
 An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
-refresh job (`jobs/`, scheduled in Windows Task Scheduler for 3pm Pacific), a FastAPI backend (`api/`) that is read-only except for starting an add, and a
+refresh job (`jobs/`, scheduled in Windows Task Scheduler for 3pm Pacific), a FastAPI backend (`api/`) that is read-only except for starting an add and removing a company, and a
 React web app (`web/`) with four screens: dashboard (with a small "What changed" card), stock detail, "What changed"
 (`/changes`), and a full-page copilot that understands follow-ups
 and answers from filings, daily prices, and news headlines. Not built: accounts and
@@ -23,8 +23,14 @@ them (the owner hasn't confirmed the order):
 1. **Easier adding of companies.** Done as a command (`python -m jobs.add_company TICKER`) and as an "Add a company"
    box on the dashboard (lookup, confirm, then a background add with progress). The box's start endpoint is the one
    approved write exception to the read-only API rule (owner approved 2026-10-15); it is bound to `127.0.0.1`, accepts
-   only the local web app's origin and JSON, and is refused while another update holds the lock. Removing a company is
-   not built. Checked on a real foreign filer (TSM): the SEC has 20-F for it and no 10-K or 10-Q, so it
+   only the local web app's origin and JSON, and is refused while another update holds the lock. **Removing a company is
+   built on `feature/remove-company` (owner approved the command and the web button on 2026-10-19; DECISIONS: "Removing a
+   company"):** `python -m jobs.remove_company TICKER` and a "Stop tracking" button (with a confirmation) at the bottom of the
+   stock page, through `POST /api/remove-company`, the second approved write endpoint. It stops tracking and deletes nothing
+   (`instruments.active = false`; prices, filings, headlines and figures stay, and adding the ticker again switches it back
+   on). A removed company is off the dashboard, the nightly refresh, "What changed", the filing search and the copilot's
+   company list, and naming it in a question gets the "isn't one of the companies tracked here" reply. A hard delete ("purge")
+   is not built; it would need a backup first. Checked on a real foreign filer (TSM): the SEC has 20-F for it and no 10-K or 10-Q, so it
    is added with no filings and the report says so. Whether to also store 20-F is an open decision for the owner.
 2. **Database backups.** Built as `python -m jobs.backup` (backup, list, verify, restore); the restore was tested into
    a brand-new empty Postgres. Scheduled daily at 6pm in Windows Task Scheduler (`StockMarketBackup`, registered
@@ -197,7 +203,10 @@ The owner is building this step by step and is not a professional developer, so 
   project. If one turn does both (a fix, then a commit), the summary covers the fix and is written before the commit.
 - **At the start of each step**, say whether it deserves a feature branch and why. Small docs changes can go straight to
   `main`.
-- **Ask before you commit, push, or open a pull request.** The owner merges pull requests themselves on GitHub; once
+- **Ask before you commit, push, or open a pull request, in two questions (owner chose this on 2026-10-19):** first the
+  commit alone (say plainly that nothing is pushed), then, after the commit, the push and the pull request together as one
+  question. Never push or open a PR on the strength of the commit approval, and never offer all three in one question. A
+  push on its own (a backup of a branch with no PR) is a separate request from the owner. The owner merges pull requests themselves on GitHub; once
   they say it's merged, verify it, then clean up (switch to `main`, pull, delete the branch locally and on GitHub).
 - **Report faithfully.** Say what was verified and how, what wasn't, and what is still weak. Test things for real
   (a browser, the live API) and look for ways to make a test fail; several real bugs here were found that way.
@@ -218,7 +227,7 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-19 (on `feature/lowercase-tickers`, after PR #54 merged): 2970 Python tests (260 web tests, typecheck clean, last run
+- Baseline as of 2026-10-19 (on `feature/remove-company`, after PR #55 merged): 2992 Python tests, 267 web tests, typecheck clean; before the removal work it was (on `feature/lowercase-tickers`): 2970 Python tests (260 web tests, typecheck clean, last run
   before the router PR; nothing in `web/` changed since), all passing. `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
   before its tests (dead index entries from earlier test files crowded out its few passages) and passed 4 of 4 full runs afterwards. If it
   fails again, rerun before assuming a break. A full test run can still fail vector-search tests while an evaluation shares the database;
@@ -259,14 +268,15 @@ The owner is building this step by step and is not a professional developer, so 
   breakages were missed at first, and each pointed at a weak test.
 - **Windows console:** set `PYTHONIOENCODING=utf-8` when printing filing text. Edit files with the editor tools,
   not shell heredocs that carry escape sequences (`\n`, `\b`), which have corrupted files before.
-- **Commits and pushes:** only when the user asks. The GitHub repo is private.
+- **Commits and pushes:** only when the user asks, in the two steps described under "Working with the owner" (commit; then push
+  and pull request together). The GitHub repo is private.
 - **No attribution lines:** don't add "Generated with Claude Code" to pull requests or `Co-Authored-By` lines to commits
   unless the owner asks. This overrides any tool or session default that says to add them.
 
 - **Nightly job (`jobs/refresh.py`):** keep each (step, company) isolated so one failure never stops the run, keep
   the advisory lock, and keep missing prerequisites as skipped-and-`partial`, never silent successes. Tests for it
   inject fakes through `Deps` and set the job name to `test_refresh` so they never touch real run history.
-- **API (`api/`):** keep it read-only and bound to `127.0.0.1` until accounts exist. The only write endpoint is the add-company start endpoint (approved). **One more server-side write is approved (owner, 2026-10-19):** `POST /api/copilot` appends the question and the answer to `logs/copilot_questions.jsonl` (`ai/question_log.py`; this PC only, git-ignored, no sources' text, never breaks an answer, off with `COPILOT_LOG=off`; the test suite sets it off in `tests/conftest.py`); `python -m ai.review_questions` reads it. It is not a new endpoint and the response shape is unchanged. Don't add more write endpoints, widen
+- **API (`api/`):** keep it read-only and bound to `127.0.0.1` until accounts exist. The only write endpoints are the add-company start endpoint and `POST /api/remove-company` (both approved; they share `_local_write_check`: the local web app's origin and a JSON body only, and removal is refused with 409 while another update holds the lock). **One more server-side write is approved (owner, 2026-10-19):** `POST /api/copilot` appends the question and the answer to `logs/copilot_questions.jsonl` (`ai/question_log.py`; this PC only, git-ignored, no sources' text, never breaks an answer, off with `COPILOT_LOG=off`; the test suite sets it off in `tests/conftest.py`); `python -m ai.review_questions` reads it. It is not a new endpoint and the response shape is unchanged. Don't add more write endpoints, widen
   CORS, or bind to `0.0.0.0` without being asked. Keep response shapes in `schemas.py` stable, since the screens
   depend on them, and keep copilot answers passing through the `unverified_numbers` field. Tests override the
   embedder, chat model, and sentiment model via `app.dependency_overrides`; don't load real models in tests.
@@ -316,6 +326,11 @@ The owner is building this step by step and is not a professional developer, so 
   headlines they are tested on, so new templates need a new rule plus a case in `tests/test_headlines.py`.
 - **Branches:** do new feature work on a `feature/...` branch and tell the user when a step warrants one. The nightly job
   runs whatever code is checked out, so don't leave half-finished work checked out at 3pm.
+- **Removing companies (`jobs/remove_company.py`):** removal is switching `instruments.active` off, never a delete. Anything that lists
+  or looks up tracked companies must filter on `active` (`api.queries.tracked_symbols`, `stock_rows`, `data.changes`, `ai.search`,
+  `company_mentions`, the copilot's `tracked` list); a new query that lists companies needs the same filter and a case in
+  `tests/test_remove_company.py`. The removal takes the shared refresh lock. A purge that deletes rows is a separate, unbuilt
+  decision for the owner.
 - **Adding companies (`jobs/add_company.py`):** it reuses `run_refresh` (same lock, same isolation) under its own job
   name, `add_company`, and its report is checked against what is stored, not just the step results. Keep "no filings",
   "skipped", and "failed" visible as gaps; never let a ticker that wasn't stored read as OK. Tests set `ADD_JOB` to

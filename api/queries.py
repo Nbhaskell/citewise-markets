@@ -19,7 +19,7 @@ LEFT JOIN LATERAL (SELECT ts, close, volume FROM prices_daily WHERE symbol = i.s
                    ORDER BY ts DESC LIMIT 1) l ON true
 LEFT JOIN LATERAL (SELECT close FROM prices_daily WHERE symbol = i.symbol AND ts < l.ts
                    ORDER BY ts DESC LIMIT 1) pr ON true
-WHERE (%(symbol)s::text IS NULL AND i.active) OR i.symbol = %(symbol)s
+WHERE i.active AND (%(symbol)s::text IS NULL OR i.symbol = %(symbol)s)
 ORDER BY i.symbol
 """
 
@@ -154,7 +154,8 @@ def changes(
 
 
 def tracked_symbols(conn: psycopg.Connection) -> set[str]:
-    return {r[0] for r in conn.execute("SELECT symbol FROM instruments")}
+    """The companies being tracked now. A removed company (switched off) is not one of them; its data stays stored."""
+    return {r[0] for r in conn.execute("SELECT symbol FROM instruments WHERE active")}
 
 
 def fundamentals(conn: psycopg.Connection, symbol: str) -> dict:

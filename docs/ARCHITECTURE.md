@@ -179,7 +179,13 @@ Everything is read-only except one exception the owner approved: the "Add compan
   The add runs as its own process (`python -m jobs.add_company TICKER --job-id N`) and writes into a `job_runs` row
   (migration 008: the ticker, the current step, a heartbeat, and the per-company report). The status is worked out
   when read: `queued`, `running`, `interrupted` (the process died or stopped reporting), `success`, `partial`
-  (added with gaps) or `failed`. Nothing removes a company yet.
+  (added with gaps) or `failed`.
+- **Remove company (the second write):** `POST /api/remove-company` with `{"ticker": ...}` switches the company off
+  (`instruments.active = false`) and returns what stays stored. It uses the same origin and JSON guard as the add start,
+  returns 404 for a company that is not tracked (never added, or already removed) and 409 while another update holds the
+  lock. It runs in the request (one `UPDATE` under the shared lock), no background process. `python -m jobs.remove_company`
+  does the same from the terminal. Every query that lists or finds companies filters on `active`, so a removed company is
+  404 on its stock pages and the add box's lookup reports it as not tracked.
 - **What changed:** `GET /api/changes?days=` (1 to 30 trading days, default 1; or `since=YYYY-MM-DD`, which wins over `days` and means the stored trading dates after that date, newest 30 at most, with `days` in the reply then the real count, 0 if none) returns new filings, big moves, market-wide
   days, notable headlines, and mood shifts, built by `data/changes.py` (all rules are named constants at the top of that
   file) with `api/queries.changes` passing in `label_counts` for the mood comparison. Read-only; nothing is stored, it is

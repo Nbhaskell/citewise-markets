@@ -227,6 +227,24 @@ class AddJobIn(BaseModel):
     ticker: str = Field(min_length=1, max_length=12, description="US ticker, e.g. TSLA or BRK.B")
 
 
+class RemoveIn(BaseModel):
+    ticker: str = Field(min_length=1, max_length=12, description="Ticker of a tracked company, e.g. TSLA")
+
+
+class RemoveKept(BaseModel):
+    prices: int
+    filings: int
+    headlines: int
+    figures: int
+
+
+class RemoveOut(BaseModel):
+    symbol: str
+    name: Optional[str]
+    kept: RemoveKept = Field(description="What stays stored. Removing stops tracking a company; it deletes nothing")
+    message: str = Field(description="Plain-language note for the page, including how to track the company again")
+
+
 class ReportLine(BaseModel):
     step: str
     status: str = Field(description="OK, NONE, SKIPPED, FAILED, or -- (not tried)")

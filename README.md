@@ -124,6 +124,17 @@ same lock as the nightly job, so it refuses to run while a refresh is in progres
 `job_runs` as `add_company`, not in `--status`. Same exit codes as above, except 1 also means "added with gaps".
 (`python -m data.ingest TICKER` still works for prices alone.)
 
+**Remove a company** (stop tracking it) with a command, or with the "Stop tracking" button at the bottom of its page:
+
+```bash
+.venv\Scripts\python -m jobs.remove_company TSM
+```
+
+Nothing is deleted. The company is switched off, so it leaves the dashboard, the nightly refresh, "What changed", and the
+copilot, but its prices, filings, headlines, and figures stay stored. `python -m jobs.add_company TSM` brings it back with
+that history. It uses the same lock as the nightly job (exit code 3 while a refresh is running); exit code 1 means the
+ticker is not tracked (never added, or already removed).
+
 Runs are logged to the `job_runs` table and to `logs/refresh.log`. Exit codes: 0 all good,
 1 something failed or was skipped, 2 database unreachable, 3 another run already in progress, 4 the job crashed.
 Exit codes 1, 2 and 4 also pop up a Windows desktop alert, so you hear about a bad night without checking. Test that
@@ -303,7 +314,7 @@ data/        Ingest tools and data sources
 ai/          Chunking, embeddings, search, copilot, sentiment, and the LLM interface
 api/         The FastAPI app (app.py), response shapes (schemas.py), SQL (queries.py), per-request setup (deps.py)
 web/         The React web app (see web/README.md)
-jobs/        The nightly refresh (refresh.py), its status report (status.py), adding companies (add_company.py), backups (backup.py)
+jobs/        The nightly refresh (refresh.py), its status report (status.py), adding and removing companies (add_company.py, remove_company.py), backups (backup.py)
 db/          migrate.py and numbered SQL migrations (never edit one that has been applied)
 scripts/     PowerShell scripts to schedule and unschedule the nightly job and the backup
 logs/        refresh.log, backup.log (git-ignored)
@@ -336,7 +347,7 @@ docker-compose.yml   The database container
 - Backups on a second disk or off this PC (they go to `BACKUP_DIR`; you have to point it somewhere safe), and an alert
   when no backup has happened for days (a PC that is off sends none)
 - Accounts and login, portfolios, and alerts (the API has no login yet)
-- Removing a company from the app (there is no remove command; a mistyped ticker has to be removed by hand)
+- Deleting a removed company's stored data (removing stops tracking and keeps everything; there is no purge)
 - A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
 - More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, what-changed, and copilot exist.
 - "Since last visit" is per browser (clearing site data or using another browser loses it), and "What changed" has no

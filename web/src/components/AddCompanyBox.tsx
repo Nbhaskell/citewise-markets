@@ -109,8 +109,8 @@ export function AddCompanyBox() {
     <section className="card add-company" aria-labelledby="add-company-title">
       <h2 id="add-company-title">Add a company</h2>
       <p className="muted small">
-        Adds prices, filings, headlines, and figures for a US-listed company. It can take a few minutes. There is no
-        remove button yet, so check the name before you confirm.
+        Adds prices, filings, headlines, and figures for a US-listed company. It can take a few minutes. To stop tracking
+        a company later, open it and use "Stop tracking" at the bottom of its page; nothing is deleted.
       </p>
 
       {(state.kind === "idle" || state.kind === "looking") && (
