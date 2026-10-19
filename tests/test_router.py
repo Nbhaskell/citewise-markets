@@ -234,20 +234,25 @@ def test_an_outside_verdict_is_only_a_hint_and_only_without_a_company():
 # ---- switching it on ----
 
 
-@pytest.mark.parametrize("value,on", [("model", True), ("MODEL", True), ("on", True), ("1", True), ("true", True), (" On ", True),
-                                      ("off", False), ("0", False), ("", False), ("no", False)])
+# On by default since 2026-10-19 (DECISIONS: "Router on by default"); COPILOT_ROUTER=off is the way back. Every off value has a question
+# of its own, and so does every value that must NOT turn it off (a blank or unrecognised value keeps the default).
+@pytest.mark.parametrize("value,on", [
+    ("model", True), ("MODEL", True), ("on", True), ("1", True), ("true", True), (" On ", True),
+    ("off", False), ("OFF", False), (" off ", False), ("0", False), ("false", False), ("no", False), ("none", False),
+    ("", True), ("   ", True), ("banana", True),
+])
 def test_the_environment_variable_values(monkeypatch, value, on):
     monkeypatch.setenv("COPILOT_ROUTER", value)
     assert router_enabled(None) is on
 
 
-def test_the_router_is_off_unless_asked_for(monkeypatch):
+def test_the_router_is_on_unless_switched_off(monkeypatch):
     monkeypatch.delenv("COPILOT_ROUTER", raising=False)
-    assert router_enabled(None) is False and router_enabled(True) is True and router_enabled(False) is False
+    assert router_enabled(None) is True and router_enabled(True) is True and router_enabled(False) is False
     monkeypatch.setenv("COPILOT_ROUTER", "model")
     assert router_enabled(None) is True and router_enabled(False) is False
     monkeypatch.setenv("COPILOT_ROUTER", "off")
-    assert router_enabled(None) is False
+    assert router_enabled(None) is False and router_enabled(True) is True
 
 
 # ---- through the whole copilot (ZZMA has prices, headlines, a filing) ----

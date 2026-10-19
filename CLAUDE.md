@@ -132,8 +132,8 @@ them (the owner hasn't confirmed the order):
    what the keywords had), and the page shows a muted "the local model chose: ..." line under "Looked at ..."; "Understood as" is
    unchanged. Results: a fresh 39-question baseline of 44% (52 of 117) went to 71% on the same cases (those are now development
    material); on the 282 older cases 761 to 769 of 846; the sealed 38 (run once) 78 to 93 of 114 on the first version, 90 on the final,
-   after two false declines found by reading the answers made it a second-look set. The merge rule set beforehand is met. **Next:** the
-   owner decides whether to turn it on by default (a one-line change plus a test; the switch back is `COPILOT_ROUTER=off`); "clear
+   after two false declines found by reading the answers made it a second-look set. The merge rule set beforehand is met. **The owner turned it on by default on 2026-10-19
+   (`feature/router-on-by-default`, DECISIONS: "Router on by default"; the switch back is `COPILOT_ROUTER=off`); "clear
    in profit" is covered by the router when it is on (a fresh set will tell). The router does not fix a question the keywords route wrongly, or a follow-up whose
    rewrite lost its topic. Every keyword list so far has missed on the next wording, so write a new sealed set (`SEALED`, `--sealed`)
    before the next fair comparison. All earlier fresh cases are in `CASES` (359 market, plus the 37-case development set `ROUND_SL`
@@ -204,10 +204,10 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-18 (on `feature/filings-price-words`, after PRs #44 to #47 merged): 2388 Python tests, 260 web tests, all
-  passing (the web count last run on 2026-10-17; nothing in `web/` changed since). `tests/test_search.py` fails one or two tests in
-  about half of the full runs, always the first run after the database was used by other runs, and passes alone and on the rerun:
-  rerun before assuming a break (not investigated). A full test run can fail one or two vector-search tests while an evaluation shares the database;
+- Baseline as of 2026-10-19 (on `feature/router-on-by-default`, after PR #50 merged): 2643 Python tests, 260 web tests (typecheck clean), all
+  passing. `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
+  before its tests (dead index entries from earlier test files crowded out its few passages) and passed 4 of 4 full runs afterwards. If it
+  fails again, rerun before assuming a break. A full test run can still fail vector-search tests while an evaluation shares the database;
   run the suite when no evaluation is running. Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
   refresh ran at 3pm on 2026-10-16 (success, 0 problems).
 
@@ -318,14 +318,14 @@ The owner is building this step by step and is not a professional developer, so 
   mismatched periods); a correct number can still mislead. Keep rejecting a leftover concept (Amazon's 2009 gross
   profit). Figures are checked against the filing text, not just for self-consistency. Tests use fake SEC data and
   `ZZFUN`.
-- **Model router (`ai/router.py`, switched by `COPILOT_ROUTER`):** the model only picks among the routes that already exist, from
+- **Model router (`ai/router.py`, switched by `COPILOT_ROUTER`; ON by default since 2026-10-19, `COPILOT_ROUTER=off` turns it off; the test suite sets it off in `tests/conftest.py`):** the model only picks among the routes that already exist, from
   the standalone question alone (never history or an earlier answer), asked only when the keywords found no specific route and
   none of the guards (`deliberately_filings`: a filing, quarter, segment, "why", dividends, "sales" the keywords did not read) says
   the keyword route was deliberate. It may add, never remove, a notice; its "outside" verdict is a hint, its "writing" verdict needs
   a writing word, and its headlines need a news word. Any failure leaves the keyword route. When it changes what is retrieved the
   answer must say so (`Answer.model_route`, the API's `model_route`, the "local model chose" line); keep that visible, and keep it out
   of "Understood as", which means a rewritten follow-up. Before changing its prompt or a guard,
-  run `python -m ai.eval_market --repeat 3` with `COPILOT_ROUTER=off` and with `=model` on one data snapshot, read the answers, and
+  run `python -m ai.eval_market --repeat 3` with `COPILOT_ROUTER=off` and with it on (the default; set `=model` to be explicit) on one data snapshot, read the answers, and
   A/B every case that drops; a new fair comparison needs a new `SEALED` set run once with `--sealed`.
 - **Questions the app cannot answer (`ai/market.py`: `outside_scope`, `unknown_name`, `writing_request`; used in
   `answer_question`):** declined in code, before the model, with a fixed message. A request to write something is declined

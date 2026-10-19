@@ -1782,6 +1782,26 @@ benchmarks.
   business itself?" (filings, arguably fine), "Which of these companies is getting the best press right now?" (no company named), and the
   gap between "good" and "bad" press words. (6) `tests/test_search.py` failed one or two tests in 3 of 6 full runs, with and without the
   new test file and on the clean code, and passed alone each time: the known flakiness, not investigated.
+- **Router on by default, and the flaky search tests, 2026-10-19** (branch `feature/router-on-by-default`; no prompt change). **The
+  decision:** the owner turned the model router on by default after reading what it does and what it costs. The rule set beforehand ("on
+  only after a fair sealed comparison shows gains without harm") was met by the third sealed round (keywords 25 of 43, router 30 of 43, no
+  case lost) and the first one (78 to 90 of 114). **Built:** `router_enabled(None)` is now true unless `COPILOT_ROUTER` is `off`, `0`,
+  `false`, `no` or `none` (case and spaces ignored); a blank or unrecognised value keeps the default, which means a typo such as `of` leaves it
+  on. `router=True/False` on `answer_question` still wins. Nothing else in `ai/` changed: it is still asked only when the keywords find no
+  route, it can only add, any failure leaves the keyword route, and the page still shows the "local model chose" line. `tests/conftest.py`
+  sets `COPILOT_ROUTER=off` for the whole suite: with it removed, `test_copilot_history` fails (a scripted model gets a router call it was
+  not written for). **Tests first: the switch tests were rewritten (every off value, and the blank and unrecognised values, have a question of
+  their own; 4 failed before the change). Deliberate breakages: every off value dropped in turn and the default put back to off, all
+  caught.** A real check, router variable unset: `router_enabled(None)` is true, "Has the stock gone anywhere since spring for Nvidia?" is
+  routed to the prices by the model and says so in `model_route`, and a mood question and a filings question are unchanged. **What was not
+  measured:** the extra time per routed question (the sealed run averaged 1.7 s per case with the router and 3.5 s without, because routed
+  questions get short price or news answers instead of long filing ones; that is not the cost of the router call), and the variation from run
+  to run. **The flaky `tests/test_search.py`:** `test_symbol_and_form_filters_and_limit` and `test_latest_only_drops_older_filings_of_the_same_form`
+  failed in about half of the full runs and passed alone. The conftest vacuum runs once at the start of the session, and by the time the search
+  tests run, earlier files have inserted and deleted thousands of vectors; the dead entries left in the index crowd out the search tests' few
+  passages. The search module now vacuums `filing_chunks` right before its tests; **4 full runs in a row passed** (2643 tests), against
+  about 5 failures in 8 runs before. That is strong evidence (luck would give 4 passes about 2.5% of the time), not proof. Web: typecheck
+  clean, 260 tests pass.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a
