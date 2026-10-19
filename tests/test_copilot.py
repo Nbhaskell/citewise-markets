@@ -107,7 +107,9 @@ def conn():
 def test_detect_symbols_by_ticker_and_company_name(conn):
     assert detect_symbols(conn, "What is ZZCA doing?") == ["ZZCA"]
     assert detect_symbols(conn, "compare zetacorp with OMEGAWARE") == ["ZZCA", "ZZCB"]
-    assert detect_symbols(conn, "zzca?") == []  # tickers are matched case-sensitively
+    # a ticker of three or more letters that is not a common word is matched in lowercase too ("hows nvda doing"); the words and short
+    # tickers that must stay capitals-only are tested in tests/test_typing_variants.py (DECISIONS: "Typing variants")
+    assert detect_symbols(conn, "zzca?") == ["ZZCA"]
 
 
 def test_grounded_answer_cites_real_passages_only(conn):

@@ -23,6 +23,7 @@ from .market import (
     MarketEvidence,
     detect_intent,
     gather_market_evidence,
+    NOT_NAMES,
     join_names,
     outside_scope,
     parse_window,
@@ -182,11 +183,22 @@ class Answer:
         return [(n, self.retrieved[n - 1]) for n in self.cited]
 
 
+# A ticker is matched in capitals only, unless it is safe to match as typed ("hows nvda doing"): at least three letters and not a word people
+# type for other reasons ("now", "all", "can", "best"). A ticker that is added later and is also a word needs adding here.
+LOWERCASE_TICKER_BLOCKLIST = frozenset(NOT_NAMES) | frozenset(
+    "now new one two out key low big best fast good well work open real true safe post play snap line tech fund bank gold gas car sun run fit "
+    "hot cool".split())
+
+
+def lowercase_ticker_ok(symbol: str) -> bool:
+    return len(symbol) >= 3 and symbol.lower() not in LOWERCASE_TICKER_BLOCKLIST
+
+
 def company_mentions(conn: psycopg.Connection, text: str) -> dict[str, list[re.Match]]:
     """Every tracked company the text names (by ticker, first word of its name, or alias), with where it does so."""
     found: dict[str, list[re.Match]] = {}
     for symbol, name in conn.execute("SELECT symbol, name FROM instruments ORDER BY symbol"):
-        patterns = [(rf"\b{re.escape(symbol)}\b", 0)]
+        patterns = [(rf"\b{re.escape(symbol)}\b", re.IGNORECASE if lowercase_ticker_ok(symbol) else 0)]
         first = re.match(r"[A-Za-z]+", name or "")
         if first and len(first.group()) >= 4:
             patterns.append((rf"\b{re.escape(first.group())}\b", re.IGNORECASE))
