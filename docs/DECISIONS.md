@@ -1802,6 +1802,34 @@ benchmarks.
   passages. The search module now vacuums `filing_chunks` right before its tests; **4 full runs in a row passed** (2643 tests), against
   about 5 failures in 8 runs before. That is strong evidence (luck would give 4 passes about 2.5% of the time), not proof. Web: typecheck
   clean, 260 tests pass.
+- **Fourth sealed round: a fair score after PRs #49 to #51, 2026-10-19** (branch `feature/router-on-by-default`; only `ai/eval_market.py`
+  changed). **Method:** 47 new cases (`SEALED_ROUND_FOUR`, `s4`) in wordings taken from no list, test or earlier case (checked by script against
+  5,196 strings; two near-copies reworded), committed unrun (52496e1), then run **once** with `--sealed --show`, `COPILOT_ROUTER=off` and then
+  with the router on, on one data snapshot. **Honest limit:** the person writing it had read much of `ai/market.py` while fixing earlier misses, so
+  it is not blind to the rules. Mix: 8 prices, 7 news and mood, 6 stored figures, 7 filings, 13 traps, 6 follow-ups. **Score (one run each):
+  keywords only 31 of 47 (66%); router on 37 of 47 (79%).** The router turned 6 failures into passes and lost none: "worth more than it was in the
+  summer", "how far is Apple from its yearly peak", "is the talk around Amazon getting nastier" (the keyword-only run answered from the filings'
+  legal section), "how do the writers covering Apple feel", and both writing requests ("word a note to my team": the keyword-only run wrote the
+  note, with a filing figure in it; "a bedtime story featuring Apple's logo"). Against the third round (58% and 70%) both columns are higher; the
+  sets are different and the person writing them knew more, so this is not a trend. **I read every answer.** Of the 10 failures with the router
+  on, 4 are arguable (my check or expectation): "Why did Microsoft stock triple this month?" is answered correctly (+6.42%, no tripling) but the
+  numbers check flagged "17" from a date; "Tesla lost half its value this week, didn't it?" is answered correctly (-7.31%) but the premise
+  notice did not fire ("lost half" is not a claim verb); "Did the Russell 2000 go up yesterday?" is declined truthfully as an unknown name
+  rather than as an index; "What's Microsoft's dividend payout ratio?" is answered honestly ("not directly provided") instead of the fixed
+  decline. **The wrong answers that matter:** (1) **A wrong number stated as the answer:** "How much of every sales dollar does Apple keep after
+  paying for production?" went to the filings and said 15% (the stored gross margin is 48.7%); "What did Tesla clear after all expenses?"
+  quoted operating income ($4.4 billion) as if it were what is left after all expenses (net income is $3.8 billion). (2) **A false "nothing
+  there":** "Anything interesting come out about Nvidia this morning?" went to the filings and said there are no headlines for today;
+  "What price did Alphabet end at on Thursday?" said the data cannot be isolated by day of the week. (3) **A prediction question that
+  reached no prices:** "Where will Apple's stock be next March?" declined the prediction correctly but quoted a year-old filing price ($234)
+  as the basis. (4) **Advice missed:** "Everyone says I'm crazy not to own Nvidia. Am I?" got no buy/sell/hold notice and a soft "consult an
+  advisor" answer. **Passing answers that are weak:** "worth more than in the summer" treated the past month as "the summer"; "has AMD given
+  back its gains from this quarter" said no although the stock is far below its 10-06 high; "which headline about AMD is the most recent"
+  answered with a source number and a date and no title; "compare Microsoft and Alphabet since the start of the month" used the past 31
+  days (it printed the dates). **Unchanged by the router:** every wrong answer above was routed by a keyword rule or by the model's
+  arithmetic, not by the "no route found" step. **State of the set:** spent; it stays in `SEALED` (out of `CASES`, out of the shadow run) until
+  a fifth set replaces it. **Weak spots of the measurement:** one run per configuration (a swing of two is normal), 47 cases, four arguable
+  expectations, and the writer was not blind to the rules.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

@@ -150,7 +150,11 @@ them (the owner hasn't confirmed the order):
    `feature/sealed-misses-routing` (2026-10-18, DECISIONS: "Routing misses of the third sealed round"):** "what all its shares are worth"
    goes to the market value, a news source doing something ("the papers are printing", "columnists writing") to the headlines, "highest and
    lowest close" and "X's swings" to the prices, and warn / admit / concede / signal / indicate / flag / note / talk / tell are speaker
-   verbs. 18 fresh cases 3 to 46 of 54; 2637 Python tests pass. Still open: named outlets ("the Wall Street Journal"), "since spring" as a
+   verbs. 18 fresh cases 3 to 46 of 54; 2637 Python tests pass. **Fourth sealed round, run once 2026-10-19 (DECISIONS: "Fourth sealed round"): keywords only 31 of 47 (66%), router on 37 of 47
+   (79%), no case lost; `SEALED` is now spent again, write `SEALED_ROUND_FIVE` for the next fair comparison.** Its worst answers: a wrong
+   number (gross margin 15% from the filings instead of the stored 48.7%; operating income given as "after all expenses"), a false "no
+   headlines" for "this morning", a day-of-week close ("on Thursday") called unavailable, a prediction question that quoted a year-old
+   price, and "crazy not to own Nvidia. Am I?" with no advice notice. Still open: named outlets ("the Wall Street Journal"), "since spring" as a
    period, a company's later mention turning the prices off ("shares fell after Marketco warned"), and a new sealed set
    (`SEALED_ROUND_FOUR`) for the next fair comparison. A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
    "Router second look, step 2") found no policy for "the model second-guesses a specific keyword route" that beats today on the older

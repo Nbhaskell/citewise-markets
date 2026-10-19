@@ -1684,6 +1684,8 @@ SEALED_ROUND_FOUR: tuple[Case, ...] = (
 HELD_OUT: tuple[Case, ...] = ()
 # The sealed test set: run only with `--sealed`, once, at the end of an experiment, and never tuned on.
 # SEALED_ROUND_THREE was RUN once on 2026-10-18 and is SPENT (docs/DECISIONS.md, "Third sealed round"): it joins `CASES` below.
+# SEALED_ROUND_FOUR was RUN once on 2026-10-19 (keywords only 31 of 47, router on 37 of 47; DECISIONS: "Fourth sealed round") and every answer
+# was read, so it is SPENT too; it stays here (out of `CASES`, out of the router shadow run) until a SEALED_ROUND_FIVE replaces it.
 CASES = CASES + SEALED_ROUND_THREE
 SEALED: tuple[Case, ...] = SEALED_ROUND_FOUR
 
