@@ -1873,6 +1873,37 @@ benchmarks.
   maker?") now carries the advice notice: one extra notice by design. (4) The weekday reading guesses the most recent such day before today; asked
   on a Monday about "Monday" it is a week back, and the source prints the date it used. (5) `ROUND_FR` has 17 cases and one of them depends on the
   time of day the headlines were last stored.
+- **Fifth sealed round: a measurement against the stopping rule, 2026-10-19** (branch `feature/sealed-round-five`; only `ai/eval_market.py` and
+  these notes changed, and **no rule was changed for it or after it**). **Method:** 46 new cases (`SEALED_ROUND_FIVE`, `s5`; I had meant 47) in
+  wordings taken from no list, test or earlier case (checked by script; two near-copies reworded), committed unrun (7380781), run **once** with
+  `--sealed --show`, `COPILOT_ROUTER=off` and then on, on one data snapshot. Same honest limit as the fourth round: the writer had read the rules.
+  Mix: 8 prices, 7 news and mood, 6 stored figures, 7 filings, 12 traps, 6 follow-ups. **The stopping rule agreed with the owner:** stop tuning
+  keywords when the router-on score is 85 to 90 percent or better on two rounds in a row, or when most failures are arguable or model-quality
+  rather than routing. **Score (one run each): keywords only 30 of 46 (65%); router on 36 of 46 (78%). Not met.** Router-on across the last
+  three rounds: 70%, 79%, 78%; keywords only: 58%, 66%, 65%. With about 46 cases a score near 75% moves about 6 to 7 points from luck alone, so the
+  last two rounds are the same number. The router turned 6 failures into passes and lost none ("close in the green yesterday", "spread between
+  the best and worst day", "talk of an AMD acquisition", both writing requests, "is that unusual for it"). **I read every answer.** Of the 10
+  failures with the router on, **5 are arguable (my check or expectation, not the app)**: "what are people on the street saying about the chip
+  launch" and "a quick rundown of Alphabet's recent coverage" and "are Nvidia headlines getting kinder" were answered sensibly from the right data
+  but with one source kind more or fewer than I demanded; "the total dollar value of all Amazon stock" ($2.70 trillion) and "Microsoft earning per
+  share" ($17.95) were answered correctly with the prices shown too. **5 are real:** (1) **The mood of the press not routed:** "Has the media turned
+  against Tesla?" went to the filings and answered from the lawsuits ("no direct evidence the media has turned"), which implies the headlines were
+  looked at; "How's the feeling toward Microsoft after its last earnings?" went to the figures because of "earnings" and said there is no
+  sentiment data. (2) **Advice missed twice:** "I have 10k saved. Should it go into AMD?" got a risk list with no notice ("should it" is not "should
+  I"), and "My dad says dump Apple. Smart?" was refused as "couldn't find anything" with no notice. (3) **A period the prices cannot read:** "Is
+  Microsoft stock at a better level than it was in July?" ("in July" is an unmet period) said the sources have no July data, after showing the
+  past month. **Passing answers that are weak:** "how much has Microsoft added since the first of the year" printed a window start of 2025-10-15
+  and said the exact change is not provided; "what was the biggest one-day jump in Apple's stock" answered with the window's low and high and said a
+  daily change would be needed; "the spread between the best and worst day" gave the highest and lowest closes, not the best and worst days;
+  "how does Google's stock today stack up against Monday" compared the last two closes, not Monday's; "if you were me, would you load up on
+  Nvidia" carried the notice but quoted a price of $1,448.75 "as of January 25, 2026" that I could not trace to a stored close. Counting the
+  arguable five as passes the router-on score would be 41 of 46 (89%), and subtracting the five weak passes it would be about 36 to 41: so
+  **the honest range is 78% strict to about 85% generous, and the stopping rule is not met on either reading.** **What this says:** the
+  routing misses are the same families as before (a mood phrasing, an advice phrasing, a period), each fixed in turn and each replaced by a
+  neighbour in the next round; the score has not moved in three rounds. The next rounds of keyword fixes are expected to buy about one case each
+  round and to cost a round of testing, which is why the agreed alternatives are a local log of real questions and fewer confident wrong
+  answers rather than more word lists. **State of the set:** spent; it stays in `SEALED` until a sixth set replaces it. **Weak spots of the
+  measurement:** one run per configuration, 46 cases, five arguable expectations, the writer was not blind to the rules.
 - **Question log, phase 1, 2026-10-19** (branch `feature/question-log`; no prompt change, no model call). **Why:** the five sealed rounds show a
   plateau (router on: 70%, 79%, 78%) that more synthetic rounds cannot move; the owner's real daily questions are the better measure. **The decision:**
   the owner approved a local log (2026-10-19), as a server-side write that is not a new endpoint (CLAUDE.md, API rules). **Built:** `ai/question_log.py`

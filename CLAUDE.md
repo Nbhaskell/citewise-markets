@@ -158,7 +158,10 @@ them (the owner hasn't confirmed the order):
    "clear after all expenses" reach the stored figures (which now say what net income, operating income and each margin mean), "this morning" /
    "overnight" / "come out about" are news, "on Thursday" / "last Wednesday" give that day's close and change, "where X's stock will be" is a price
    prediction, and "crazy not to own X. Am I?" carries the advice notice. 17 fresh cases 4 to 40 of 51 (router off) and 15 to 38 (router on); 106
-   routes change on 2,960 questions, 101 written for this fix; no evaluation case changed its route. Still open: named outlets ("the Wall Street Journal"), "since spring" as a
+   routes change on 2,960 questions, 101 written for this fix; no evaluation case changed its route. **Fifth sealed round, run once 2026-10-19 (DECISIONS: "Fifth sealed round"): keywords only 30 of 46 (65%), router on 36 of 46 (78%); the 85 to 90 percent
+   stopping rule is NOT met (router on: 70%, 79%, 78% over the last three rounds), and `SEALED` is spent again.** Real misses: "Has the media turned
+   against Tesla?" (routed to the filings), "the feeling toward Microsoft after its last earnings" (routed to the figures), "Should it go into AMD?" and
+   "My dad says dump Apple. Smart?" (no advice notice), "better level than it was in July" (unread period). Still open: named outlets ("the Wall Street Journal"), "since spring" as a
    period, a company's later mention turning the prices off ("shares fell after Marketco warned"), and a new sealed set
    (`SEALED_ROUND_FOUR`) for the next fair comparison. A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
    "Router second look, step 2") found no policy for "the model second-guesses a specific keyword route" that beats today on the older
@@ -212,7 +215,7 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-19 (on `feature/question-log`, after PR #52 merged): 2883 Python tests (260 web tests, typecheck clean, last run
+- Baseline as of 2026-10-19 (on `feature/question-log`, after PRs #52 and #53 merged): 2883 Python tests (260 web tests, typecheck clean, last run
   before the router PR; nothing in `web/` changed since), all passing. `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
   before its tests (dead index entries from earlier test files crowded out its few passages) and passed 4 of 4 full runs afterwards. If it
   fails again, rerun before assuming a break. A full test run can still fail vector-search tests while an evaluation shares the database;
