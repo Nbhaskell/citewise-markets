@@ -108,7 +108,11 @@ PRICE_PREDICTION_RE = re.compile(
     r"\b(?:can|could|will)\s+only\s+go\s+(?:up|down)\b(?=\s+from\b|\s+forever\b|\W*$)|"
     r"\bonly\s+go(?:es)?\s+(?:up|down)\s+from\s+(?:here|now|this\s+point)\b|"
     r"(?-i:\b[A-Z][\w.&-]*)\s+(?:(?:will|would|could|might)\s+)?reach(?:es)?\s+\$\s?\d[\d,]*+(?:\.\d+)?+"
-    r"(?!\s*(?:[bmk]\b|billion|million|trillion|thousand|percent|%))",
+    r"(?!\s*(?:[bmk]\b|billion|million|trillion|thousand|percent|%))|"
+    # "Can you tell me where Apple's stock will be next March?", "Where do you see Nvidia's shares being in the spring?" (fourth sealed round):
+    # where the stock will be, with a stock word ("stock-based" does not count)
+    r"\bwhere\s+(?:(?:will|would|might|could)\b|do\s+you\s+(?:see|think|expect)\b)[^?.]{0,60}?\b(?:stock|shares?|price)\b(?!-)|"
+    r"\b(?:stock|shares?|price)\b(?!-)[^?.]{0,25}?\b(?:will|would|might|could)\s+(?:be|end|trade|close|stand|sit)\b",
     re.IGNORECASE,
 )
 # "Tell me Apple's close from last Thursday", "Where did Nvidia close yesterday?": the noun or verb "close" as a price. Each form
@@ -138,6 +142,18 @@ CLOSE_EXTREME_RE = re.compile(
 SWINGS_RE = re.compile(
     r"(?-i:\b[A-Z][\w.&-]*)['’]s\s+(?:[a-z]+\s+)?swings?\b(?!\s+in\s+(?!(?:the\s+)?(?:stock|shares?|price)\b))", re.IGNORECASE
 )
+# "Where did Nvidia trade this morning?", "Where did AMD settle on Monday?": a company, a verb for where its stock ended up, and a day or part
+# of the day. The verb must not take an object ("settle its lawsuit", "open the new store", "finish with the project"), so only the
+# stock's own movement is caught.
+PRICE_VERB_DAY_RE = re.compile(
+    rf"\bwhere\s+did\s+[\w.&-]+\s+(?:trade|settle|finish|open|end|close)\b(?!\s+(?:its|their|the|a|an|with)\b)[^?.]{{0,20}}?"
+    rf"\b(?:yesterday|today|this\s+(?:morning|afternoon|week)|(?:on|last)\s+{_WEEKDAY}|overnight)\b",
+    re.IGNORECASE,
+)
+# News with a part of the day, or "come out about" ("Anything interesting come out about Nvidia this morning?" went to the filings and was
+# told there are no headlines). A part of the day is a news cue only when the question is not already about prices or the figures.
+TIME_OF_DAY_RE = re.compile(r"\b(?:this\s+(?:morning|afternoon|evening)|tonight|overnight|first\s+thing\s+(?:this\s+morning|today))\b", re.IGNORECASE)
+COME_OUT_RE = re.compile(r"\b(?:come|comes|came|coming)\s+out\s+(?:about|on|from|for)\b", re.IGNORECASE)
 # "How much higher is Nvidia than it was a year ago?", "Is AMD lower than where it was a month ago?": the stock against its
 # own past. The subject is one bare name, so "Apple's revenue" and "Tesla's headcount" are not caught; the caller also needs a
 # named period and no financial-figure word ("revenue than a year ago" is a figures question).
@@ -332,8 +348,14 @@ _BROAD_TOPICS = (
     # subject), so "How much do Apple engineers earn?" is left alone
     ("profit", r"\bnet\s+income\b|\bprofit(?:s|ability|able)?\b|\bearnings\b|\boperating\s+income\b|\bbottom\s+line\b|"
                r"\b(?:what|how\s+much(?:\s+money)?)\s+(?:did|does|do|has|have|had|will|would)\s+"
-               r"(?!(?:the|its|their|this|that|these|those|a|an|my|your|our)\b)[\w.&-]+\s+earn(?:ed)?\b"),
-    ("margin", r"\bmargins?\b"),
+               r"(?!(?:the|its|their|this|that|these|those|a|an|my|your|our)\b)[\w.&-]+\s+earn(?:ed)?\b|"
+               # what a company "clears" or "pockets" after its costs (fourth sealed round: "What did Tesla clear after all expenses?")
+               r"\b(?:clears?|cleared|nets?|netted|pocket(?:s|ed)?|(?:take|takes|took)\s+home)\b[^?.]{0,25}?"
+               r"\bafter\s+(?:all\s+)?(?:(?:its|their|the)\s+)?(?:expenses|costs|taxes|everything)\b"),
+    # "Of every sales dollar, how much does Apple keep after paying for production?" (fourth sealed round): a keeping word after "every /
+    # each dollar" is a margin question however the costs are worded
+    ("margin", r"\bmargins?\b|\b(?:every|each)\s+(?:sales\s+|revenue\s+)?dollar\b[^?.]{0,80}?"
+               r"\b(?:keeps?|kept|left|remain(?:s|ing)?|retain(?:s|ed)?|pocket(?:s|ed)?|stays?|hold(?:s)?\s+on(?:to|\s+to))\b"),
     # "sales" counts as the company's revenue only in the forms that cannot mean a product or a department: "Nvidia's sales",
     # "total / net sales", "dollars of sales". Not "iPhone sales (over the past year)", "retail sales", "sales tax" or "the
     # sales team" (a "sales over the last ..." form was tried and dropped: it caught "iPhone sales over the past year").
@@ -461,6 +483,8 @@ ADVICE_ASK_RE = re.compile(
         (?:one|something|stocks?)\s+to\s+(?:buy|sell|hold|own|keep|avoid)\b|
         # "Should I?" with the trade left unsaid, and the common ways to finish it (third sealed round)
         should\s+(?:i|we)\s*[?!.]*\s*$|
+        # a bare "Am I?" / "Do I?" / "Shall we?" ending a statement (fourth sealed round: "Everyone says I'm crazy not to own Nvidia. Am I?")
+        (?:^|[.!?]\s+)(?:am|are|do|shall|ought|must)\s+(?:i|we)\s*[?!.]*\s*$|
         should\s+(?:i|we)\s+(?:do\s+it|go\s+for\s+it|take\s+the\s+(?:plunge|leap|bet))\b|
         should\s+(?:i|we)\s+(?:join(?:\s+(?:in|them|him|her))?|listen(?:\s+to\s+(?:him|her|them|it|that))?)\s*[?!.]*\s*$|
         should\s+(?:i|we)\s+(?:follow|take|heed|trust|listen\s+to)\s+(?:[\w'’]+\s+){0,3}?(?:advice|tips?|suggestions?|recommendations?|hunch(?:es)?)\b
@@ -510,6 +534,7 @@ ADVICE_JUDGMENT_RE = re.compile(
         (?:would|will|do|did)\s+you\s+(?:bet|wager)|rate\s+\w+\s+as\s+an?\s+investment|
         your\s+(?:take|view|opinion|read|thoughts)\s+on|make\s+(?:me|us)\s+(?:money|rich)|
         am\s+i\s+(?:crazy|nuts|wrong|silly|foolish|dumb|smart|right)\s+to|
+        (?:crazy|mad|foolish|stupid|dumb|nuts|silly|insane|wrong)\s+not\s+to\s+(?:own|buy|hold|invest|have|keep|get|pick\s+up)\b|
         (?:is|are|was)\b.{0,50}?\b(?:good|great|solid|safe|smart|risky|better|best)\s+(?:[\w-]+\s+){0,2}(?:buy|sell|investment|bet|hold|pick|choice|play)\b|
         where\s+should\s+(?:it|that|the\s+money|i|we)\s+(?:go|be\s+put|put|invest)|(?:i|we)\s+(?:have|got)\s+\$\s?\d|
         (?:in|into|to|for)\s+(?:a|an|my|our|your)\s+(?:retirement|brokerage|savings|college)\s+(?:account|fund)|
@@ -759,6 +784,7 @@ def detect_intent(question: str) -> Intent:
         or year_start_comparison(question)
         or bool(CLOSE_NOUN_RE.search(question))
         or bool(CLOSE_EXTREME_RE.search(question))
+        or bool(PRICE_VERB_DAY_RE.search(question))
         or bool(SWINGS_RE.search(question))
         or bool(PRICE_PREDICTION_RE.search(question))
         or (
@@ -772,7 +798,8 @@ def detect_intent(question: str) -> Intent:
     sentiment = bool(SENTIMENT_RE.search(question))
     general = bool(GENERAL_RE.search(question)) and not STOCK_WORD_RE.search(question)  # "How's Nvidia doing?" wants both
     headlines = (
-        bool(NEWS_RE.search(question)) or bool(NEWS_VOICE_RE.search(question)) or sentiment or general
+        bool(NEWS_RE.search(question)) or bool(NEWS_VOICE_RE.search(question)) or bool(COME_OUT_RE.search(question)) or sentiment or general
+        or (bool(TIME_OF_DAY_RE.search(question)) and not prices and not topics)  # "Where did Nvidia trade this morning?" is a price question
         or (prices and bool(CAUSE_RE.search(question)))
         or (bool(LATELY_RE.search(question)) and not prices)  # "lately" is a news cue only when it is not already a price question
     )
@@ -797,6 +824,7 @@ class Window:
     since: Optional[date] = None  # "since July": the first day of the window, which wins over `days` when pricing it
     unmet: Optional[str] = None  # a period the question named that no window here can match ("the end of last week")
     asked_day: Optional[str] = None  # "today" or "yesterday": checked against the newest stored close
+    day: Optional[date] = None  # "on Thursday", "last Wednesday", "Thursday's close": the most recent such day before today, whose close is given
 
 
 DEFAULT_WINDOW = Window("past month", 31)
@@ -1013,16 +1041,34 @@ def _unread_period(question: str) -> Optional[str]:
     return None
 
 
+# One named weekday ("What was Microsoft's close last Wednesday?"): the most recent such day before today. "Since last Monday" is a range and
+# stays flagged (it can mean either of two Mondays), so a weekday right after "since" is not read here.
+_NAMED_DAY_RE = re.compile(
+    rf"(?<!since )\b(?:on|last)\s+({_WEEKDAY})\b|\b({_WEEKDAY})['’]s\s+(?:close|closing)\b", re.IGNORECASE
+)
+
+
+def _named_day(question: str, today: date) -> Optional[date]:
+    m = _NAMED_DAY_RE.search(question)
+    if not m:
+        return None
+    name = (m.group(1) or m.group(2)).lower()
+    return today - timedelta(days=(today.weekday() - _WEEKDAY_NAMES.index(name)) % 7 or 7)
+
+
 def parse_window(question: str, today: Optional[date] = None) -> Window:
     today = today or date.today()
     window = _read_window(question, today)
     unmet = _unmet_period(question)
+    day = _named_day(question, today)
+    if day and unmet and re.fullmatch(rf"(?:on|last)\s+{_WEEKDAY}", unmet, re.IGNORECASE):
+        unmet = None  # read as one day, so it is no longer a period the daily closes cannot isolate
     if not unmet and not window.explicit:
         unmet = _unread_period(question)
     asked = "today" if re.search(r"\btoday\b", question, re.IGNORECASE) else (
         "yesterday" if re.search(r"\byesterday\b", question, re.IGNORECASE) else None)
-    if unmet or asked:
-        window = replace(window, unmet=unmet, asked_day=asked)
+    if unmet or asked or day:
+        window = replace(window, unmet=unmet, asked_day=asked, day=day)
     return window
 
 
@@ -1138,7 +1184,7 @@ def premise_cautions(question: str, evidence: list, window: Window) -> list[str]
     month" when it rose 1%). It quotes the claim and the data and never calls the question wrong. Silent when there is nothing to compare:
     no price source, several companies, a period that could not be read, a prediction. At most one statement."""
     prices = [e for e in evidence if e.kind == "price"]
-    if len(prices) != 1 or window.unmet or prices[0].change_pct is None:
+    if len(prices) != 1 or window.unmet or window.day or prices[0].change_pct is None:  # a named day: the shown move is not that day's
         return []
     e = prices[0]
     for phrase, supported in _claims(question):
@@ -1206,6 +1252,17 @@ def price_evidence(conn: psycopg.Connection, symbol: str, window: Window, today:
         f"Highest close in the window: {_money(high[1])} on {high[0]}. Lowest close in the window: {_money(low[1])} on {low[0]}.",
         f"52-week closing range: {_money(min(r[1] for r in year))} to {_money(max(r[1] for r in year))}.",
     ]
+    if window.day:  # "What was Microsoft's close last Wednesday?": that day's own close, worked out here
+        name = _WEEKDAY_NAMES[window.day.weekday()].capitalize()
+        row = next((r for r in rows if r[0] == window.day), None)
+        lines.append(f"Close on {name} {window.day}: {_money(row[1])}." if row else
+                     f"No close is stored for {name} {window.day} (a weekend or holiday, or outside the stored prices).")
+        prev = [r for r in rows if r[0] < window.day][-1:] if row else []
+        if prev:  # what the day did, against the close before it
+            day_change = float(row[1]) - float(prev[0][1])
+            day_pct = day_change / float(prev[0][1]) * 100 if prev[0][1] else 0.0
+            lines.append(f"Close before that, {prev[0][0]}: {_money(prev[0][1])}. Change on that day: {day_change:+.2f} ({day_pct:+.2f}%), "
+                         f"{_direction(day_change, day_pct)}.")
     if not before:
         lines.append(f"Note: stored prices only start on {base_ts}, so the change is measured from then.")
     if (today - last_ts).days > STALE_AFTER_DAYS:
@@ -1293,22 +1350,29 @@ def evidence_from_fundamentals(f: Fundamentals, today: Optional[date] = None) ->
     ]
     growths: list[float] = []
 
-    def flow_lines(label: str, flow, fmt) -> None:
+    def flow_lines(label: str, flow, fmt, meaning: str = "") -> None:
         if flow is None:
             return
-        lines.append(f"{label} (last 12 months): {fmt(flow.value)}. How: {flow.how}.")
+        # `meaning` says what the figure is, because the model once quoted operating income as "what is left after all expenses"
+        lines.append(f"{label} (last 12 months): {fmt(flow.value)}.{' ' + meaning if meaning else ''} How: {flow.how}.")
         line, pct = _growth_line(label, flow)
         if line:
             lines.append(line)
             growths.append(pct)
 
     flow_lines("Revenue", f.revenue, format_money)
-    flow_lines("Net income", f.net_income, format_money)
+    flow_lines("Net income", f.net_income, format_money,
+               "This is the profit left after all expenses, including interest and taxes.")
     flow_lines("Diluted earnings per share", f.diluted_eps, lambda v: f"${v:.2f}")
-    flow_lines("Operating income", f.operating_income, format_money)
-    for label, value in (("Gross margin", f.gross_margin), ("Operating margin", f.operating_margin), ("Net margin", f.net_margin)):
+    flow_lines("Operating income", f.operating_income, format_money,
+               "This is the profit from running the business before interest and taxes, not what is left after all expenses.")
+    for label, value, meaning in (
+        ("Gross margin", f.gross_margin, "revenue minus the cost of making or buying what was sold, as a share of revenue"),
+        ("Operating margin", f.operating_margin, "operating income, before interest and taxes, as a share of revenue"),
+        ("Net margin", f.net_margin, "net income, after all expenses, as a share of revenue"),
+    ):
         if value is not None:
-            lines.append(f"{label}: {value:.1%}.")
+            lines.append(f"{label}: {value:.1%} ({meaning}).")
     if f.shares:
         lines.append(f"Shares outstanding: {f.shares.value / 1e9:.2f} billion, from {f.shares.source}.")
     if f.close is not None:

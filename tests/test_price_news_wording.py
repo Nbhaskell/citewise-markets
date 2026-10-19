@@ -72,9 +72,11 @@ def test_a_question_about_a_close_is_a_price_question(question):
     assert got.prices and not got.filings, question
 
 
-def test_a_close_on_a_named_day_keeps_its_unmet_period_so_the_answer_is_warned():
+def test_a_close_on_a_named_day_is_read_as_that_day_and_no_longer_warned():
+    # Before 2026-10-19 this was "unmet" (the daily closes were said not to isolate a day); now the day's own close is given
+    # (DECISIONS: "Fourth-round misses"), so there is nothing to warn about.
     w = parse_window("Tell me Apple's close from last Thursday.", TODAY)
-    assert w.unmet == "last Thursday"
+    assert w.unmet is None and w.day is not None and w.day.strftime("%A") == "Thursday"
 
 
 @pytest.mark.parametrize("question", [

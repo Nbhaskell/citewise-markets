@@ -154,7 +154,11 @@ them (the owner hasn't confirmed the order):
    (79%), no case lost; `SEALED` is now spent again, write `SEALED_ROUND_FIVE` for the next fair comparison.** Its worst answers: a wrong
    number (gross margin 15% from the filings instead of the stored 48.7%; operating income given as "after all expenses"), a false "no
    headlines" for "this morning", a day-of-week close ("on Thursday") called unavailable, a prediction question that quoted a year-old
-   price, and "crazy not to own Nvidia. Am I?" with no advice notice. Still open: named outlets ("the Wall Street Journal"), "since spring" as a
+   price, and "crazy not to own Nvidia. Am I?" with no advice notice. **The six wrong answers are fixed in code on `feature/fourth-round-misses` (DECISIONS: "Fourth-round misses"):** "every sales dollar ... keep" and
+   "clear after all expenses" reach the stored figures (which now say what net income, operating income and each margin mean), "this morning" /
+   "overnight" / "come out about" are news, "on Thursday" / "last Wednesday" give that day's close and change, "where X's stock will be" is a price
+   prediction, and "crazy not to own X. Am I?" carries the advice notice. 17 fresh cases 4 to 40 of 51 (router off) and 15 to 38 (router on); 106
+   routes change on 2,960 questions, 101 written for this fix; no evaluation case changed its route. Still open: named outlets ("the Wall Street Journal"), "since spring" as a
    period, a company's later mention turning the prices off ("shares fell after Marketco warned"), and a new sealed set
    (`SEALED_ROUND_FOUR`) for the next fair comparison. A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
    "Router second look, step 2") found no policy for "the model second-guesses a specific keyword route" that beats today on the older
@@ -208,8 +212,8 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-19 (on `feature/router-on-by-default`, after PR #50 merged): 2643 Python tests, 260 web tests (typecheck clean), all
-  passing. `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
+- Baseline as of 2026-10-19 (on `feature/fourth-round-misses`, after PR #51 merged): 2799 Python tests (260 web tests, typecheck clean, last run
+  before the router PR; nothing in `web/` changed since), all passing. `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
   before its tests (dead index entries from earlier test files crowded out its few passages) and passed 4 of 4 full runs afterwards. If it
   fails again, rerun before assuming a break. A full test run can still fail vector-search tests while an evaluation shares the database;
   run the suite when no evaluation is running. Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly

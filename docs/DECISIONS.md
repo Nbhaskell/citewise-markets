@@ -1830,6 +1830,49 @@ benchmarks.
   arithmetic, not by the "no route found" step. **State of the set:** spent; it stays in `SEALED` (out of `CASES`, out of the shadow run) until
   a fifth set replaces it. **Weak spots of the measurement:** one run per configuration (a swing of two is normal), 47 cases, four arguable
   expectations, and the writer was not blind to the rules.
+- **Fourth-round misses, 2026-10-19** (branch `feature/fourth-round-misses`; no prompt change, no model call). **The problem:** the six
+  wrong answers of the fourth sealed round. **Built:** (1) **Money wording.** "Of every / each (sales or revenue) dollar ... keep / left /
+  remain / retain / pocket / stay / hold on to" is a margin question, and "clear / net / pocket / take home ... after (all) (its / their / the)
+  expenses / costs / taxes / everything" is a profit question (`_BROAD_TOPICS`). The figures source now says what each profit figure is
+  ("Net income ... the profit left after all expenses, including interest and taxes"; "Operating income ... before interest and taxes, not what
+  is left after all expenses"; each margin says what it is a share of), because the model quoted operating income as "what is left after all
+  expenses". The added text contains no digits, so the numbers check is unaffected. (2) **Part of the day.** `TIME_OF_DAY_RE` ("this morning /
+  afternoon / evening", tonight, overnight, "first thing today") is a news cue only when the question is not already a price or figures
+  question; `COME_OUT_RE` ("come / came / coming out about / on / from / for") always is. `PRICE_VERB_DAY_RE` ("Where did Nvidia trade / settle /
+  finish / open / end / close ... this morning / on Monday") is a price question unless the verb takes an object (its, their, the, a, an,
+  with). (3) **One named weekday.** "On Thursday", "last Wednesday" and "Thursday's close" are read as the most recent such day before today
+  (`Window.day`; a week back when today is that weekday; "since last Monday" stays a flagged range). The price source gives that day's close, the
+  close before it and the change, in Python, or says no close is stored for it; the old "the daily closes do not isolate a day" warning no longer
+  applies to these. The premise check stays silent for a named day (the move it would compare is the month's). (4) **Where a stock will be.**
+  "Where will / would / might / could / do you see / think / expect ... stock / shares / price" and "stock / shares / price ... will / would /
+  might / could be / end / trade / close / stand / sit" (not "stock-based") are price predictions, so the forecast is declined from the prices
+  instead of a year-old filing price. (5) **Advice.** "crazy / mad / foolish / stupid / dumb / nuts / silly / insane / wrong not to own / buy /
+  hold / invest / have / keep / get / pick up", and a bare "Am I? / Are we? / Do I? / Shall we? / Ought I? / Must I?" ending a statement, carry the
+  notice. **Tests first: 157 new (`tests/test_fourth_round_misses.py`); the first run had 101 failures; the full suite is 2799 passed, with
+  3 older tests changed on purpose (they pinned the "a weekday is unmet" behavior).** **Deliberate breakages: about 160, all caught except one
+  equivalent mutant (dropping "first thing this morning" when "this morning" is itself a cue), on a baseline verified green.** The first
+  pass had 31 survivors because my test sentences were flagged by two rules at once ("my" is a decision cue, "come out about" is also a news
+  cue), so the sentences were rewritten to be flagged by one alternative only; the verb guard lost six particles (up, out, off, down, over,
+  in) because "Where did Amazon end up today?" and "close down yesterday" are price questions. **A review of the offline diff found a gap
+  before shipping:** "Did Microsoft shares go lower on Monday?" now had Monday's close but no comparison, so the source also gives the close
+  before it and the change that day (tested, 5 more breakages caught). **Evidence, old code against new code, router off unless said:** (a)
+  **offline on 2,960 distinct questions** (every evaluation case and history turn, every question-like string in the `.py` files, the web
+  tests' questions): 106 routes change; 101 are questions written for this fix, 4 are "on <weekday>" test strings that now read a day instead of
+  an unmet period ("Did Microsoft shares go lower on Monday?" and the like, intended) and 1 is an app message ("tonight's refresh was skipped");
+  **no evaluation case changed its route**; (b) **17 fresh cases written before the fix (`ROUND_FR`, in `CASES`), 3 runs each: router off 4 of
+  51 before, 40 of 51 after; router on 15 of 51 before, 38 of 51 after**; (c) the cases that could be hurt: the 99 fundamentals cases, 2 runs
+  each, 176 before and 178 after of 198 (no case lost); the 161 price cases, one run, 125 before and 123 after, where the 3 that dropped were
+  rerun 8 times on each code (5, 2 and 6 of 8 on the new code against 2, 0 and 4 on the old), so they are noise. **The 11 left of the fresh
+  set:** "first thing today" 0 of 3 on both settings (it names today, there are no headlines yet today, so it is correctly refused: data, not
+  code); "hold on to once paid" 0 of 3 (right answer, 63.7% net margin, but the model also wrote the figure as $0.637 and the numbers check
+  flagged it; not loosened); "foolish not to hold some Apple" 0 of 3 (the notice is now attached but the question was refused by the relevance
+  gate with "couldn't find anything", and the case demanded filings evidence); "end of next year" 1 of 3 and 0 of 3 (it declines correctly but not
+  in the words the check wants); "in january" 2 of 3 with the router on. **Weak spots:** (1) word lists again: "yesterday morning", "Wednesday
+  afternoon", a date ("on the 14th"), and "two Thursdays ago" are still unread. (2) "close the highest" style verbs and company-side uses are guarded
+  by a handful of words; the next object word will slip through. (3) A company-side "crazy not to buy" ("Would Microsoft be foolish not to buy a chip
+  maker?") now carries the advice notice: one extra notice by design. (4) The weekday reading guesses the most recent such day before today; asked
+  on a Monday about "Monday" it is a week back, and the source prints the date it used. (5) `ROUND_FR` has 17 cases and one of them depends on the
+  time of day the headlines were last stored.
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

@@ -91,8 +91,10 @@ def test_predictions_hypotheticals_and_plain_questions_are_silent(question, pct)
 
 
 def test_a_period_that_could_not_be_read_is_silent():
-    # "last Friday" is flagged (unmet): the window is not the day the question means, so the move is not comparable.
+    # "last Friday" is a named day (window.day): the window shown is the default month, not that day, so the move is not comparable.
     assert check("Why did Apple stock crash last Friday?", 5.0) == []
+    # and a period that is still unmet keeps it silent too
+    assert check("Why did Apple stock crash at the end of last week?", 5.0) == []
 
 
 def test_several_companies_or_no_price_source_is_silent():
