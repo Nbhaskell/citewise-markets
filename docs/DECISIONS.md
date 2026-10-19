@@ -1925,6 +1925,27 @@ benchmarks.
   its own approval):** a "this looked wrong" button on the page (a second write), turning flagged questions into evaluation cases automatically, and
   rotating or trimming the file (a year of daily use is a few megabytes). **Weak spots:** the signals are a first filter, not a verdict (a refusal can
   be right; a wrong answer with a citation has no signal at all); times are shown in UTC.
+- **Typing variants, 2026-10-19** (branch `feature/lowercase-tickers`; no prompt change, no model call). **Where it came from:** the first real
+  questions in the owner's question log. "Hows nvda doing?" was refused ("tell me which company") because a lowercase ticker was not a
+  company and "hows" without an apostrophe was not "how's"; a probe found a curly apostrophe ("How’s NVDA doing?", what a phone types) got no
+  route either. **Built:** (1) `normalize_typing` (`ai/market.py`), applied at the top of `detect_intent`: curly single quotes become straight, and
+  "hows / whats / wheres / whos / thats / theres" (any case) get their apostrophe; "Shows" and "Whatsapp" are not touched; fixing twice changes
+  nothing more. The question is kept and shown as typed (it is not a rewrite, so no "Understood as"). (2) `company_mentions` matches a ticker in
+  lowercase too when `lowercase_ticker_ok`: at least three letters and not in `LOWERCASE_TICKER_BLOCKLIST` (the function words in `NOT_NAMES` plus 32
+  words a person types for other reasons: now, new, one, two, out, key, low, big, best, fast, good, well, work, open, real, true, safe, post, play,
+  snap, line, tech, fund, bank, gold, gas, car, sun, run, fit, hot, cool). Capitals still match as before; a ticker inside a longer word does not.
+  **Tests first: 87 new (`tests/test_typing_variants.py`); one older test (`test_detect_symbols_by_ticker_and_company_name`) pinned "tickers are
+  matched case-sensitively" and was changed on purpose; the suite is 2970 passed.** **Deliberate breakages: 63, all caught, after adding a question for
+  each blocked word and each word boundary (the first pass had 21 survivors, all untested blocklist words, and one redundant call that I removed: a
+  second `normalize_typing` in `answer_question` that no test could tell from the one in `detect_intent`).** **Evidence, old code against new code,
+  offline on 3,072 distinct questions:** 6 routes change and all 6 are questions written for this fix; the company a question names changes for 1
+  question (a test string), so **the lowercase rule matched nothing unintended in 3,072 questions against the 10 tracked companies**. A real check
+  with the live model: "Hows nvda doing?", "How’s NVDA doing?" and "whats the latest news on tsla" are answered from prices and headlines (before:
+  refused or no route). **Weak spots:** (1) a ticker added later that is also a word ("NOW", "ALL" are covered; "FIT" is; "ON" and "IT" are too short) needs
+  adding to the blocklist by hand, or it matches in lowercase; (2) only the six contractions above are handled ("cant", "dont", "isnt" are not; the
+  routing rules mostly match the full forms); (3) "Wheres Tesla stock?" now reads "Where's", but "where's" is not a price phrase, so it still has no
+  route; (4) the question log showed one more thing not fixed here: "what is the overall health of the stocks tracked?" is refused as "no company
+  named" (an overview over the tracked companies is not built).
 - **What changed: new filings, big moves, notable headlines (step 4; 2026-10-15).** `GET /api/changes?days=` and a
   `/changes` page, built by `data/changes.py` from stored data (rules are named constants at the top of that file).
   **What the data showed first (read-only queries on the dev database):** the newest stored filing was 2026-08-26, so a

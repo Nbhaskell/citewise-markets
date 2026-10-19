@@ -47,6 +47,17 @@ class MarketEvidence:
 
 # ---- what is the question asking for? ----
 
+# A question as it is typed on a phone or in a hurry (DECISIONS: "Typing variants"): a curly apostrophe ("How’s NVDA doing?") and a contraction
+# with no apostrophe ("Hows", "Whats", "Wheres", "Whos", "Thats", "Theres") made every rule that looks for "how's" or "what's" miss. Fixed once,
+# for the search text only; the question is shown as the owner typed it. "Shows" and "Whatsapp" are not touched (the word must be exactly this).
+_CURLY_APOSTROPHES = str.maketrans({"‘": "'", "’": "'"})
+_MISSING_APOSTROPHE_RE = re.compile(r"\b(how|what|where|who|that|there)s\b", re.IGNORECASE)
+
+
+def normalize_typing(text: str) -> str:
+    return _MISSING_APOSTROPHE_RE.sub(lambda m: m.group(1) + "'s", text.translate(_CURLY_APOSTROPHES))
+
+
 PRICE_RE = re.compile(
     r"""\b(?:
         stock\s+price|share\s+price|price\s+(?:history|chart|change|movement|action)|current\s+price|latest\s+price|price\s+today|
@@ -768,6 +779,7 @@ class Intent:
 def detect_intent(question: str) -> Intent:
     """Which kinds of evidence the question needs. Plain keyword rules, so the choice is predictable and testable.
     With no market wording the copilot behaves exactly as it did before (filings only)."""
+    question = normalize_typing(question)
     advice = asks_for_advice(question)
     unstored, question = unstored_figures(question)
     share_count = bool(HOW_MANY_SHARES_RE.search(question)) and not SHARES_ACTION_RE.search(question)
