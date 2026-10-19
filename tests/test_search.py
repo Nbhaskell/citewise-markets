@@ -1,12 +1,23 @@
 from datetime import date
 
+import psycopg
 import pytest
 
 from ai.index_filings import vector_literal
 from ai.search import search_filings
-from data.db import connect
+from data.db import connect, database_url
 
 SYMBOLS = ("ZZSA", "ZZSB")
+
+
+@pytest.fixture(scope="module", autouse=True)
+def vacuum_vectors_before_these_tests():
+    """The session-start vacuum in conftest is not enough: by the time this module runs, the earlier test files have inserted and deleted
+    thousands of vectors, and the dead entries left in the vector index crowd out these few test passages (the filter and latest-only tests
+    failed in about half of the full runs and passed alone, where the session vacuum had just run). Vacuum again right before them."""
+    with psycopg.connect(database_url(), autocommit=True) as c:
+        c.execute("VACUUM filing_chunks")
+    yield
 
 
 def axis(i, weight=1.0):

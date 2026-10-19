@@ -1,7 +1,13 @@
+import os
+
 import psycopg
 import pytest
 
 from data.db import database_url
+
+# The model router is on by default (DECISIONS: "Router on by default"). Tests use scripted models that expect exactly the calls they
+# were written for, so the suite switches it off; tests of the router itself pass `router=True` or set the variable themselves.
+os.environ["COPILOT_ROUTER"] = "off"
 
 
 @pytest.fixture(scope="session", autouse=True)

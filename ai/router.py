@@ -7,7 +7,8 @@ pick among routes that already exist. The model never names a company, never wri
 rules attached; companies, periods, figures, the numbers checks and the cautions all stay in Python. Any failure (model offline, bad
 JSON, a wrong type) leaves the keyword route alone, so the router can never make an answer fail.
 
-Off unless asked for: COPILOT_ROUTER=model, or `answer_question(..., router=True)`.
+On by default since 2026-10-19. Switch it off with COPILOT_ROUTER=off, or per call with `answer_question(..., router=False)`. The test
+suite sets COPILOT_ROUTER=off (tests/conftest.py) so tests with a scripted model never get an unexpected router call.
 """
 import json
 import os
@@ -74,10 +75,11 @@ class Route:
 
 
 def router_enabled(flag: Optional[bool] = None) -> bool:
-    """An explicit True or False wins; otherwise the COPILOT_ROUTER environment variable ("model" or "on" turns it on)."""
+    """An explicit True or False wins; otherwise the router is ON unless COPILOT_ROUTER says "off", "0", "false", "no" or "none". A blank
+    or unrecognised value keeps the default (on since 2026-10-19, DECISIONS: "Router on by default")."""
     if flag is not None:
         return flag
-    return os.environ.get("COPILOT_ROUTER", "off").strip().lower() in ("model", "on", "1", "true")
+    return os.environ.get("COPILOT_ROUTER", "").strip().lower() not in ("off", "0", "false", "no", "none")
 
 
 # The keyword rules send some questions to the filings ON PURPOSE even though they hold a figure word: the question names a filing
