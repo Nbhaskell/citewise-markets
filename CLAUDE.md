@@ -5,196 +5,62 @@ history see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md]
 
 ## What this is
 
-An AI stock market app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
+Citewise for Markets (the repo and folder are still called `stockMarket`): an AI stock market research app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
 refresh job (`jobs/`, scheduled in Windows Task Scheduler for 3pm Pacific), a FastAPI backend (`api/`) that is read-only except for starting an add and removing a company, and a
 React web app (`web/`) with four screens: dashboard (with a small "What changed" card), stock detail, "What changed"
 (`/changes`), and a full-page copilot that understands follow-ups
 and answers from filings, daily prices, and news headlines. Not built: accounts and
-login, portfolios, a screener, fundamentals for foreign (20-F) filers, adding a company from the app, backups
+login, portfolios, a screener, fundamentals for foreign (20-F) filers, backups
 kept anywhere but this PC's disk, email or phone alerts, a Claude (Anthropic API) provider, and anything that puts it online. See the
 README's "What is not built yet" for the current list.
 
 ## Current direction
 
 The owner uses this privately, on their own PC, for **daily research on companies**, and holds no stocks. So skip
-accounts, login, portfolios, holdings, and putting it online; none of that is wanted now. Roughly in the order to do
-them (the owner hasn't confirmed the order):
+accounts, login, portfolios, holdings, and putting it online; none of that is wanted now. The blow-by-blow history
+(dates, PR numbers, scores per round) lives in [docs/DECISIONS.md](docs/DECISIONS.md); this section is the state of
+play and the standing guidance.
 
-1. **Easier adding of companies.** Done as a command (`python -m jobs.add_company TICKER`) and as an "Add a company"
-   box on the dashboard (lookup, confirm, then a background add with progress). The box's start endpoint is the one
-   approved write exception to the read-only API rule (owner approved 2026-10-15); it is bound to `127.0.0.1`, accepts
-   only the local web app's origin and JSON, and is refused while another update holds the lock. **Removing a company is
-   built (PR #56, merged 2026-10-19; owner approved the command and the web button; DECISIONS: "Removing a company"):**
-   `python -m jobs.remove_company TICKER` and, in the web app, an on/off tracking switch (✓ / ✕ and the words "Tracked" / "Not
-   tracked") beside every company in the watchlist and in the stock page header, each with an "Are you sure?" before anything
-   happens (`feature/watchlist-toggle`, DECISIONS: "Tracking switches"). Switching off calls `POST /api/remove-company`, the second
-   approved write endpoint. Removed companies stay in the watchlist card under "Not tracked" (dimmed, from the read-only
-   `GET /api/removed-companies`); switching one back on runs the existing add (a few minutes, progress shown, every switch off
-   meanwhile), so there is no third write endpoint. It stops tracking and deletes nothing
-   (`instruments.active = false`; prices, filings, headlines and figures stay, and adding the ticker again switches it back
-   on). A removed company is off the dashboard, the nightly refresh, "What changed", the filing search and the copilot's
-   company list, and naming it in a question gets the "isn't one of the companies tracked here" reply. A hard delete ("purge")
-   is not built; it would need a backup first. Checked on a real foreign filer (TSM): the SEC has 20-F for it and no 10-K or 10-Q, so it
-   is added with no filings and the report says so. Whether to also store 20-F is an open decision for the owner.
-2. **Database backups.** Built as `python -m jobs.backup` (backup, list, verify, restore); the restore was tested into
-   a brand-new empty Postgres. Scheduled daily at 6pm in Windows Task Scheduler (`StockMarketBackup`, registered
-   2026-10-13 at the owner's request), writing to `C:\Users\nbhas\stockmarket-backups` via `BACKUP_DIR` in `.env`.
-   That folder is outside the project but still on the only internal disk (`C:`), so it does not survive the disk
-   failing; an occasional copy to OneDrive or a USB drive is the owner's call. No "newest backup is old" warning yet.
-3. **Fundamentals** (P/E, market value, revenue, margins), in three steps the owner approved on 2026-10-13: (1) data
-   and calculations, built: SEC "company facts" stored in `financial_facts`, ratios computed in `data/fundamentals.py`,
-   a nightly `fundamentals` step; (2) built: `GET /api/stocks/{symbol}/fundamentals` and a "Fundamentals" card on the
-   stock detail page (`web/src/components/Fundamentals.tsx`); (3) built: the copilot answers P/E, market value,
-   EPS, revenue, profit, and margin questions from the figures as a numbered source of kind `fundamentals`
-   (`ai/market.py`), and attaches the relevant cautions to the answer in code. US-GAAP filers only; foreign filers show "not available".
-   Python computes every ratio and the model only quotes it as a numbered source. A screener can't exist without these.
-4. **A daily "what changed" view** (new filings, big moves, notable headlines) from data already stored. Built on
-   (`/changes`, `GET /api/changes`, `data/changes.py`; see DECISIONS "What changed"), with a "since last visit" option
-   (a per-browser marker) and a dashboard card. No AI summary, computed on read, nothing stored. Not built: copilot
-   questions about it.
-5. **Copilot trust.** In progress; the history is in DECISIONS.md ("Copilot trust, steps 1 to 6"). Built, all in code and
-   not in the prompt: a follow-up that only names another company keeps the earlier topic (`carry_topic`); ratios the app
-   doesn't compute are declined (`unstored_figures`); "Tesla's stock" with nothing else is a price question
-   (`BARE_STOCK_RE`); "how many shares does X have" goes to the stored share count (`HOW_MANY_SHARES_RE`); a request for a
-   buy, sell, or hold call always carries a fixed notice (`asks_for_advice`, `ADVICE_CAUTION`); a table passage that lost
-   its unit sentence to the cut between passages gets it back at prompt time (`ai/table_units.py`); and a figure the
-   question itself contains is not flagged as unverified when the answer only declines or restates (`_users_own_numbers`).
-   Two held-out rounds, each written in new wording and run once before any tuning: the first (36 cases) scored 78 of 108
-   (72%), the second (35 cases, after five fixes from the first) **68 of 105 (65%)**, which is the honest number (DECISIONS:
-   "Held-out round" and "Second held-out round"). The five fixes from the first round are merged: quoted titles must be
-   in the sources (`invented_titles`, a warning, it does not prevent the invention), more price wordings, more ratios
-   declined and a caution on a false "no price" claim (`false_price_claim`), market-value, sentiment and advice wordings,
-   the earlier year's real date in the growth label, and a placeholder headline rule. The second round shows the wording
-   rules are not general: new everyday phrasings miss in the same places (a period in a price question, "earn" and
-   "sales", "Now do X" follow-ups, a few advice phrasings, a non-company question answered from a filing), and some
-   passing answers use the wrong period without saying so. The set was 157 cases then (189 after fix (f)); all are tuning material now, and the full
-   run scored 356 of 366 before the second round. Also failing: "shares: buy back (quarter total)" on purpose (a real
-   wrong answer: one month's row, not the Total; rebuilding rows was tried and dropped, see DECISIONS, so don't retry it),
-   and flaky cases ("news and stock", "press coverage", "sentiment", "how is X doing") that swing between runs on the same
-   code. Scores from different steps are not the same bar, because some checks changed. Not done: the fixes the second
-   round points to, in the order DECISIONS gives (price questions with a period first), whether to weigh a model-based
-   routing step against more keyword rules, and the content of advice-adjacent answers. (The fresh held-out round that measured
-   fixes (a) to (f) is done; see below.) (The newest-stored-price-a-day-old problem looks fixed by moving the nightly task to 3pm: the 2026-10-15 run
-   left every price on the same day. It is one run, so keep checking `python -m jobs.refresh --status`.)
+1. **Adding and removing companies: built.** `python -m jobs.add_company TICKER` and an "Add a company" box on the
+   dashboard; `python -m jobs.remove_company TICKER` and an on/off tracking switch beside every company (with an "Are you
+   sure?"). These are the only two write endpoints the API has (`POST` add-start and `POST /api/remove-company`, both
+   approved by the owner; there is no third: switching a removed company back on runs the existing add). Removal sets
+   `instruments.active = false` and deletes nothing; a purge is not built and would need a backup first. A foreign 20-F
+   filer (TSM) is added with prices and headlines but no filings; whether to also store 20-F is an open decision for the
+   owner. DECISIONS: "Removing a company", "Tracking switches".
+2. **Database backups: built** as `python -m jobs.backup` (backup, list, verify, restore), scheduled daily at 6pm in Windows
+   Task Scheduler (`StockMarketBackup`) into `BACKUP_DIR`. The folder is on the only internal disk, so it does not survive
+   the disk failing; an occasional copy to OneDrive or a USB drive is the owner's call. No "newest backup is old" warning yet.
+3. **Fundamentals: built** (P/E, market value, revenue, margins, EPS): SEC "company facts" stored in `financial_facts`,
+   ratios computed on read in `data/fundamentals.py`, `GET /api/stocks/{symbol}/fundamentals`, a Fundamentals card on the
+   stock page, and the copilot quoting the figures as a numbered source of kind `fundamentals` with cautions attached in
+   code. US-GAAP filers only. Python computes every ratio; the model only quotes it. A screener can't exist without these.
+4. **"What changed": built** (`/changes`, `GET /api/changes`, `data/changes.py`, a dashboard card, a per-browser "since last
+   visit" marker). Computed on read, no AI summary, nothing stored. Not built: copilot questions about it.
+5. **Copilot trust: ongoing.** Everything below is done in code, not in the prompt (DECISIONS: "Copilot trust, steps 1 to 6"
+   and the rounds after it): follow-ups that name only another company keep the earlier topic; ratios the app doesn't
+   compute are declined; a request for a buy, sell or hold call always carries `ADVICE_CAUTION`; questions about things
+   outside the tracked companies and requests to write something are declined with a fixed message; named periods are
+   read exactly or flagged by a caution; a false premise (or a false "no price data" / "no news") gets a code-side note;
+   a lowercase ticker and "hows / whats" typing variants are read. A local-model **router** (`ai/router.py`) is asked only
+   when the keywords find no specific route, and was turned on by default on 2026-10-19 (`COPILOT_ROUTER=off` switches it
+   off).
 
-   **Next up (as of 2026-10-15): this step.** Order from DECISIONS ("Second held-out round"). Done (PR #32, merged
-   2026-10-15): (a) price questions that name a period or compare with the start of
-   the year, and (b) reading more periods (numbers, "a few weeks", "since July") and saying in code, as a caution, when
-   the period asked cannot be matched or "today" has no close (DECISIONS: "Price questions that name a period"; 422 of 471
-   before, 434 after, tuning material, not a fair score). Done (PR #33, merged 2026-10-16): (c) follow-up carrying ("Now
-   do X", "better or worse than X" keeping both companies; DECISIONS: "Follow-up carrying"; 436 of 471 on the market
-   evaluation; 11 fresh follow-up cases went 3 of 11 on `main` to 7 of 11, 9 of 11 after adding the words they missed, now
-   tuning material). Done (PR #34, merged 2026-10-16): (d) "earn" and "sales" wording (DECISIONS: "'Earn' and 'sales'
-   wording"; 437 of 471 before, 446 after; 11 fresh cases 8 of 11, 9 of 11 after one fix, now tuning material). Done (PR #35,
-   merged 2026-10-16): (e) advice and sentiment wording (DECISIONS: "Advice and sentiment wording"; 474 of 504 before, 485 after; 11 fresh cases 5 of 11, then all 11 after adding their wordings, now
-   tuning material). Done (PR #36, merged 2026-10-16): (f) questions about things outside the tracked companies
-   (DECISIONS: "Questions about things outside the tracked companies"; 515 of 537 before, 519 after; 10 fresh cases 6 of 10
-   once the checker read refusal text, now tuning material). **That closes items (a) to (f).**
+   **How to read the scores.** The routing rules are word lists, and every list has missed on the next wording. Held-out
+   rounds, each written in new wording and run once before any tuning, scored 72% and 65% (the first two) and 46% on the
+   fresh round after them (a deliberately harder set). The sealed rounds scored, with the router on, 70%, 79% and 78%
+   (keywords only: 58%, 66%, 65%); once a round has been run its cases are tuning material and join `CASES`. The agreed
+   stopping rule (stop tuning keywords at 85 to 90 percent on two rounds in a row, or when most failures are arguable) is
+   **not met**, and `SEALED` is spent: write a new sealed set (`--sealed`) before any fair comparison. Scores from different
+   steps are not the same bar, because some checks changed. DECISIONS holds the per-round numbers and the worst misses.
 
-   **Fresh held-out round for the whole second-round work: run 2026-10-16, fair score 48 of 105 (46%)** (branch
-   `feature/fresh-held-out-round`; the 35 market and 8 follow-up resolution cases were committed, 56ab20b, before the run;
-   DECISIONS: "Fresh held-out round"). The second round scored 68 of 105 (65%) on different questions, and 12 of these 35 were
-   deliberate stretches (3 of 12 passed; the other 23 passed 13), so the numbers are not a trend; about 21 of 35 (60%) after
-   reading every answer and counting six arguable expectations. By group (first pass): prices, news, and sentiment 5 of 12,
-   figures 3 of 5, filings 3 of 3, traps, advice, and outside topics 3 of 10, follow-ups 2 of 5; follow-up resolution 3 of 8.
-   The worst failures are confident wrong answers, not refusals: a false "no price data" or "no news" (the code-side caution
-   fired for some and not others), a wrong period stated as the one asked ("when the year opened", "ninety days"), a missed
-   advice notice ("cash out"), and a false premise accepted ("Google doubled"). **Those 35 cases have been run, so
-   they are tuning material from now on (they are in `CASES`).** **Fix (1) is merged (PR #37, 2026-10-16;
-   DECISIONS: "Fix (1) of the fresh round"):** the since-mid-month, "N units ago", "close", "higher than it was ... ago",
-   "chatter" and "stories" wordings now route, and a false "no news" claim carries a caution like the price one; the 189 older
-   cases went 549 to 548 of 567 (a flaky case), the fresh round's 35 went 48 to 65 of 105, and 10 fresh cases went 2 to 6 of 10.
-   **Fix (2) is merged (PR #38, 2026-10-16; DECISIONS: "Fix (2) of the fresh round"):** "ninety days", quarters, trading days, "since 2024", "since Monday", "a year and a half" and "when the year
-   opened" are read exactly, and every other named period that is not read is flagged by a caution (prices and headlines) instead
-   of defaulting silently; a window past the first stored close says so. A clean old-against-new run on 234 cases went 631 to 636
-   of 702; 12 fresh cases went 1 to 5.
-   **Fix (3) is merged (PR #39, 2026-10-16; DECISIONS: "Fix (3) of the fresh round"):** "cash out", "take profits", "unload", "is it time to", "would it be crazy to" and the like now carry the
-   advice notice (with company-side guards), "Google doubled" and "can only go up" reach the prices, and a new code-side premise
-   statement quotes the stored move when the question assumes one that did not happen. A clean old-against-new run on 246 cases went
-   648 to 657 of 738; 12 fresh cases went 3 to 8.
-   **The cause-word gap from fix (3) is merged (PR #40, 2026-10-16; DECISIONS: "Cause words"):** "what drove / caused / triggered it", "how come" and "what's responsible for" bring the headlines to a price question, and
-   "<Company>'s jump / slide" or "the move in <Company> stock" with a cause word reaches the prices. A clean old-against-new run on 258
-   cases went 675 to 681 of 774; 8 fresh cases went 1 to 7.
-   **Fix (4) is merged (PR #41, 2026-10-17; DECISIONS: "Fix (4) of the fresh round"):** a
-   question that is only a company switch ("Skip to Nvidia.", "Switch over to Microsoft.", "Give me the number for Apple too.") or only
-   a comparison ("Is Tesla's list longer than that?", "Does Amazon say anything similar?", "Did Microsoft fare better than that?") names
-   no topic, so the earlier question rebuilt with the new company now wins over the model's rewrite (it used to be trusted when it named
-   both companies); "similar" searches the earlier company too; "the companies" / "which company" with no company named is used as written.
-   One clean old-against-new run on 266 cases went 707 to 711 of 798; follow-up resolution 39 (40 after a checker fix) to 46 of 46; 10 fresh
-   cases (fair score) went 3 to 4 of 10, 8 of 10 after adding the words they missed (now tuning material). The next wording will miss
-   again: these are still word lists.
-   **Fix (5) is merged (PR #42, 2026-10-17; DECISIONS: "Fix (5) of the fresh round"):** a
-   question that names no tracked company and contains a capitalised name found in no stored filing or headline is declined by name
-   (`unknown_name`, so no company list is needed for it); the company list grew from 70 to 183 names; more outside assets (gas, diesel,
-   crops, "the economy", REITs, stablecoins, more currencies); and a request to write an email, post, poem, code, slides or a translation
-   is declined **even when a tracked company is named** (`writing_request`; summaries, lists and tables are research and stay answerable).
-   One clean old-against-new run on 271 cases went 726 to 730 of 813 (gas prices, Chipotle and "draft an email" 0 to 3 of 3); 11 fresh
-   cases (fair score) went 2 to 8 of 11. A false-positive spot check of 38 ordinary questions with no tracked company found 3 wrongly
-   declined (Brussels, the Pentagon, Llama: names in nothing stored). Eggs, uranium and "write up a one-pager" still miss.
-   **Model-based routing experiment is merged (PR #43, 2026-10-17, router OFF by default; DECISIONS: "Model-based
-   routing experiment"):** when the keywords find no specific route, the local model is asked one JSON question (`ai/router.py`: which
-   kinds of stored data does this question need; research / outside / writing) and can only add to the keyword route; it never names a
-   company or writes an answer, and any failure leaves the keywords. It is off unless `COPILOT_ROUTER=model` (or `router=True`).
-   Guards in code keep it from overriding the keyword rules' deliberate filings routes ("10-K", "why", dividends, "iPhone sales"), from
-   adding headlines to a non-news question, and from declining anything that has no writing word in it; its "outside" verdict is only
-   a hint. **Router visibility is built on `feature/router-visibility` (2026-10-17, DECISIONS: "Router visibility"):** the answer carries
-   `model_route` (the kinds of evidence the model chose; empty when the keywords decided, the router was off or failed, or it chose
-   what the keywords had), and the page shows a muted "the local model chose: ..." line under "Looked at ..."; "Understood as" is
-   unchanged. Results: a fresh 39-question baseline of 44% (52 of 117) went to 71% on the same cases (those are now development
-   material); on the 282 older cases 761 to 769 of 846; the sealed 38 (run once) 78 to 93 of 114 on the first version, 90 on the final,
-   after two false declines found by reading the answers made it a second-look set. The merge rule set beforehand is met. **The owner turned it on by default on 2026-10-19
-   (`feature/router-on-by-default`, DECISIONS: "Router on by default"; the switch back is `COPILOT_ROUTER=off`); "clear
-   in profit" is covered by the router when it is on (a fresh set will tell). The router does not fix a question the keywords route wrongly, or a follow-up whose
-   rewrite lost its topic. Every keyword list so far has missed on the next wording, so write a new sealed set (`SEALED`, `--sealed`)
-   before the next fair comparison. All earlier fresh cases are in `CASES` (359 market, plus the 37-case development set `ROUND_SL`
-   = 396, plus the 11 of the "lately" rule = 407; 51 follow-up resolution), so `HELD_OUT` is empty. **`SEALED_ROUND_TWO` (41 cases) joined `CASES`
-   on 2026-10-18 (partly spoiled by the "lately" rule). `SEALED` is `SEALED_ROUND_THREE` (43 cases), RUN ONCE on 2026-10-18 and spent
-   (DECISIONS: "Third sealed round"): keywords only 25 of 43 (58%), router on 30 of 43 (70%), no case lost. Worst misses, all
-   keyword-side: advice ("go all in on AMD. Should I?" got no notice), a writing request with a company named ("LinkedIn update on
-   Amazon's quarter" answered), a false "market value not available", and speaker verbs not on the list ("warn"). Write
-   `SEALED_ROUND_FOUR` before the next fair comparison.** **The advice and writing misses are fixed in code on the same branch
-   (2026-10-18, DECISIONS: "Advice and writing misses"):** the reader's own "go all in" / "bet big" / "put everything in" and a bare
-   "Should I?" carry the notice, "LinkedIn update", "status update", "blurb", "slogan" and similar are declined as writing requests
-   (the update/blurb/bio words only after a writing verb), and a refused advice question carries the notice too. 14 fresh cases 9 to
-   33 of 42; 72 of 2,623 routes change and all are new questions; 2501 Python tests pass. **The routing misses of the sealed round are fixed on
-   `feature/sealed-misses-routing` (2026-10-18, DECISIONS: "Routing misses of the third sealed round"):** "what all its shares are worth"
-   goes to the market value, a news source doing something ("the papers are printing", "columnists writing") to the headlines, "highest and
-   lowest close" and "X's swings" to the prices, and warn / admit / concede / signal / indicate / flag / note / talk / tell are speaker
-   verbs. 18 fresh cases 3 to 46 of 54; 2637 Python tests pass. **Fourth sealed round, run once 2026-10-19 (DECISIONS: "Fourth sealed round"): keywords only 31 of 47 (66%), router on 37 of 47
-   (79%), no case lost; `SEALED` is now spent again, write `SEALED_ROUND_FIVE` for the next fair comparison.** Its worst answers: a wrong
-   number (gross margin 15% from the filings instead of the stored 48.7%; operating income given as "after all expenses"), a false "no
-   headlines" for "this morning", a day-of-week close ("on Thursday") called unavailable, a prediction question that quoted a year-old
-   price, and "crazy not to own Nvidia. Am I?" with no advice notice. **The six wrong answers are fixed in code on `feature/fourth-round-misses` (DECISIONS: "Fourth-round misses"):** "every sales dollar ... keep" and
-   "clear after all expenses" reach the stored figures (which now say what net income, operating income and each margin mean), "this morning" /
-   "overnight" / "come out about" are news, "on Thursday" / "last Wednesday" give that day's close and change, "where X's stock will be" is a price
-   prediction, and "crazy not to own X. Am I?" carries the advice notice. 17 fresh cases 4 to 40 of 51 (router off) and 15 to 38 (router on); 106
-   routes change on 2,960 questions, 101 written for this fix; no evaluation case changed its route. **Fifth sealed round, run once 2026-10-19 (DECISIONS: "Fifth sealed round"): keywords only 30 of 46 (65%), router on 36 of 46 (78%); the 85 to 90 percent
-   stopping rule is NOT met (router on: 70%, 79%, 78% over the last three rounds), and `SEALED` is spent again.** Real misses: "Has the media turned
-   against Tesla?" (routed to the filings), "the feeling toward Microsoft after its last earnings" (routed to the figures), "Should it go into AMD?" and
-   "My dad says dump Apple. Smart?" (no advice notice), "better level than it was in July" (unread period). **Typing variants are fixed on `feature/lowercase-tickers` (found in the question log; DECISIONS: "Typing variants"):** a lowercase ticker of three or more
-   letters that is not a common word names the company ("hows nvda doing"), a curly apostrophe and "hows / whats / wheres / whos / thats / theres" are read as
-   typed with an apostrophe (`normalize_typing`, `lowercase_ticker_ok`, `LOWERCASE_TICKER_BLOCKLIST`); a ticker added later that is also a word needs adding to the blocklist.
-   Still open: named outlets ("the Wall Street Journal"), "since spring" as a
-   period, a company's later mention turning the prices off ("shares fell after Marketco warned"), and a new sealed set
-   (`SEALED_ROUND_FOUR`) for the next fair comparison. A shadow run of the router (`ai/eval_router_shadow.py`, DECISIONS:
-   "Router second look, step 2") found no policy for "the model second-guesses a specific keyword route" that beats today on the older
-   cases (the router is right in 10 of 72 disagreements, all on cases written to find keyword mistakes; it adds prices to figures
-   questions), so **there is no second look; the router is still asked only when the keywords find no route.** **The "lately" rule is
-   built on `feature/lately-price-rule` (DECISIONS: "Router second look, 'lately'"):** "lately" brings headlines only when the question is
-   not already a price question, a company + a movement word (climbing, sliding, drifting...) + a recency word is a price question, and a
-   cause question about a "slide" or "jump" counts "lately" as the period; 4 of 11 fresh cases on the old code, 10 of 11 on the new.
-   **Follow-up topic carry is merged (PR #47, 2026-10-18, DECISIONS: "Follow-up topic carry"):** a follow-up that points back without
-   naming a topic gets the earlier question's topic in code (a new company swapped in, a comparison "..., compared with X", or a cause
-   question appended to an earlier price question). On 61 follow-up cases, old against new, answers: 138 to 177 of 183; the 16 fresh ones
-   34 to 45 of 48; `ai.eval_followups` 50/51 to 51/51. Still failing: "Where does Tesla land on that scale?". It is a word list again, and a
-   rebuilt comparison replaces the user's own comparison wording.
-   **Filings questions with price or mood words are fixed in code on `feature/filings-price-words` (2026-10-18, DECISIONS: "Filings
-   questions with price or mood words"):** when a tracked company, its management or its 10-K is the one saying or describing something
-   ("What does Apple say about falling demand in China?", "Does Tesla sound optimistic...?"), prices, headlines and mood are switched off and
-   the question goes to the filings, unless the press is named; the stored figures are untouched, and the router is not asked about such a
-   question (`company_is_speaking`, `route_by_speaker`). 8 development cases 0 to 24 of 24 runs; 14 fresh cases 14 to 38 of 42; 25 routes
-   change on 1,786 questions, all intended. Still open: a price word in a question with no speaker ("Was Microsoft's Activision acquisition
-   closed on schedule?"), a speaker verb not on the list, and a new sealed set for the next fair comparison.
+   **Known open items:** named outlets ("the Wall Street Journal"), "since spring" as a period, a company's later mention
+   turning the prices off ("shares fell after Marketco warned"), a price word in a question with no speaker, a speaker
+   verb not on the list, and the follow-up "Where does Tesla land on that scale?". The router does not fix a question the
+   keywords route wrongly, and a shadow run found no policy for letting the model second-guess a keyword route (DECISIONS:
+   "Router second look, step 2"), so there is no second look. **Do not retry rebuilding table rows for the model**: it was
+   tried and dropped (DECISIONS, 2026-10-14), and "shares: buy back (quarter total)" fails on purpose. The newest stored
+   price being a day old looks fixed by moving the nightly task to 3pm; keep checking `python -m jobs.refresh --status`.
 
 ## Working with the owner
 

@@ -24,7 +24,7 @@ describe("CopilotPage", () => {
     expect(screen.getByText(/only to understand what you mean, never as evidence/)).toBeInTheDocument();
     expect(screen.getByText(/saved in this browser only/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Ask about your companies" })).toBeInTheDocument();
-    expect(document.title).toBe("Copilot · stockMarket");
+    expect(document.title).toBe("Copilot · Citewise for Markets");
   });
 
   it("answers an example question with one click and then shows the conversation", async () => {

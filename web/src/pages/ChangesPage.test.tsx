@@ -25,7 +25,7 @@ describe("ChangesPage", () => {
     expect(screen.getByRole("heading", { name: "Big moves" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Notable headlines" })).toBeInTheDocument();
     expect(await screen.findByText(/Latest trading day: Oct 14, 2026/)).toBeInTheDocument();
-    expect(document.title).toBe("What changed · stockMarket");
+    expect(document.title).toBe("What changed · Citewise for Markets");
   });
 
   it("asks for the latest day first, then for the window you pick", async () => {

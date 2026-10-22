@@ -48,9 +48,9 @@ function StockDetailView({ symbol }: { symbol: string }) {
   const [asking, setAsking] = useState(false); // the "Stop tracking?" question is open
 
   useEffect(() => {
-    document.title = `${symbol} · stockMarket`;
+    document.title = `${symbol} · Citewise for Markets`;
     return () => {
-      document.title = "stockMarket";
+      document.title = "Citewise for Markets";
     };
   }, [symbol]);
 

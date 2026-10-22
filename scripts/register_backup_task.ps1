@@ -31,7 +31,7 @@ $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatt
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings `
-    -Principal $principal -Description "Backs up the stockMarket database to the backups folder (or BACKUP_DIR)." -Force | Out-Null
+    -Principal $principal -Description "Backs up the Citewise for Markets database to the backups folder (or BACKUP_DIR)." -Force | Out-Null
 
 Write-Host "Scheduled '$TaskName' daily at $Time."
 Write-Host "Run it now:       Start-ScheduledTask -TaskName $TaskName"

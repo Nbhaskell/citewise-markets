@@ -49,7 +49,7 @@ def send_notification(title: str, body: str) -> bool:
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    ok = send_notification("Stock market app: test alert", "If you can read this, nightly-job alerts will reach you.")
+    ok = send_notification("Citewise for Markets: test alert", "If you can read this, nightly-job alerts will reach you.")
     print("Sent. Look for a notification at the bottom right." if ok else "Failed; see the message above.")
     return 0 if ok else 1
 

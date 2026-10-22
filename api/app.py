@@ -46,7 +46,7 @@ Source = Annotated[PriceSource, Depends(get_instrument_source)]
 Launcher_ = Annotated[Launcher, Depends(get_job_launcher)]
 
 app = FastAPI(
-    title="stockMarket API",
+    title="Citewise for Markets API",
     version="0.1.0",
     description=(
         "Read-only access to prices, news, sentiment, SEC filings, and the filing-grounded copilot. "

@@ -20,7 +20,7 @@ export function App() {
     <div className="app">
       <header className="app-header">
         <Link to="/" className="brand">
-          stockMarket
+          Citewise for Markets
         </Link>
         <nav className="main-nav" aria-label="Main">
           <NavLink to="/" end>
