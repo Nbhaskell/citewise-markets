@@ -1,6 +1,6 @@
 # Web app
 
-The browser screens for Citewise for Markets. React 19, TypeScript, built with Vite. Three screens so far:
+The browser screens for Citewise for Markets. React 19, TypeScript, built with Vite. Four screens:
 
 - **Dashboard** (`/`): a watchlist, a combined news panel, and a box for asking the copilot questions (it answers from stored filings, prices, and headlines).
 - **Stock detail** (`/stocks/AAPL`): an interactive price chart, key stats with a 52-week range bar, that company's news,

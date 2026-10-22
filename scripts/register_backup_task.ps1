@@ -22,7 +22,7 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $root ".venv\Scripts\python.exe"
-if (-not (Test-Path $python)) { throw "Can't find $python. Create the virtual environment first (see README)." }
+if (-not (Test-Path $python)) { throw "Can't find $python. Create the virtual environment first (see docs/SETUP.md)." }
 
 $action = New-ScheduledTaskAction -Execute $python -Argument "-X utf8 -m jobs.backup" -WorkingDirectory $root
 $trigger = New-ScheduledTaskTrigger -Daily -At $Time

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repo. For setup and commands see [README.md](README.md); for design and
+Guidance for Claude Code when working in this repo. For setup and commands see [docs/SETUP.md](docs/SETUP.md) and [docs/OPERATIONS.md](docs/OPERATIONS.md) (the [README](README.md) is the overview); for design and
 history see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## What this is
@@ -12,7 +12,7 @@ React web app (`web/`) with four screens: dashboard (with a small "What changed"
 and answers from filings, daily prices, and news headlines. Not built: accounts and
 login, portfolios, a screener, fundamentals for foreign (20-F) filers, backups
 kept anywhere but this PC's disk, email or phone alerts, a Claude (Anthropic API) provider, and anything that puts it online. See the
-README's "What is not built yet" for the current list.
+README's "The full list of what is not built" for the current list.
 
 ## Current direction
 
