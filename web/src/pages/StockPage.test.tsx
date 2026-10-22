@@ -34,7 +34,7 @@ describe("StockPage", () => {
     expect(await screen.findByRole("rowheader", { name: "10-Q" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Ask about AAPL" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "← Dashboard" })).toHaveAttribute("href", "/");
-    expect(document.title).toBe("AAPL · stockMarket");
+    expect(document.title).toBe("AAPL · Citewise for Markets");
   });
 
   it("accepts a lowercase ticker in the address", async () => {

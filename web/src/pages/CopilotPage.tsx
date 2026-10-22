@@ -21,9 +21,9 @@ export function CopilotPage() {
   const [confirmingClear, setConfirmingClear] = useState(false);
 
   useEffect(() => {
-    document.title = "Copilot · stockMarket";
+    document.title = "Copilot · Citewise for Markets";
     return () => {
-      document.title = "stockMarket";
+      document.title = "Citewise for Markets";
     };
   }, []);
 

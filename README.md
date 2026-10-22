@@ -1,6 +1,6 @@
-# stockMarket
+# Citewise for Markets
 
-An AI stock market app, built bottom-up and used privately on one PC for company research. The **data layer**, the
+An AI stock market research app, built bottom-up and used privately on one PC for company research. The **data layer**, the
 **AI layer**, a nightly refresh job, an API, and a web app (dashboard, stock detail, copilot) all exist.
 
 What works today:

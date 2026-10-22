@@ -39,9 +39,9 @@ export function ChangesPage() {
   }, [data]);
 
   useEffect(() => {
-    document.title = "What changed · stockMarket";
+    document.title = "What changed · Citewise for Markets";
     return () => {
-      document.title = "stockMarket";
+      document.title = "Citewise for Markets";
     };
   }, []);
 

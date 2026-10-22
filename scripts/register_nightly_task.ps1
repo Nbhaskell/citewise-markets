@@ -29,7 +29,7 @@ $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatt
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings `
-    -Principal $principal -Description "Refreshes prices, news, filings, embeddings and sentiment for the stockMarket project." -Force | Out-Null
+    -Principal $principal -Description "Refreshes prices, news, filings, embeddings and sentiment for the Citewise for Markets project." -Force | Out-Null
 
 Write-Host "Scheduled '$TaskName' daily at $Time."
 Write-Host "Run it now:      Start-ScheduledTask -TaskName $TaskName"

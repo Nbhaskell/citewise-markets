@@ -126,7 +126,7 @@ if (Test-Listening $ApiPort) {
 }
 
 if (Test-Listening $WebPort) {
-    if (Test-Url $webUrl 3 "stockMarket") {
+    if (Test-Url $webUrl 3 "Citewise") {
         Step "The web app is already running on port $WebPort, so it is left alone"
         $webUp = $true
     } else {
@@ -146,7 +146,7 @@ if (-not $apiUp -and -not $apiBlocked) {
     if (-not $apiUp) { Warn "The API didn't answer within 60 seconds. Look at its window ('stockMarket-api-server') for the error." }
 }
 if (-not $webUp -and -not $webBlocked) {
-    $webUp = Wait-Until { Test-Url $webUrl 3 "stockMarket" } 60
+    $webUp = Wait-Until { Test-Url $webUrl 3 "Citewise" } 60
     if (-not $webUp) { Warn "The web app didn't answer within 60 seconds. Look at its window ('stockMarket-web-server') for the error." }
 }
 

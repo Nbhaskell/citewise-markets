@@ -2159,7 +2159,7 @@
   },
   "info": {
     "description": "Read-only access to prices, news, sentiment, SEC filings, and the filing-grounded copilot. Summaries of public filings, prices, and headlines. Not financial advice.",
-    "title": "stockMarket API",
+    "title": "Citewise for Markets API",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
