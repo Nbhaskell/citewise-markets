@@ -69,14 +69,14 @@ function Run-Quietly([scriptblock]$command) {  # a native command's exit code, w
 }
 
 # ---- what must exist before anything can start ----
-if (-not (Test-Path $python)) { Fail "Can't find $python. Create the virtual environment first (see README)." }
-if (-not (Test-Path (Join-Path $root ".env"))) { Fail "Can't find .env. Copy .env.example to .env first (see README)." }
+if (-not (Test-Path $python)) { Fail "Can't find $python. Create the virtual environment first (see docs/SETUP.md)." }
+if (-not (Test-Path (Join-Path $root ".env"))) { Fail "Can't find .env. Copy .env.example to .env first (see docs/SETUP.md)." }
 if (-not (Test-Path (Join-Path $web "node_modules"))) { Fail "The web app isn't installed. Run 'npm install' in the web folder first." }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Fail "Docker isn't installed or isn't on PATH. The database runs in Docker." }
 if ((Run-Quietly { docker info }) -ne 0) { Fail "Docker isn't running. Open Docker Desktop, wait for it to say it is running, and try again." }
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     $env:PATH += ";C:\Program Files\nodejs"  # a terminal opened before Node was installed doesn't have it on PATH
-    if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Fail "Can't find Node.js. Install it (see README) and try again." }
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Fail "Can't find Node.js. Install it (see docs/SETUP.md) and try again." }
 }
 
 # ---- 1. the database ----
