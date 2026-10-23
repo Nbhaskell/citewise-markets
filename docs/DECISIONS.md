@@ -4,6 +4,33 @@ A record of why things are the way they are, and what testing showed. Numbers ar
 (AAPL, MSFT, NVDA, GOOGL, AMZN, TSLA); AMD was added on 2026-10-15, so later entries (the "What changed" ones) cover seven. Most evaluations were small and hand-read, so treat them as spot checks, not
 benchmarks.
 
+## Highlights
+
+This file is long (about 2,000 lines). If you read only a few entries, read these. The story that connects them is in
+[CASE_STUDY.md](CASE_STUDY.md). The entries have no headings of their own, so each pointer below gives the section and the
+start of the bold title to search for.
+
+- **Why a citation is not enough, and why the numbers check exists.** Section "How the safety checks were calibrated", the
+  "Numbers check" item (a correct-looking Microsoft figure, wrong by $0.2 billion).
+- **Right digits, wrong direction.** "Gotchas we hit": "Asked "Why did Nvidia stock fall this month?"..." (a stock that rose
+  was described as falling, and the digits check passed).
+- **Cautions are attached in code.** "Decisions": "Cautions are attached to the answer in code, scoped to the figures asked
+  about" (the model left Alphabet's investment-gains caution out of its own sentence).
+- **Why the shared prompt is never edited for a new feature.** "Gotchas we hit": "Three new sentences in the shared prompt
+  made unrelated questions worse" ("should I sell" went from 16 of 20 to 4 of 20).
+- **Table units, and a fix that was tried and dropped.** "Known weak spots": "Filing tables lose their units, and the fix
+  (2026-10-14)" and "Rebuilding table rows for the model was tried and dropped (2026-10-14)".
+- **A silent failure.** "Known weak spots": "Prices were always a day behind; the nightly job moved from 5pm to 3pm Pacific"
+  (the job said "success, 0 problems" while the newest price was a day old).
+- **The honest scores.** "Known weak spots": "Held-out round: the fair score is 78 of 108 (72%)", "Second held-out round: the fair
+  score is 68 of 105 (65%)", and "Fresh held-out round for the whole second-round work: the fair score is 48 of 105 (46%)".
+- **The model-based router: built, measured, and the problem the score hid.** "Known weak spots": "Model-based routing
+  experiment, 2026-10-17" (including the 13 false declines found only by reading the answers).
+- **Why there is no "second look" by the model.** "Known weak spots": "Router second look, step 1" (the shadow run: the router
+  was right in 10 of 72 disagreements, all on cases written to find keyword mistakes).
+- **The stopping rule that was not met.** "Known weak spots": "Fifth sealed round: a measurement against the stopping rule,
+  2026-10-19", followed by "Question log, phase 1" and "Typing variants" (what the real-question log found first).
+
 ## Decisions
 
 | Decision | Why |

@@ -270,5 +270,5 @@ The owner is building this step by step and is not a professional developer, so 
   environment, run the full test suite, then replace `requirements.txt` with that environment's freeze. `.github/workflows/ci.yml` runs
   the Python tests (against a throwaway TimescaleDB started with the repo's own `docker-compose.yml`, no Ollama, no model downloads)
   and the web typecheck, tests, and build. A test must never depend on text that happens to be in the dev database: CI starts empty,
-  so a test that needs a stored name or headline inserts its own (three tests had to be fixed for this). Check a workflow change with
+  so a test that needs a stored name or headline inserts its own (four tests had to be fixed for this). Check a workflow change with
   `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest`.
