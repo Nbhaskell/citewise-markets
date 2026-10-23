@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict
 
 ROOT = Path(__file__).resolve().parent.parent
 MIGRATIONS = Path(__file__).resolve().parent / "migrations"
@@ -24,8 +25,23 @@ def database_url() -> str:
     return url
 
 
+def connect() -> psycopg.Connection:
+    """Connect, or exit with the usual cause. Without a timeout a database that is not running hung for over two minutes and then
+    printed a traceback."""
+    url = database_url()
+    try:
+        return psycopg.connect(url, autocommit=True, connect_timeout=10)
+    except psycopg.OperationalError:
+        where = conninfo_to_dict(url)
+        sys.exit(
+            f"Can't reach the database at {where.get('host', 'localhost')}:{where.get('port', 5432)}. "
+            "Is it running? Start it with: docker compose up -d (then wait until it is healthy), "
+            "and check that DATABASE_URL in .env matches POSTGRES_PASSWORD."
+        )
+
+
 def main() -> None:
-    with psycopg.connect(database_url(), autocommit=True) as conn:
+    with connect() as conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS schema_migrations ("
             "name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())"

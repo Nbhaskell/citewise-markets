@@ -13,8 +13,9 @@ Everything you need to install, load data, and run Citewise for Markets on your 
 
 ## One-time setup
 
-Commands are for Git Bash or PowerShell from the project folder. On Windows the virtual environment's Python is
-`.venv\Scripts\python`; on macOS or Linux it is `.venv/bin/python`.
+Commands are written for PowerShell, run from the project folder. On Windows the virtual environment's Python is
+`.venv\Scripts\python`; on macOS or Linux it is `.venv/bin/python`. In Git Bash the backslash form fails (`command not
+found`), so write it with forward slashes: `.venv/Scripts/python`.
 
 1. **Create your settings file.**
    ```bash

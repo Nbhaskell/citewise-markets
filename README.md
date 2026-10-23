@@ -126,7 +126,7 @@ which is why the checks above run in code.
 
 Needs Docker Desktop, Python 3.10 or later, Node.js, and [Ollama](https://ollama.com) with `qwen3:latest`. It was
 developed and is run on Windows 11; the Python and web code do not depend on Windows, but the launch scripts, task
-scheduling, and desktop alerts are PowerShell.
+scheduling, and desktop alerts are PowerShell, and the commands below are written for PowerShell.
 
 ```bash
 cp .env.example .env        # set POSTGRES_PASSWORD (also inside DATABASE_URL) and SEC_USER_AGENT
@@ -136,11 +136,14 @@ python -m venv .venv
 .venv\Scripts\python db/migrate.py
 ollama pull qwen3:latest
 .venv\Scripts\python -m jobs.add_company AAPL MSFT NVDA    # prices, news, filings, figures, search index, sentiment
+npm --prefix web install
 powershell -ExecutionPolicy Bypass -File scripts\start.ps1  # database check, API, and web app on http://localhost:5173
 ```
 
-Adding a company downloads its filings and embeds them, so the first run takes several minutes per company. Full
-instructions, including loading each data type separately, are in [docs/SETUP.md](docs/SETUP.md).
+Adding a company downloads its filings, embeds them, and scores its headlines with the local model. On the development PC
+(an RTX 3080), a clean install ran these exact commands in about 7 minutes: 1 for the Python packages, 5 for the three
+companies, and the rest for the web packages, the database, and startup. Full instructions, including loading each data
+type separately, are in [docs/SETUP.md](docs/SETUP.md).
 
 ## What is in it
 
