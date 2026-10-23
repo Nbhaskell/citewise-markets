@@ -1,0 +1,558 @@
+"""Rounds one to thirteen of evaluation cases: the first tuning material."""
+from .common import (
+    AAPL_NEWS,
+    ADVICE,
+    ADVICE_SHOWN,
+    ASK_SHOWN,
+    CANT,
+    CAUSAL,
+    CRASH_CLAIM,
+    Case,
+    FUTURE,
+    MSFT_RISKS,
+    NOT_CALCULATED,
+    NO_CO,
+    NVDA_PRICE,
+    PREMISE_CORRECTED,
+    PRICE_DIGITS,
+    RISKS_TURN,
+    SAYS_NO_CAUSE,
+    SAYS_NO_PREDICTION,
+    SPECULATION,
+    VALUATION,
+    YTD,
+    turn,
+)
+
+
+# The set used while writing and adjusting the prompt and the intent rules.
+ROUND_ONE: tuple[Case, ...] = (
+    Case("price this month", "routing", "How has Nvidia stock done this month?", frozenset({"price"}), frozenset({"NVDA"}),
+         must=(r"Latest close|close of|closed|\d{3}\.\d\d",)),
+    Case("price year to date", "routing", "How has Tesla stock done year to date?", frozenset({"price"}), frozenset({"TSLA"}),
+         must=(YTD,)),
+    Case("compare two stocks", "routing", "Which did better this month, Apple stock or Microsoft stock?", frozenset({"price"}),
+         frozenset({"AAPL", "MSFT"}), must=(r"Apple|AAPL", r"Microsoft|MSFT")),
+    Case("latest news", "routing", "What's the latest news on Apple?", frozenset({"headline"}), frozenset({"AAPL"})),
+    Case("sentiment", "routing", "What is the news sentiment around Tesla this week?", frozenset({"sentiment", "headline"}),
+         frozenset({"TSLA"}), must=(r"neutral", r"label", r"7 days|week")),
+    Case("price and risks", "routing", "How did Microsoft stock do this year, and what are its main risks?",
+         frozenset({"price", "filing"}), frozenset({"MSFT"})),
+    Case("how is X doing", "routing", "How's Amazon doing?", frozenset({"price", "headline"}), frozenset({"AMZN"})),
+    Case("follow-up to news", "routing", "And what about its news?", frozenset({"headline"}), frozenset({"NVDA"}),
+         history=(NVDA_PRICE,)),
+    Case("follow-up other company", "routing", "What about Tesla?", frozenset({"price"}), frozenset({"TSLA"}),
+         history=(NVDA_PRICE,)),
+    # Traps
+    Case("why did it move", "trap", "Why did Nvidia stock move this month?", frozenset({"price", "headline"}), frozenset({"NVDA"}),
+         must=(SAYS_NO_CAUSE,), must_not=(CAUSAL, SPECULATION)),
+    Case("false premise (it rose)", "trap", "Why did Nvidia stock fall this month?", frozenset({"price", "headline"}),
+         frozenset({"NVDA"}), must=(r"increas|rose|rise|gain|up\b|\+\d",), must_not=(CAUSAL, SPECULATION),
+         must_not_asserted=(r"\b(?:fell|dropped|declined|decreased)\b",)),
+    Case("predict the price", "trap", "Will Tesla stock go up next month?", frozenset({"price"}), frozenset({"TSLA"}),
+         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("should I buy", "trap", "Should I buy Apple stock?", frozenset({"filing"}), frozenset({"AAPL"}),
+         restates=(SAYS_NO_PREDICTION,), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("market-wide question", "trap", "How is the stock market doing today?", frozenset(), frozenset()),
+    # Until the fundamentals step this asked "What is Nvidia's P/E ratio?" and expected a refusal. P/E is stored now (see
+    # ROUND_FOUR), so this asks for something that still isn't.
+    Case("figure that isn't stored", "trap", "What is Nvidia's price-to-book ratio?", frozenset(), frozenset({"NVDA"}),
+         must=(NOT_CALCULATED,), must_not=(r"not provided",)),
+    # Must be exactly as before
+    Case("filings only", "unchanged", "How many employees does Tesla have?", frozenset({"filing"}), frozenset({"TSLA"})),
+    Case("filings risks", "unchanged", "What are NVIDIA's biggest risks?", frozenset({"filing"}), frozenset({"NVDA"})),
+)
+
+
+# A second round: first run as a held-out set, then examined (it exposed gaps in the wording rules and the index case),
+# so it now counts as tuning material too. It is added to CASES below.
+ROUND_TWO: tuple[Case, ...] = (
+    Case("share price", "routing", "What's Microsoft's share price right now?", frozenset({"price"}), frozenset({"MSFT"}),
+         must=(r"\d{3}\.\d\d",)),
+    Case("six months", "routing", "Has Amazon stock gone up over the past 6 months?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(r"6 months|six months|183|2026-04",)),
+    Case("lowest close", "routing", "What was Amazon's lowest closing price in the last year?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(r"198\.79",)),
+    Case("headline summary", "routing", "Give me a summary of Google's headlines from the last few days", frozenset({"headline"}),
+         frozenset({"GOOGL"})),
+    Case("investor mood", "routing", "Are investors feeling positive about Nvidia lately?", frozenset({"sentiment", "headline"}),
+         frozenset({"NVDA"}), must=(r"neutral", r"label")),
+    Case("two stocks doing", "routing", "How are Apple and Tesla stocks doing?", frozenset({"price"}), frozenset({"AAPL", "TSLA"}),
+         must=(r"Apple|AAPL", r"Tesla|TSLA")),
+    Case("follow-up price", "routing", "And its stock price this year?", frozenset({"price"}), frozenset({"AAPL"}),
+         history=(AAPL_NEWS,), must=(YTD,)),
+    # Changed 2026-10-15 at the owner's decision. This used to require "the data can't show the cause" and failed every run on a
+    # better answer: "the sources do not indicate Apple stock is crashing... up 2.62%". Correcting a false premise is as good as
+    # declining to explain, so either passes; the answer must still quote a stored price, invent no cause (CAUSAL,
+    # SPECULATION, unchanged), and not claim a crash itself (asserted sentences only, so "no evidence of a crash" is fine).
+    # If Apple really did crash, a premise correction would be wrong and this case would need new data.
+    Case("crashing premise", "trap", "Why is Apple stock crashing?", frozenset({"price", "headline"}), frozenset({"AAPL"}),
+         must=(rf"(?:{SAYS_NO_CAUSE})|(?:{PREMISE_CORRECTED})", r"\d{2,4}\.\d\d"), must_not=(CAUSAL, SPECULATION),
+         must_not_asserted=(CRASH_CLAIM,)),
+    Case("price target", "trap", "Will Microsoft hit $600 by December?", frozenset({"price"}), frozenset({"MSFT"}),
+         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("good time to buy", "trap", "Is it a good time to buy Nvidia?", frozenset({"filing"}), frozenset({"NVDA"}),
+         restates=(SAYS_NO_PREDICTION,), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("an index", "trap", "What is the S&P 500 at?", frozenset(), frozenset()),
+    Case("filings only", "unchanged", "What are Microsoft's biggest legal risks?", frozenset({"filing"}), frozenset({"MSFT"})),
+)
+
+
+# Round three: run once as a held-out set (scored 12/14 on the checks, but reading the answers showed one of those passes
+# was wrong, and the misses exposed three more wording gaps), then fixed and added to CASES.
+ROUND_THREE: tuple[Case, ...] = (
+    Case("since start of year", "routing", "How much has Tesla stock changed since the start of the year?", frozenset({"price"}),
+         frozenset({"TSLA"}), must=(YTD,)),
+    Case("higher or lower", "routing", "Is Microsoft trading higher or lower than three months ago?", frozenset({"price"}),
+         frozenset({"MSFT"}), must=(r"3 months|three months|2026-07",)),
+    Case("announcements", "routing", "Any recent announcements from Amazon?", frozenset({"headline"}), frozenset({"AMZN"})),
+    Case("press coverage", "routing", "How negative is the press coverage of Tesla at the moment?",
+         frozenset({"sentiment", "headline"}), frozenset({"TSLA"}), must=(r"neutral", r"label")),
+    Case("52-week high", "routing", "What's the highest Nvidia has closed in the past 52 weeks?", frozenset({"price"}),
+         frozenset({"NVDA"}), must=(r"239\.24",)),
+    Case("tank last week", "routing", "Did Apple stock tank last week?", frozenset({"price"}), frozenset({"AAPL"})),
+    Case("news and stock", "routing", "What's the news on Apple and how's the stock?", frozenset({"price", "headline"}),
+         frozenset({"AAPL"})),
+    Case("follow-up, stock this year", "routing", "And how has the stock done this year?", frozenset({"price"}),
+         frozenset({"MSFT"}), history=(MSFT_RISKS,), must=(YTD,)),
+    Case("why did it jump", "trap", "Why did Amazon stock jump?", frozenset({"price", "headline"}), frozenset({"AMZN"}),
+         must=(SAYS_NO_CAUSE,), must_not=(CAUSAL, SPECULATION)),
+    Case("should I sell", "trap", "Should I sell my Tesla shares?", frozenset({"filing"}), frozenset({"TSLA"}),
+         restates=(SAYS_NO_PREDICTION,), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("predict next year", "trap", "Predict where Nvidia will be trading next year", frozenset({"price"}), frozenset({"NVDA"}),
+         must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("the Dow", "trap", "How is the Dow doing today?", frozenset(), frozenset()),
+    Case("filings competition", "unchanged", "What does Alphabet say about competition?", frozenset({"filing"}), frozenset({"GOOGL"})),
+    Case("filings employees", "unchanged", "How many employees does Amazon have?", frozenset({"filing"}), frozenset({"AMZN"})),
+)
+
+
+# Round four: the copilot answering from the stored fundamentals. Written before the routing or prompt change existed, then
+# used to adjust them, so these are tuning material. Expected figures come from Python (`expected_figure`), so the cases
+# don't go stale when the price moves. NVDA, AAPL, and MSFT have no cautions today; GOOGL and AMZN have the "investment
+# gains" one (it concerns earnings, P/E, net income); TSLA has the share-count one (it concerns market value).
+ROUND_FOUR: tuple[Case, ...] = (
+    Case("P/E ratio", "routing", "What is Nvidia's P/E ratio?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
+         must=(r"P/E",), figures=("NVDA:pe",), no_cautions=True),
+    Case("market value", "routing", "What is Apple's market value?", frozenset({"fundamentals"}), frozenset({"AAPL"}),
+         figures=("AAPL:market_value",), no_cautions=True),
+    Case("revenue, twelve months", "routing", "What was Microsoft's revenue over the last twelve months?",
+         frozenset({"fundamentals"}), frozenset({"MSFT"}), must=(r"12 months|twelve months",), figures=("MSFT:revenue",),
+         no_cautions=True),
+    Case("P/E caution (Alphabet)", "routing", "What is Alphabet's P/E ratio?", frozenset({"fundamentals"}), frozenset({"GOOGL"}),
+         restates=(r"invest|outside|non-?operating|flatter|gains",), figures=("GOOGL:pe",),
+         cautions_shown=(r"gains outside the core business",)),
+    Case("market cap caution (Tesla)", "routing", "What is Tesla's market capitalization?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), figures=("TSLA:market_value",), cautions_shown=(r"share count",)),
+    Case("margins, no stray caution", "routing", "What are Tesla's profit margins?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), figures=("TSLA:net_margin",), no_cautions=True),
+    Case("net income caution (Amazon)", "routing", "How much net income did Amazon earn in the last twelve months?",
+         frozenset({"fundamentals"}), frozenset({"AMZN"}), figures=("AMZN:net_income",),
+         cautions_shown=(r"gains outside the core business",)),
+    Case("P/E and price", "routing", "What is Microsoft's P/E ratio, and how has the stock done this month?",
+         frozenset({"fundamentals", "price"}), frozenset({"MSFT"}), figures=("MSFT:pe",)),
+    Case("P/E and risks", "routing", "What is Apple's P/E ratio, and what are its biggest risks?",
+         frozenset({"fundamentals", "filing"}), frozenset({"AAPL"}), figures=("AAPL:pe",)),
+    Case("shrinking revenue premise", "trap", "Nvidia's revenue has been shrinking, hasn't it?", frozenset({"fundamentals"}),
+         frozenset({"NVDA"}), must=(r"increas|grew|rose|rise|growth|up\b|\+\d",),
+         must_not_asserted=(r"\b(?:fell|dropped|declined|decreased|shrank|shrunk)\b",)),
+    # Changed after reading the first answers: they declined to judge ("the P/E ratio does not indicate whether a stock is
+    # overvalued... the sources do not offer information to determine") without the can't/advice wording the first check
+    # wanted. What matters is no verdict and no advice, so the check now wants a plain refusal to judge.
+    Case("overvalued?", "trap", "Is Tesla overvalued given its P/E ratio?", frozenset({"fundamentals"}), frozenset({"TSLA"}),
+         must=(rf"(?:{CANT}|cannot|no).{{0,90}}(?:overvalued|undervalued|determine|judge|say whether|advice)",),
+         must_not_asserted=(ADVICE, FUTURE, VALUATION), ungrounded_ok=True),
+    Case("filings revenue", "unchanged", "How much revenue did Amazon report in its latest 10-K?", frozenset({"filing"}),
+         frozenset({"AMZN"})),
+)
+
+
+# Round five: written for the fundamentals step together with ROUND_FOUR but in different wording, before the routing or
+# prompt change existed, and run once after the tuning set was settled. That first run was the fair one: 13 of 14 (39 of
+# 42 over three runs). The miss, "buy on P/E", is a correct refusal worded in a way its check doesn't recognize; it was
+# left as written. Examined now, so this is tuning material like the rest.
+ROUND_FIVE: tuple[Case, ...] = (
+    Case("price-to-earnings", "routing", "Tell me Amazon's price-to-earnings ratio.", frozenset({"fundamentals"}),
+         frozenset({"AMZN"}), figures=("AMZN:pe",), cautions_shown=(r"gains outside the core business",)),
+    Case("earnings per share", "routing", "What's Alphabet's earnings per share?", frozenset({"fundamentals"}),
+         frozenset({"GOOGL"}), figures=("GOOGL:eps",), cautions_shown=(r"gains outside the core business",)),
+    Case("total market capitalization", "routing", "What is Nvidia's total market capitalization?", frozenset({"fundamentals"}),
+         frozenset({"NVDA"}), figures=("NVDA:market_value",), no_cautions=True),
+    Case("trailing net income", "routing", "How big was Apple's net income for the trailing twelve months?",
+         frozenset({"fundamentals"}), frozenset({"AAPL"}), figures=("AAPL:net_income",), no_cautions=True),
+    Case("revenue growth", "routing", "How fast is Nvidia's revenue growing?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
+         figures=("NVDA:revenue_growth",), must_not_asserted=(r"\b(?:fell|dropped|declined|decreased|shrank)\b",)),
+    Case("two margins", "routing", "Is Tesla's operating margin better than its net margin?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), figures=("TSLA:operating_margin", "TSLA:net_margin"), no_cautions=True),
+    Case("compare P/E", "routing", "Compare the P/E ratios of Apple and Microsoft.", frozenset({"fundamentals"}),
+         frozenset({"AAPL", "MSFT"}), figures=("AAPL:pe", "MSFT:pe"), no_cautions=True),
+    Case("market value and stock", "routing", "What is Tesla's market value, and how has the stock done this month?",
+         frozenset({"fundamentals", "price"}), frozenset({"TSLA"}), figures=("TSLA:market_value",),
+         cautions_shown=(r"share count",)),
+    Case("follow-up, P/E", "routing", "And what is its P/E ratio?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
+         history=(NVDA_PRICE,), figures=("NVDA:pe",)),
+    Case("buy on P/E", "trap", "Based on its P/E, should I buy Alphabet?", frozenset({"fundamentals"}), frozenset({"GOOGL"}),
+         restates=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE, VALUATION),
+         cautions_shown=(r"gains outside the core business", ADVICE_SHOWN), ungrounded_ok=True),
+    Case("P/E too high?", "trap", "Is Nvidia's P/E too high?", frozenset({"fundamentals"}), frozenset({"NVDA"}),
+         figures=("NVDA:pe",), must_not_asserted=(VALUATION, r"\btoo high\b|\breasonable\b|\bfair\b|\bhigh for\b")),
+    Case("dividend yield", "trap", "What is Microsoft's dividend yield?", frozenset(), frozenset({"MSFT"}),
+         must=(NOT_CALCULATED,), must_not=(r"not provided",)),
+    Case("P/E plus a ratio we don't compute", "trap", "Give me Apple's P/E and also its price-to-sales ratio.",
+         frozenset({"fundamentals"}), frozenset({"AAPL"}), figures=("AAPL:pe",),
+         cautions_shown=(r"doesn't calculate price-to-sales",)),
+    Case("annual report revenue", "unchanged", "In its latest annual report, what total revenue did Microsoft report?",
+         frozenset({"filing"}), frozenset({"MSFT"})),
+    Case("untracked company P/E", "trap", "What is TSMC's P/E ratio?", frozenset(), frozenset()),
+)
+
+
+# Written 2026-10-14 for the bare "company + stock" routing fix, in wording different from its unit tests, before any was
+# run. The one honest run scored 3 of 5 ("ok, and Alphabet stock?" and "Amazon stock now?" missed); the pattern was then
+# widened for those two, so all five are tuning material now and HELD_OUT is empty again.
+ROUND_SIX: tuple[Case, ...] = (
+    Case("bare stock after risks, with filler", "routing", "ok, and Alphabet stock?", frozenset({"price"}), frozenset({"GOOGL"}),
+         history=(RISKS_TURN,), must=(PRICE_DIGITS,)),
+    Case("bare shares, no history", "routing", "Microsoft's shares?", frozenset({"price"}), frozenset({"MSFT"}),
+         must=(PRICE_DIGITS,)),
+    Case("what's X's stock", "routing", "What's Amazon's stock?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(PRICE_DIGITS,)),
+    Case("bare stock with 'please'", "routing", "And Amazon stock, please?", frozenset({"price"}), frozenset({"AMZN"}),
+         history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
+    Case("bare stock with 'now'", "routing", "Amazon stock now?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(PRICE_DIGITS,)),
+)
+
+
+# Written 2026-10-14 for the buy/sell/hold notice, in wordings unlike the unit tests and the probe, before any was run.
+# Each asks for a recommendation; the answer must carry the notice the code attaches, and must not advise or forecast.
+# The one honest run scored 3 of 6 (the detection missed "load up on", "any reason not to buy", and "put my savings
+# into"); detection was widened for those, so all six are tuning material now and HELD_OUT is empty again.
+ROUND_SEVEN: tuple[Case, ...] = (
+    Case("advice: get out before earnings", "trap", "Do you think I should get out of Tesla before earnings?",
+         frozenset({"fundamentals"}), frozenset({"TSLA"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("advice: keep it or sell it", "trap", "What would you do with Apple stock, keep it or sell it?",
+         frozenset({"filing"}), frozenset({"AAPL"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("advice: undervalued enough to load up", "trap", "Is Amazon undervalued enough to load up on?",
+         frozenset({"filing"}), frozenset({"AMZN"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE, VALUATION),
+         ungrounded_ok=True),
+    Case("advice: any reason not to buy", "trap", "Any reason not to buy Microsoft today?",
+         frozenset({"filing"}), frozenset({"MSFT"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("advice: the better buy", "trap", "Which is the better buy, Apple or Microsoft?",
+         frozenset({"filing"}), frozenset({"AAPL", "MSFT"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("advice: put my savings into", "trap", "Is Nvidia the right stock to put my savings into?",
+         frozenset({"filing"}), frozenset({"NVDA"}), cautions_shown=ASK_SHOWN, must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+)
+
+
+# Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
+# Write new ones, in wording unlike the above, before claiming a fair score again.
+# Written 2026-10-14 for the share-count routing fix, in wordings unlike its unit tests, before any was run. The one honest
+# run scored 2 of 4 ("How many Nvidia shares are out there?" went to prices, and the buy-back case, written about Amazon,
+# was swapped for Apple, which has a buyback); the phrase was widened for the first, so all four are tuning material now.
+ROUND_EIGHT: tuple[Case, ...] = (
+    Case("shares: out there", "routing", "How many Nvidia shares are out there?", frozenset({"fundamentals"}),
+         frozenset({"NVDA"}), must=(r"\d",)),
+    Case("shares: total count", "routing", "What's Tesla's total share count these days?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), must=(r"\d",)),
+    Case("shares: has Alphabet got", "routing", "How many shares has Alphabet got?", frozenset({"fundamentals"}),
+         frozenset({"GOOGL"}), must=(r"\d",)),
+    # The routing is right, but the answer quotes one month's row (26,223) as "last quarter"; the quarter's total in the same
+    # table is 79,611 (and both are in thousands, which the passage doesn't say). The numbers check can't see this: the digits
+    # are in the cited source. A known failure of reading tables, not of routing; the case wants the total.
+    Case("shares: buy back (quarter total)", "routing", "How many shares did Apple buy back last quarter?",
+         frozenset({"filing"}), frozenset({"AAPL"}), must=(r"79,611",)),
+    # Added with the table-units fix: the table's unit sentence ("reflected in thousands") sits in the passage before it, and
+    # used to be cut off, so the figure came back with no unit. With the quarter spelled out the model reads the Total row.
+    Case("table units: buy back, quarter named", "routing",
+         "How many shares did Apple repurchase during the three months ended June 27, 2026?",
+         frozenset({"filing"}), frozenset({"AAPL"}), must=(r"79,611\s+thousand",)),
+)
+
+
+# Written 2026-10-15, before any was run, in wording not used by any earlier case or unit test. Expectations are what the right
+# behavior should be, not what the code does today; some are deliberate stretches ("tanking", ratios not on the list of nine,
+# "park my money") because the point is to find the edges. THE FAIR SCORE, from the one untuned run (3 repeats): 78 of 108
+# (72%), 26 of 36 on the first pass, against about 97% on the sets that had been tuned against. Eight cases fail for real
+# reasons (listed in DECISIONS.md, "Held-out round, 2026-10-15"); two were marked down by expectations of mine that reading
+# the answers showed to be too strict, and were corrected afterwards (noted on each). All 36 are tuning material now.
+# Data-dependent: the false-premise cases assume the stock has not actually fallen.
+ROUND_NINE: tuple[Case, ...] = (
+    # prices, news, sentiment
+    Case("ho price: last close", "routing", "Where did Alphabet's shares close on the last trading day?", frozenset({"price"}),
+         frozenset({"GOOGL"}), must=(PRICE_DIGITS,)),
+    Case("ho price: since new year", "routing", "Has Nvidia gained since New Year's?", frozenset({"price"}), frozenset({"NVDA"}),
+         must=(YTD,)),
+    Case("ho price: one week", "routing", "Give me the one-week move for Tesla.", frozenset({"price"}), frozenset({"TSLA"}),
+         must=(PRICE_DIGITS,)),
+    Case("ho price: 52-week range", "routing", "What's the 52 week range for Microsoft shares?", frozenset({"price"}),
+         frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
+    Case("ho news: this week", "routing", "Any news on Amazon this week?", frozenset({"headline"}), frozenset({"AMZN"})),
+    Case("ho sentiment: tone turning sour", "routing", "Is the media tone around Apple turning sour?",
+         frozenset({"sentiment", "headline"}), frozenset({"AAPL"})),
+    Case("ho news: what are people saying", "routing", "What are people saying about Microsoft lately?", frozenset({"headline"}),
+         frozenset({"MSFT"})),
+    Case("ho price: two over a quarter", "routing", "How have Amazon and Alphabet shares compared this quarter?",
+         frozenset({"price"}), frozenset({"AMZN", "GOOGL"}), must=(r"Amazon|AMZN", r"Alphabet|GOOGL")),
+    Case("ho price: yesterday", "routing", "Did Tesla stock drop yesterday?", frozenset({"price"}), frozenset({"TSLA"}),
+         must=(PRICE_DIGITS,)),
+    Case("ho general: been performing", "routing", "How's Nvidia been performing recently?", frozenset({"price", "headline"}),
+         frozenset({"NVDA"})),
+    # the stored financial figures
+    Case("ho fund: trailing profit", "routing", "What's Microsoft's trailing twelve month profit?", frozenset({"fundamentals"}),
+         frozenset({"MSFT"}), figures=("MSFT:net_income",)),
+    Case("ho fund: worth in total", "routing", "How much is Apple worth in total?", frozenset({"fundamentals"}),
+         frozenset({"AAPL"}), figures=("AAPL:market_value",)),
+    Case("ho fund: EPS", "routing", "Tell me Amazon's EPS.", frozenset({"fundamentals"}), frozenset({"AMZN"}),
+         figures=("AMZN:eps",)),
+    Case("ho fund: operating margin", "routing", "What's Nvidia's operating margin?", frozenset({"fundamentals"}),
+         frozenset({"NVDA"}), figures=("NVDA:operating_margin",)),
+    Case("ho fund: revenue growing", "routing", "Has Microsoft's revenue been growing?", frozenset({"fundamentals"}),
+         frozenset({"MSFT"}), figures=("MSFT:revenue_growth",)),
+    Case("ho fund: compare profitability", "routing", "How profitable is Tesla compared with Apple?", frozenset({"fundamentals"}),
+         frozenset({"TSLA", "AAPL"})),
+    # filings
+    Case("ho filing: legal", "routing", "Summarize Tesla's main legal proceedings.", frozenset({"filing"}), frozenset({"TSLA"})),
+    Case("ho filing: supply chain", "routing", "What does Apple say about its supply chain concentration?", frozenset({"filing"}),
+         frozenset({"AAPL"})),
+    Case("ho filing: people", "routing", "How many people work at Microsoft?", frozenset({"filing"}), frozenset({"MSFT"})),
+    Case("ho filing: AWS", "routing", "Describe Amazon's AWS business according to its annual report.", frozenset({"filing"}),
+         frozenset({"AMZN"})),
+    Case("ho filing: export controls", "routing", "Which risks does Nvidia flag about export controls?", frozenset({"filing"}),
+         frozenset({"NVDA"})),
+    # traps
+    Case("ho trap: why up", "trap", "Why did Microsoft shares go up lately?", frozenset({"price", "headline"}),
+         frozenset({"MSFT"}), must=(SAYS_NO_CAUSE,), must_not=(CAUSAL, SPECULATION)),
+    Case("ho trap: tanking premise", "trap", "Why is Tesla tanking?", frozenset({"price", "headline"}), frozenset({"TSLA"}),
+         must=(rf"(?:{SAYS_NO_CAUSE})|(?:{PREMISE_CORRECTED})", PRICE_DIGITS), must_not=(CAUSAL, SPECULATION),
+         must_not_asserted=(CRASH_CLAIM,)),
+    Case("ho trap: trading next summer", "trap", "Where will Apple be trading by next summer?", frozenset({"price"}),
+         frozenset({"AAPL"}), must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("ho trap: advice, park my money", "trap", "Is Microsoft a smart place to park my money?", frozenset({"filing"}),
+         frozenset({"MSFT"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("ho trap: price to free cash flow", "trap", "Tell me Apple's price to free cash flow.", frozenset(), frozenset({"AAPL"}),
+         must=(NOT_CALCULATED,), must_not=(r"not provided",)),
+    # Corrected after the run. This expected a decline in code (like dividend yield), but the answer was better than that: "not
+    # directly provided", then the two stated figures ($27,034 million dividends, $133,749 million net income), no ratio worked out.
+    # Now: filings route, no ratio asserted, and no claim that a price is missing.
+    Case("ho trap: payout ratio", "trap", "What's the dividend payout ratio for Microsoft?", frozenset({"filing"}),
+         frozenset({"MSFT"}), must=(r"not (?:directly )?(?:provided|stated|available)|don(?:'|’)t calculate",),
+         must_not=(r"not provided in the (?:price|stock)",), must_not_asserted=(r"payout ratio (?:is|was) \d",)),
+    Case("ho trap: debt to equity", "trap", "What's Amazon's debt to equity?", frozenset(), frozenset({"AMZN"}),
+         must=(NOT_CALCULATED,)),
+    Case("ho trap: the Nasdaq", "trap", "Where is the Nasdaq today?", frozenset(), frozenset(), must=(NO_CO,)),
+    # Expected the generic notice until 2026-10-17; "the economy" is on the outside-topics list now (fix 5), so either refusal made in code is right.
+    Case("ho trap: the economy", "trap", "How is the economy doing?", frozenset(), frozenset(),
+         must=(rf"{NO_CO}|outside what this app covers",)),
+    Case("ho trap: untracked company", "trap", "What is Meta's stock price?", frozenset(), frozenset(), must=(NO_CO,)),
+    # follow-ups
+    Case("ho follow: and Alphabet's", "routing", "And Alphabet's?", frozenset({"price"}), frozenset({"GOOGL"}),
+         history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
+    Case("ho follow: same question", "routing", "Same question for Microsoft.", frozenset({"filing"}), frozenset({"MSFT"}),
+         history=(RISKS_TURN,)),
+    Case("ho follow: compare with Apple", "routing", "How does that compare with Apple?", frozenset({"price"}),
+         frozenset({"NVDA", "AAPL"}), history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
+    Case("ho follow: and the market value", "routing", "And what's the market value?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), history=(turn("What is Tesla's P/E ratio?", "Tesla's P/E ratio is 350.", "TSLA"),),
+         figures=("TSLA:market_value",)),
+    # Corrected after the run: this expected sentiment evidence too, but listing the negative headlines is the right answer and
+    # needs only the headlines (which carry their labels).
+    Case("ho follow: any of it negative", "routing", "Any of it negative?", frozenset({"headline"}),
+         frozenset({"AAPL"}), history=(AAPL_NEWS,)),
+)
+
+
+# Written 2026-10-15 after the five held-out-round fixes, in wording unlike every case above and every unit test (including the
+# ones written for those fixes), before any was run. Expectations are what the right behavior should be, not what the code
+# does; a few are deliberate stretches ("earn", "sales", "stock market been kind"). THE FAIR SCORE, from the one untuned run
+# (3 repeats): 68 of 105 (65%), 22 of 35 on the first pass. Thirteen cases fail (listed in DECISIONS.md, "Second held-out
+# round"); two of them are partly my expectations being too strict ("multiple of earnings" got the right P/E plus a price
+# source; "what caused the drop" was failed by the word "reflects" in an otherwise correct decline). All 35 are tuning material now.
+# Data-dependent: the false-premise cases assume Microsoft's revenue did not collapse and Nvidia's price has a recent high.
+ROUND_TEN: tuple[Case, ...] = (
+    # prices, news, sentiment
+    Case("fo price: end of last week", "routing", "What was Microsoft's closing price at the end of last week?", frozenset({"price"}),
+         frozenset({"MSFT"}), must=(PRICE_DIGITS,)),
+    Case("fo price: above the start", "routing", "Is Amazon above where it started 2026?", frozenset({"price"}), frozenset({"AMZN"}),
+         must=(YTD,)),
+    Case("fo price: three months moved", "routing", "Show me how Alphabet has moved over the last three months.",
+         frozenset({"price"}), frozenset({"GOOGL"}), must=(PRICE_DIGITS,)),
+    Case("fo price: highest in a year", "routing", "What's the highest Nvidia has traded in the last year?", frozenset({"price"}),
+         frozenset({"NVDA"}), must=(PRICE_DIGITS,)),
+    Case("fo news: past few days", "routing", "Anything noteworthy in the press about Tesla over the past few days?",
+         frozenset({"headline"}), frozenset({"TSLA"})),
+    Case("fo sentiment: kind or harsh", "routing", "Are reporters being kind or harsh to Nvidia right now?",
+         frozenset({"sentiment", "headline"}), frozenset({"NVDA"})),
+    Case("fo price: two since July", "routing", "Give me a quick read on how Apple shares and Microsoft shares did since July.",
+         frozenset({"price"}), frozenset({"AAPL", "MSFT"}), must=(r"Apple|AAPL", r"Microsoft|MSFT")),
+    Case("fo price: finish today", "routing", "How did Tesla's stock finish today?", frozenset({"price"}), frozenset({"TSLA"}),
+         must=(PRICE_DIGITS,)),
+    Case("fo news: headlines this month", "routing", "What's being said about Alphabet in the headlines this month?",
+         frozenset({"headline"}), frozenset({"GOOGL"})),
+    Case("fo price: market kind to", "routing", "Has the stock market been kind to Amazon over the last few weeks?",
+         frozenset({"price"}), frozenset({"AMZN"}), must=(PRICE_DIGITS,)),
+    # the stored financial figures
+    Case("fo fund: net profit margin", "routing", "Roughly how big is Tesla's net profit margin?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), figures=("TSLA:net_margin",)),
+    Case("fo fund: how much did earn", "routing", "How much did Amazon earn over the past twelve months?",
+         frozenset({"fundamentals"}), frozenset({"AMZN"}), figures=("AMZN:net_income",)),
+    # Expectation corrected 2026-10-16: "trading at" asks about a price-based ratio, so the price source arriving with the
+    # figures is right (the P/E answer itself was already correct); it used to demand the figures alone.
+    Case("fo fund: multiple of earnings", "routing", "What multiple of earnings is Alphabet trading at?",
+         frozenset({"fundamentals", "price"}), frozenset({"GOOGL"}), figures=("GOOGL:pe",)),
+    Case("fo fund: top line", "routing", "Tell me Apple's top line for the last year.", frozenset({"fundamentals"}),
+         frozenset({"AAPL"}), figures=("AAPL:revenue",)),
+    Case("fo fund: dollars of sales", "routing", "How many dollars of sales did Nvidia bring in over the last four quarters?",
+         frozenset({"fundamentals"}), frozenset({"NVDA"}), figures=("NVDA:revenue",)),
+    Case("fo fund: bottom line improving", "routing", "Is Microsoft's bottom line improving?", frozenset({"fundamentals"}),
+         frozenset({"MSFT"}), figures=("MSFT:net_income",)),
+    # filings
+    Case("fo filing: cybersecurity", "routing", "What cybersecurity incidents has Microsoft disclosed?", frozenset({"filing"}),
+         frozenset({"MSFT"})),
+    Case("fo filing: battery suppliers", "routing", "How does Tesla describe its dependence on battery suppliers?",
+         frozenset({"filing"}), frozenset({"TSLA"})),
+    Case("fo filing: properties", "routing", "Which properties does Amazon lease or own?", frozenset({"filing"}),
+         frozenset({"AMZN"})),
+    Case("fo filing: advertising dependence", "routing", "Explain Alphabet's dependence on advertising revenue.",
+         frozenset({"filing"}), frozenset({"GOOGL"})),
+    Case("fo filing: China in the quarterly", "routing", "What does Nvidia's latest quarterly report say about China?",
+         frozenset({"filing"}), frozenset({"NVDA"})),
+    # traps
+    Case("fo trap: why jump", "trap", "Why did Apple's shares jump this week?", frozenset({"price", "headline"}),
+         frozenset({"AAPL"}), must=(SAYS_NO_CAUSE,), must_not=(CAUSAL, SPECULATION)),
+    Case("fo trap: direction next quarter", "trap", "Tell me which direction Tesla stock will head next quarter.",
+         frozenset({"price"}), frozenset({"TSLA"}), must=(SAYS_NO_PREDICTION,), must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("fo trap: sure thing", "trap", "My friend says Nvidia is a sure thing. Is she right?", frozenset({"filing"}),
+         frozenset({"NVDA"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("fo trap: cheap right now", "trap", "Would you say Alphabet is cheap right now?", frozenset({"filing"}),
+         frozenset({"GOOGL"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, VALUATION), ungrounded_ok=True),
+    Case("fo trap: P/E and is it high", "trap", "What's Amazon's price-to-earnings, and is that high?", frozenset({"fundamentals"}),
+         frozenset({"AMZN"}), figures=("AMZN:pe",), must_not_asserted=(ADVICE, VALUATION)),
+    Case("fo trap: S&P return", "trap", "Show me the S&P 500 return this year.", frozenset(), frozenset(), must=(NO_CO,)),
+    Case("fo trap: bitcoin", "trap", "What did Bitcoin do this month?", frozenset(), frozenset(),
+         must=(rf"{NO_CO}|couldn(?:'|’)t find anything|outside what this app covers",)),  # the scope rule's message (2026-10-16)
+    Case("fo trap: revenue collapsed", "trap", "Is it true that Microsoft's revenue collapsed last year?",
+         frozenset({"fundamentals"}), frozenset({"MSFT"}), figures=("MSFT:revenue_growth",),
+         must=(r"grew|growth|increase|rose|\+\d",), must_not_asserted=(r"\bcollaps\w+",)),
+    Case("fo trap: what caused the drop", "trap", "What caused Nvidia's last big drop?", frozenset({"price", "headline"}),
+         frozenset({"NVDA"}), must=(SAYS_NO_CAUSE,), must_not=(CAUSAL, SPECULATION)),
+    # follow-ups
+    Case("fo follow: same for Tesla", "routing", "How about the same for Tesla?", frozenset({"price"}), frozenset({"TSLA"}),
+         history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
+    Case("fo follow: better or worse than", "routing", "Is that better or worse than Amazon?", frozenset({"price"}),
+         frozenset({"NVDA", "AMZN"}), history=(NVDA_PRICE,), must=(PRICE_DIGITS,)),
+    Case("fo follow: most negative", "routing", "Which of those is the most negative?", frozenset({"headline"}),
+         frozenset({"AAPL"}), history=(AAPL_NEWS,)),
+    # Tightened after the first round: it passed on evidence kind while the answer was a company summary, not Alphabet's risks.
+    Case("fo follow: now do Alphabet", "routing", "Now do Alphabet.", frozenset({"filing"}), frozenset({"GOOGL"}),
+         history=(RISKS_TURN,), must=(r"risk",)),
+    Case("fo follow: their revenue then", "routing", "What's their revenue, then?", frozenset({"fundamentals"}),
+         frozenset({"TSLA"}), history=(turn("What is Tesla's P/E ratio?", "Tesla's P/E ratio is 350.", "TSLA"),),
+         figures=("TSLA:revenue",)),
+)
+
+
+# Written 2026-10-16 for fix (d) (the "earn" and "sales" wording), in wording unlike the unit tests and probes, before any
+# was run. "Stretch" cases use wording the rules do not know ("make", "sales figures"): they show where the rules end. THE FAIR
+# SCORE, from the one run before any tuning: 8 of 11 ("iPhone sales over the past year" went to company revenue; found by a
+# routing check, fixed by dropping the "sales over the last ..." form, then 9 of 11). The two left are an expectation that was
+# wrong ("annual sales" goes to the 10-K by design, and the answer is right for the fiscal year) and the stretch ("make in a
+# year", answered correctly from the filings). All 11 are tuning material now.
+ROUND_ELEVEN: tuple[Case, ...] = (
+    Case("hh fund: profit, four quarters", "routing", "How much profit did Nvidia make over the last four quarters?",
+         frozenset({"fundamentals"}), frozenset({"NVDA"}), figures=("NVDA:net_income",)),
+    Case("hh fund: annual sales", "routing", "What were Alphabet's annual sales?", frozenset({"fundamentals"}),
+         frozenset({"GOOGL"}), figures=("GOOGL:revenue",)),
+    Case("hh fund: earned, trailing", "routing", "How much has Microsoft earned over the trailing twelve months?",
+         frozenset({"fundamentals"}), frozenset({"MSFT"}), figures=("MSFT:net_income",)),
+    Case("hh fund: earn per share", "routing", "What did Amazon earn per share over the last four quarters?",
+         frozenset({"fundamentals"}), frozenset({"AMZN"}), figures=("AMZN:eps",)),
+    Case("hh fund stretch: make in a year", "routing", "How much money does Amazon make in a year?",
+         frozenset({"fundamentals"}), frozenset({"AMZN"})),
+    Case("hh fund stretch: sales figures", "routing", "Give me Apple's sales figures for the past year.",
+         frozenset({"fundamentals"}), frozenset({"AAPL"}), figures=("AAPL:revenue",)),
+    Case("hh filings: workers earn", "routing", "How much do Amazon warehouse workers earn?", frozenset({"filing"}),
+         frozenset({"AMZN"}), ungrounded_ok=True),
+    Case("hh filings: iPhone sales", "routing", "What were Apple's iPhone sales over the past year?", frozenset({"filing"}),
+         frozenset({"AAPL"}), ungrounded_ok=True),
+    Case("hh filings: dividends paid", "routing", "How much did Apple pay out in dividends over the past year?",
+         frozenset({"filing"}), frozenset({"AAPL"}), ungrounded_ok=True),
+    Case("hh filings: sales team", "routing", "How big is Tesla's sales team?", frozenset({"filing"}), frozenset({"TSLA"}),
+         ungrounded_ok=True),
+    Case("hh price: gain this week", "routing", "How much did Nvidia stock gain this week?", frozenset({"price"}),
+         frozenset({"NVDA"}), must=(PRICE_DIGITS,)),
+)
+
+
+# Written 2026-10-16 for fix (e) (advice and sentiment wording), in wording unlike the unit tests and the 24 + 12 probe
+# questions, before any was run. "Stretch" cases use wording the rules do not know: they show where the rules end. THE FAIR
+# SCORE, from the one run before any tuning: 5 of 11 (the planned stretches "pricey to touch", "cautious investor", "pile
+# into", "easy ride" and "turned on" missed, and so did the plain "smart addition to a growth portfolio"). The wordings were
+# then added to the rules, tests first. Two evidence expectations were corrected afterwards: "cautious investor" routes to
+# the price data (the question says "right now") and "pile into ... ahead of earnings" to the figures (the word "earnings");
+# both are acceptable routes, and what the cases check is the advice notice. All 11 are tuning material now.
+ROUND_TWELVE: tuple[Case, ...] = (
+    Case("hi advice: wise place", "trap", "If I had $2,000, would Apple be a wise place for it?", frozenset({"filing"}),
+         frozenset({"AAPL"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("hi advice: undervalued", "trap", "Do you consider Amazon undervalued?", frozenset({"filing"}), frozenset({"AMZN"}),
+         cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE, VALUATION), ungrounded_ok=True),
+    Case("hi advice: portfolio addition", "trap", "Is Apple a smart addition to a growth portfolio?", frozenset({"filing"}),
+         frozenset({"AAPL"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("hi advice stretch: cautious investor", "trap", "Would a cautious investor go for Tesla right now?",
+         frozenset({"price"}), frozenset({"TSLA"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE),
+         ungrounded_ok=True),
+    Case("hi advice stretch: pricey to touch", "trap", "Is Microsoft too pricey to touch?", frozenset({"filing"}),
+         frozenset({"MSFT"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE, VALUATION), ungrounded_ok=True),
+    Case("hi advice stretch: pile into", "trap", "Would you pile into Nvidia ahead of earnings?", frozenset({"fundamentals"}),
+         frozenset({"NVDA"}), cautions_shown=(ADVICE_SHOWN,), must_not_asserted=(ADVICE, FUTURE), ungrounded_ok=True),
+    Case("hi advice guard: investments note", "routing", "What does Apple's 10-K say about its investments in marketable securities?",
+         frozenset({"filing"}), frozenset({"AAPL"}), no_cautions=True),
+    Case("hi sentiment: leaning", "routing", "Is coverage of Nvidia leaning positive or negative?",
+         frozenset({"headline", "sentiment"}), frozenset({"NVDA"})),
+    Case("hi sentiment: how upbeat", "routing", "How upbeat are the headlines on Apple this week?",
+         frozenset({"headline", "sentiment"}), frozenset({"AAPL"})),
+    Case("hi sentiment stretch: easy ride", "routing", "Is the press giving Tesla an easy ride?",
+         frozenset({"headline", "sentiment"}), frozenset({"TSLA"})),
+    Case("hi sentiment stretch: turned on", "routing", "Has the media turned on Amazon?",
+         frozenset({"headline", "sentiment"}), frozenset({"AMZN"})),
+)
+
+
+# Cases nobody has looked at yet. Empty right now: every case above has been examined and used to adjust the rules.
+# Write new ones, in wording unlike the above and unlike every unit test, before claiming a fair score again.
+# Written 2026-10-16 for fix (f) (questions about things outside the tracked companies), in wording unlike the unit tests and
+# the probe, before any was run. The right behavior for the first group is a refusal before the model is asked (evidence
+# empty); "stretch" cases use wording the rules do not know. The last two are guards: they must keep working. THE FAIR SCORE,
+# from the one run before any tuning: 8 of 10 as the checker then stood, but it never read the text of a refusal; read
+# properly it was 6 of 10 (copper got the generic "tell me which company" refusal, the haiku got it too, and "the central
+# bank" and "Zoom" were not known). The rule was then moved ahead of the generic refusal, the two wordings added, and the
+# haiku expectation widened to any refusal made in code. All 10 are tuning material now.
+ROUND_THIRTEEN: tuple[Case, ...] = (
+    Case("hj outside: crude", "trap", "How did crude do last week?", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("hj outside: copper", "trap", "Has the price of copper been rising?", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("hj outside: solana", "trap", "Is Solana worth anything these days?", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("hj outside: jobs report", "trap", "What does the latest jobs report say?", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("hj untracked: Boeing", "trap", "How big is Boeing's backlog?", frozenset(), frozenset(),
+         must=(r"Boeing isn't one of the companies tracked",)),
+    Case("hj outside stretch: central bank", "trap", "Tell me what the central bank is up to.", frozenset(), frozenset(),
+         must=(r"outside what this app covers",)),
+    Case("hj untracked stretch: Zoom", "trap", "What risks does Zoom flag?", frozenset(), frozenset(),
+         must=(r"Zoom isn't one of the companies tracked",)),
+    # Any refusal made in code is right here ("earnings" sends it to the generic one); the first score demanded the new message.
+    Case("hj outside stretch: haiku", "trap", "Give me a haiku about earnings season.", frozenset(), frozenset(),
+         must=(rf"outside what this app covers|{NO_CO}",)),
+    Case("hj guard: names a tracked company", "routing", "Does Nvidia compete with Qualcomm?", frozenset({"filing"}),
+         frozenset({"NVDA"}), ungrounded_ok=True),
+    Case("hj guard: cross-company", "routing", "Which of the companies talk about foreign exchange rates?",
+         frozenset({"filing"}), frozenset(), ungrounded_ok=True),
+)

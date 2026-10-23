@@ -82,7 +82,7 @@ test checks this). Around the rewrite:
 - the reply carries `interpreted_question` (null when the question was used as written) so the screen can show it.
 
 `ai/eval_followups.py` measures this against 27 conversations (see DECISIONS for results). `ai/eval_market.py` does
-the same for price, news, and sentiment questions.
+the same for price, news, and sentiment questions (the cases themselves are in `ai/eval_cases/`).
 
 ### Prices, headlines, and sentiment in answers
 

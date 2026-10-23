@@ -196,7 +196,8 @@ The owner is building this step by step and is not a professional developer, so 
   direction, minus-sign, and cause checks, the "no company named" and index refusals, and the rule that headlines never
   explain a price move. Before changing the prompt, `detect_intent`, or `parse_window`, run `python -m ai.eval_market
   --repeat 3 --show` (needs Ollama) and read the answers, not just the totals; checks that are too loose give false
-  passes. `HELD_OUT` in that file is empty; the 35 of the fresh round, the 10, 12 and 12 of fixes (1) to (3), the 8 of the cause-word step and
+  passes. The cases live in `ai/eval_cases/` (`CASES`, `HELD_OUT`, `SEALED` are assembled in its `__init__.py`; the runner is
+  `ai/eval_market.py`). `HELD_OUT` is empty; the 35 of the fresh round, the 10, 12 and 12 of fixes (1) to (3), the 8 of the cause-word step and
   the 5 of fix (4) and the 11 of fix (5) are in `CASES` (282 with the older ones). All of them are tuning
   material from now on, so write fresh cases in different wording before claiming a fair score, and don't tune against
   held-out cases once run. Before the fundamentals step, three runs scored about 121 to 123 of 129;
