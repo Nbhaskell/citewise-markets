@@ -25,7 +25,7 @@ def stored():
         c.execute("INSERT INTO instruments (symbol, name) VALUES ('ZZOUT', 'Outcorp Inc.')")
         c.execute(
             "INSERT INTO filings (accession_number, symbol, cik, form, filed_at, url, text) VALUES ('0-ZO-A', 'ZZOUT', '1', '10-K', %s, "
-            "'https://x', %s)", (date(2025, 1, 1), "Outcorp supplies the Plenvora platform to groups of customers. Item 1A."))
+            "'https://x', %s)", (date(2025, 1, 1), "Outcorp supplies the Plenvora platform to groups of customers, including in China. Item 1A."))
         c.execute(
             "INSERT INTO news_articles (id, source, title, url, published_at) VALUES ('zz-out-1', 'zz', %s, 'https://x', %s)",
             ("Mirvanta surges on guidance", datetime.now(timezone.utc)))

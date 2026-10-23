@@ -313,6 +313,10 @@ def test_a_market_question_without_a_company_is_not_guessed_at(conn):
 
 
 def test_an_index_question_without_a_company_is_refused_not_answered_from_a_filing(conn):
+    # `unknown_name` comes first for a capitalised name found in no stored text, so "S&P" has to be stored (a database with real
+    # headlines has it; an empty one does not). The conn fixture deletes ids that start with fake:zzm-.
+    conn.execute("INSERT INTO news_articles (id, source, title, url, published_at) VALUES ('fake:zzm-sp', 'fake', %s, 'https://x/sp', now())",
+                 ("S&P 500 edges higher on Tuesday",))
     llm, emb = ScriptedLLM("should not be asked"), FakeEmbedder()
     ans = answer_question(conn, emb, llm, "What is the S&P 500 at?", expand=False)
     assert ans.text == NO_COMPANY and ans.refused and llm.calls == [] and emb.queries == []

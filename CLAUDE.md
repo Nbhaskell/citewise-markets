@@ -259,3 +259,10 @@ The owner is building this step by step and is not a professional developer, so 
 - New behavior gets tests that use fake sources, fake embedders, and fake LLMs, so most tests need no network and no
   model.
 - Keep docs honest: when an evaluation or limitation changes, update [docs/DECISIONS.md](docs/DECISIONS.md).
+- **Dependencies and CI.** `requirements.in` lists the packages the project asks for; `requirements.txt` is the exact `pip freeze` of a
+  working environment, and CI installs from it. To add or upgrade a package: change `requirements.in`, install it into a new virtual
+  environment, run the full test suite, then replace `requirements.txt` with that environment's freeze. `.github/workflows/ci.yml` runs
+  the Python tests (against a throwaway TimescaleDB started with the repo's own `docker-compose.yml`, no Ollama, no model downloads)
+  and the web typecheck, tests, and build. A test must never depend on text that happens to be in the dev database: CI starts empty,
+  so a test that needs a stored name or headline inserts its own (three tests had to be fixed for this). Check a workflow change with
+  `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest`.
