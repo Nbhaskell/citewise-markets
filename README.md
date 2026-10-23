@@ -239,6 +239,19 @@ docs/        Setup, operations, API, architecture, and decisions
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The design, layer by layer |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Why things are the way they are, the evaluation rounds, and the known weak spots |
 
+## A related project
+
+**[rag-project](https://github.com/Nbhaskell/rag-project)** is a companion project: a question-answering system for a
+folder of your own documents (`.md`, `.txt`, `.pdf`, `.docx`) that also runs entirely on your computer, so the documents
+never leave it. The two share an approach: local models, a retrieval pipeline written by hand (no LangChain or
+LlamaIndex), answers that show the passages they came from, an "I don't know" instead of a guess, and an evaluation set
+kept apart from the tuning.
+
+They differ in what they are for. That one is general-purpose: any folder, a streamed chat in the browser, and hardening
+and a Docker image for running on a public server. This one is specialised for markets: it combines SEC filings with
+stored prices, headlines and financial figures, works out every number in Python and checks the model's numbers against
+its sources, refuses buy/sell advice in code, and keeps its data fresh with a nightly job.
+
 ## Licence
 
 [MIT](LICENSE).
