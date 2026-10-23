@@ -105,9 +105,13 @@ The owner is building this step by step and is not a professional developer, so 
   company_even_when_asked_for_it_by_name` and `test_comparison_retrieves_from_each_company`) failed in 2 of 6 runs of the test files up
   to and including `test_remove_company.py`, because the approximate index sometimes missed a synthetic test vector among 10,000 real
   chunks and dead entries; with the setting, 10 of 10 such runs passed. `tests/test_exact_search.py` checks that the setting stays on and
-  that the HNSW index still exists and can be used. A new search test should not expect the index to behave; if you want to test the
-  index path, set `enable_indexscan = on` on that connection deliberately.
-- Baseline as of 2026-10-23: 3008 Python tests and 303 web tests (both run on `feature/ui-polish`), typecheck clean, all passing.
+  that the HNSW index still exists (in the catalog, with the cosine operator class), that the search sorts by the operator it serves, and
+  that a plain nearest-neighbour query can be answered by it. A new search test should not expect the index to behave; if you want to
+  test the index path, set `enable_indexscan = on` on that connection deliberately. **Never assert which plan the planner chooses for a
+  query that joins tables**: that depends on the table statistics, and an earlier version of that test (asking for the plan of the real
+  three-table search) passed on the dev database and every earlier CI run, then failed on `main` when the CI database held about 16 companies, 34
+  filings and 165 chunks with statistics. Check the catalog, or ask a question with one answer (sequential scans and sorts switched off).
+- Baseline as of 2026-10-23: 3010 Python tests (run on `feature/fix-index-test`) and 303 web tests (run on `main`), typecheck clean, all passing.
   The suite also passes on a fresh clone with an empty database (checked 2026-10-22; it needs `DB_CONTAINER` set if the database container is not named `stockmarket-db`).
   `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
   before its tests (dead index entries from earlier test files crowded out its few passages) and passed 4 of 4 full runs afterwards. If it
