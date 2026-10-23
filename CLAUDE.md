@@ -100,10 +100,14 @@ The owner is building this step by step and is not a professional developer, so 
   Ruff is configured in `pyproject.toml` (errors, pyflakes and bugbear only; line length, import sorting and modernising rules are off
   on purpose) and is also a step in CI. Do not run `ruff --fix` blindly: its "unused import" fix would have deleted `MAX_DAYS` from
   `api/queries.py`, which `api/app.py` reads back as `queries.CHANGES_MAX_DAYS`. Fix each finding by hand, or `# noqa` it with the reason.
-  `tests/test_remove_company.py::test_filing_search_skips_a_removed_company_even_when_asked_for_it_by_name` failed in 2 of 6 full runs
-  on 2026-10-23 and passed 25 of 25 alone; it asks for the top 20 of the shared vector table, so treat it as the known vector-index
-  flake and rerun before assuming a break (an open item: it should not depend on the shared table's size).
-- Baseline as of 2026-10-22: 2996 Python tests (run on `feature/clean-room-fixes`) and 300 web tests (run on `main`, nothing in `web/` changed since), typecheck clean, all passing.
+  **Vector searches in the tests are exact, not through the HNSW index** (`tests/conftest.py` sets `PGOPTIONS=-c enable_indexscan=off`
+  for every connection the tests open; the app is not affected). Before this, two different tests (`test_filing_search_skips_a_removed_
+  company_even_when_asked_for_it_by_name` and `test_comparison_retrieves_from_each_company`) failed in 2 of 6 runs of the test files up
+  to and including `test_remove_company.py`, because the approximate index sometimes missed a synthetic test vector among 10,000 real
+  chunks and dead entries; with the setting, 10 of 10 such runs passed. `tests/test_exact_search.py` checks that the setting stays on and
+  that the HNSW index still exists and can be used. A new search test should not expect the index to behave; if you want to test the
+  index path, set `enable_indexscan = on` on that connection deliberately.
+- Baseline as of 2026-10-23: 2998 Python tests (run on `feature/stabilize-removal-test`) and 300 web tests (run on `main`, nothing in `web/` changed since), typecheck clean, all passing.
   The suite also passes on a fresh clone with an empty database (checked 2026-10-22; it needs `DB_CONTAINER` set if the database container is not named `stockmarket-db`).
   `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
   before its tests (dead index entries from earlier test files crowded out its few passages) and passed 4 of 4 full runs afterwards. If it
