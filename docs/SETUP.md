@@ -36,6 +36,8 @@ found`), so write it with forward slashes: `.venv/Scripts/python`.
    python -m venv .venv
    .venv\Scripts\python -m pip install -r requirements.txt
    ```
+   `requirements.txt` pins every package to the exact version the tests passed with. The packages the project asks for
+   directly are in `requirements.in`.
 
 4. **Create the tables.**
    ```bash

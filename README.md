@@ -1,5 +1,7 @@
 # Citewise for Markets
 
+[![CI](https://github.com/Nbhaskell/stockMarket/actions/workflows/ci.yml/badge.svg)](https://github.com/Nbhaskell/stockMarket/actions/workflows/ci.yml)
+
 **A local-first research copilot for public companies.** Ask a question in plain English and get an answer written only
 from SEC filings, daily prices, financial figures, and news headlines. Every claim carries a numbered citation, and every
 number is checked against the source it cites.
@@ -221,6 +223,7 @@ jobs/        The nightly refresh, adding and removing companies, backups
 db/          migrate.py and numbered SQL migrations (append-only)
 scripts/     PowerShell scripts to start and stop the app and to schedule the nightly job and the backup
 tests/       pytest tests (against the real database, using ZZ-prefixed test tickers)
+.github/     The CI workflow: Python tests against a throwaway database, and the web app's typecheck, tests, and build
 docs/        Setup, operations, API, architecture, and decisions
 ```
 
