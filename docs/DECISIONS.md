@@ -1081,7 +1081,7 @@ start of the bold title to search for.
   about a month (from 2026-09-14) and called it ninety days, because `parse_window` does not read "ninety" and the leftover
   default window is not flagged. The second one passed the rules, which only check that a price was quoted.
   (3) **A missed advice notice (1, the most serious):** "Is it time to cash out of Nvidia?" got no buy, sell, or hold notice
-  and the answer listed the stock's growth and strong cash. CLAUDE.md says a missed request is worse than one extra notice.
+  and the answer listed the stock's growth and strong cash. The project's rules say a missed request is worse than one extra notice.
   (4) **A false premise accepted (1):** "Google doubled this month. What drove it?" was answered as if it had doubled (it rose
   about 1%). (5) **Follow-ups that lose their history in the full answer (2):** "And did Nvidia do better than that?" after an
   AMD price question compared Data Center revenue from the filings; "Switch over to Microsoft." after Tesla news gave a general
@@ -1799,7 +1799,7 @@ start of the bold title to search for.
   guard, the singular "swing", "swings in price / shares", the lowercase-subject guard), so tests were added, and the "at its highest" form,
   an optional "closing close" and six rare guard words were deleted instead of tested (they were either already covered by the old
   `CLOSE_NOUN_RE` or never in a real question). One more finding: a heredoc wrote a backspace character into a regex (`\b` in a non-raw
-  Python string); the tests caught it, and the editor tool or a script file is the safe way to write regexes (already in CLAUDE.md).
+  Python string); the tests caught it, and the editor tool or a script file is the safe way to write regexes (already in the project's working rules).
   **Evidence, old code against new code (a `git worktree` of the parent commit, router off):** (a) **offline on 2,780 distinct questions**
   (every evaluation case and history turn, every string literal in the `.py` files that reads like a question, the web tests' questions):
   68 routes change; 63 are questions written for this fix, 2 are sentences from the app's own answers that the script collected, and 3 are
@@ -1942,7 +1942,7 @@ start of the bold title to search for.
   measurement:** one run per configuration, 46 cases, five arguable expectations, the writer was not blind to the rules.
 - **Question log, phase 1, 2026-10-19** (branch `feature/question-log`; no prompt change, no model call). **Why:** the five sealed rounds show a
   plateau (router on: 70%, 79%, 78%) that more synthetic rounds cannot move; the owner's real daily questions are the better measure. **The decision:**
-  the owner approved a local log (2026-10-19), as a server-side write that is not a new endpoint (CLAUDE.md, API rules). **Built:** `ai/question_log.py`
+  the owner approved a local log (2026-10-19), as a server-side write that is not a new endpoint (the project's API rules). **Built:** `ai/question_log.py`
   (`log_answer`, called by `POST /api/copilot` after the answer is built, so tests and evaluations that call `answer_question` directly never log):
   one JSON line per answered question in `logs/copilot_questions.jsonl` with the time (UTC), the question as typed, "understood as", whether it was a
   follow-up, companies, kinds of data looked at, the router's route and whether the router was on, refused, grounded, unverified numbers, cautions, the

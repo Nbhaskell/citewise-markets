@@ -2,7 +2,7 @@
 
 "Is it time to cash out of Nvidia?" got the data and no "I can't tell you whether to buy, sell, or hold" notice. A probe of 20 wordings
 found 16 unflagged: the trade words "cash out", "take profits", "lock in gains", "unload", "ride it out", "hang on to" were not known, and
-"is it time to", "would it be crazy to" were not decision cues. CLAUDE.md says to lean towards flagging (a missed request is worse than one
+"is it time to", "would it be crazy to" were not decision cues. The project's rules say to lean towards flagging (a missed request is worse than one
 extra notice), but the same words turn up in questions about a company's own plans ("Does Tesla say whether it will unload its Bitcoin?"),
 so every new phrase is written to need the reader's own decision beside it. Each wording is new (none is an evaluation case).
 """

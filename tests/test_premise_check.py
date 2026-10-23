@@ -1,7 +1,7 @@
 """A move the question assumes, checked against the stored closes (DECISIONS: "Fresh held-out round", fix 3).
 
 "Google doubled this month. What drove it?" was answered as if it had (it rose about 1%). The prompt already says to correct a premise the
-sources contradict, but the model does not always, and CLAUDE.md wants guarantees in code. `premise_cautions` reads the claim from the
+sources contradict, but the model does not always, and the project's rules want guarantees in code. `premise_cautions` reads the claim from the
 question ("doubled", "plunge 20%", "skyrocketed"), compares it with the move over the window the price source shows, and attaches a plain
 statement of what the closes show. It never says the question is wrong in its own voice: it quotes the claim and the data. It stays silent when
 there is nothing to compare (no price source, several companies, a period it could not read) and for predictions and hypotheticals.
