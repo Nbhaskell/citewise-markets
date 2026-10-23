@@ -62,6 +62,23 @@ play and the standing guidance.
    tried and dropped (DECISIONS, 2026-10-14), and "shares: buy back (quarter total)" fails on purpose. The newest stored
    price being a day old looks fixed by moving the nightly task to 3pm; keep checking `python -m jobs.refresh --status`.
 
+## When the repo goes public
+
+The repo is private now (the README's CI badge shows 404 until it is public). **Remind the owner of this list as soon as they
+say the repo is going public, or ask about making it public.** Visibility, settings and uploads on GitHub are the owner's
+steps; walk them through each one, and never change repository settings without being asked.
+
+1. Change the visibility (Settings, General, Danger zone).
+2. Upload `docs/images/social-preview.png` (Settings, General, Social preview, Edit). GitHub offers this only on a public
+   repo, or on a private one that had an image before.
+3. Protect `main` (Settings, Rules or Branches): require a pull request and the three CI checks ("Python tests",
+   "Web app checks", "Secret scan").
+4. Turn on secret scanning with push protection, and Dependabot alerts (Settings, Advanced Security).
+5. Turn on "Automatically delete head branches" (Settings, General).
+6. Check that the README CI badge now shows the real status.
+7. Still open: the demo video link in the README, a "how this relates" section for each README (needs the owner's RAG
+   project description), and whether the case study mentions that it was built with Claude Code.
+
 ## Working with the owner
 
 The owner is building this step by step and is not a professional developer, so explain things plainly.
