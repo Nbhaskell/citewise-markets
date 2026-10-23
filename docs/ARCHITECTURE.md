@@ -47,9 +47,9 @@ filings text -> chunking.py -> embeddings.py -> filing_chunks (pgvector)
                                                       |
 question (+ earlier turns, optional) -> followups.py: resolve_question: rewrite a follow-up into a standalone question (LLM)
          -> find companies -> rewrite into extra searches (LLM)
-         -> market.py: detect_intent (keyword rules): which of filings / prices / headlines / sentiment does it need?
+         -> market/intent.py: detect_intent (keyword rules): which of filings / prices / headlines / sentiment does it need?
          -> search.py (vector search, merged by reciprocal rank, near-duplicates dropped)   [filings]
-         -> market.py: price facts, headlines, sentiment summary worked out in Python from the database
+         -> market/evidence.py: price facts, headlines, sentiment summary worked out in Python from the database
          -> relevance gate (filings) -> LLM answers from the numbered sources with [n] citations
          -> answer_checks.py: citations, numbers, direction, and cause checks (one retry on failure) -> answer
 headlines -> sentiment.py -> LLM labels in batches (strict JSON) -> news_sentiment
@@ -66,7 +66,7 @@ headlines -> sentiment.py -> LLM labels in batches (strict JSON) -> news_sentime
 | Follow-ups | `ai/followups.py` | The rewriting step and the code rules that carry an earlier question's topic or comparison over; also the rule that sends "What does Apple say about falling demand?" to the filings |
 | Answer checks | `ai/answer_checks.py` | The checks on what the model wrote, done in code: citations, figures and their direction, implied causes, made-up headlines, and false "no price" or "no news" claims |
 | Company names | `ai/companies.py` | Which tracked (or removed) companies a piece of text names |
-| Market evidence | `ai/market.py` | Turns stored prices, headlines, and sentiment labels into numbered sources. See "Prices, headlines, and sentiment in answers" |
+| Market evidence | `ai/market/` | Turns stored prices, headlines, and sentiment labels into numbered sources. `intent.py` decides which evidence a question needs (its word lists are in `topics.py`, the buy/sell/hold rule in `advice.py`, the "not something this app holds" rules in `scope.py`), `windows.py` reads the period asked about, `premise.py` checks a move the question assumes, and `evidence.py` builds the sources. See "Prices, headlines, and sentiment in answers" |
 | Sentiment | `ai/sentiment.py` | Labels each headline from an investor's view of one company. `label_counts` turns labels into the totals and score: each story once per company, quote and "X vs Y" pages left out (shared rules in `data/headlines.py`) |
 
 ### Follow-up questions
@@ -91,7 +91,7 @@ the same for price, news, and sentiment questions (the cases themselves are in `
 
 The copilot's rule is that the model sees only numbered sources and every figure it writes is checked against them.
 That rule now covers four kinds of source: a filing passage, **price facts**, a **headline**, and a **sentiment
-summary** (`MarketEvidence` in `ai/market.py`; filing passages are still `SearchResult`).
+summary** (`MarketEvidence` in `ai/market/evidence.py`; filing passages are still `SearchResult`).
 
 - **Which sources a question gets** is decided by `detect_intent`, plain keyword rules (no model call), so it is
   predictable and tested. No market wording means filings only, exactly as before. Price wording ("stock", "closed",

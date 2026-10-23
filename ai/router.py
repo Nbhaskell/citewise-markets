@@ -1,6 +1,6 @@
 """A model-based router: which stored data does this question need? (DECISIONS: "Model-based routing experiment".)
 
-The keyword rules in `ai/market.py` decide which evidence a question needs (prices, headlines, sentiment, financial figures, filings).
+The keyword rules in `ai/market/` decide which evidence a question needs (prices, headlines, sentiment, financial figures, filings).
 Every round of new wording missed in the same places, so when the keywords find no specific route (the question would be searched in
 the filings only) the local model is asked one question: what kind of question is this? The answer is constrained to JSON and can only
 pick among routes that already exist. The model never names a company, never writes an answer, and never removes a notice the keyword
