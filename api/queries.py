@@ -5,7 +5,7 @@ from typing import Optional
 import psycopg
 
 from ai.sentiment import SentimentSummary as Counts, label_counts
-from data.changes import MAX_DAYS as CHANGES_MAX_DAYS, build_changes
+from data.changes import MAX_DAYS as CHANGES_MAX_DAYS, build_changes  # noqa: F401  (CHANGES_MAX_DAYS is read as queries.CHANGES_MAX_DAYS in api/app.py)
 from data.fundamentals import Flow, compute, latest_close, load_facts
 from data.headlines import title_key
 

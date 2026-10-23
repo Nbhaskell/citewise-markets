@@ -4,7 +4,7 @@ Python computes every figure (data/fundamentals.py); the copilot only quotes the
 down: which questions go to the figures, what the source says, that cautions reach the answer whether or not the model
 repeats them, and that the existing checks (numbers, direction, no advice) still apply to the new source.
 """
-from datetime import date, timedelta
+from datetime import date
 
 import pytest
 

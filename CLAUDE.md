@@ -96,7 +96,13 @@ The owner is building this step by step and is not a professional developer, so 
 - Web app: `cd web`, then `npm install` (first time), `npm test`, `npm run typecheck`, `npm run build`. To see it,
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
-- Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
+- Before a commit, run all of them: `python -m ruff check .`, `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
+  Ruff is configured in `pyproject.toml` (errors, pyflakes and bugbear only; line length, import sorting and modernising rules are off
+  on purpose) and is also a step in CI. Do not run `ruff --fix` blindly: its "unused import" fix would have deleted `MAX_DAYS` from
+  `api/queries.py`, which `api/app.py` reads back as `queries.CHANGES_MAX_DAYS`. Fix each finding by hand, or `# noqa` it with the reason.
+  `tests/test_remove_company.py::test_filing_search_skips_a_removed_company_even_when_asked_for_it_by_name` failed in 2 of 6 full runs
+  on 2026-10-23 and passed 25 of 25 alone; it asks for the top 20 of the shared vector table, so treat it as the known vector-index
+  flake and rerun before assuming a break (an open item: it should not depend on the shared table's size).
 - Baseline as of 2026-10-22: 2996 Python tests (run on `feature/clean-room-fixes`) and 300 web tests (run on `main`, nothing in `web/` changed since), typecheck clean, all passing.
   The suite also passes on a fresh clone with an empty database (checked 2026-10-22; it needs `DB_CONTAINER` set if the database container is not named `stockmarket-db`).
   `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right

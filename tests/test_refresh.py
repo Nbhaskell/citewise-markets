@@ -72,7 +72,7 @@ class FakeLLM:
 
     def generate(self, system, user, json_schema=None):
         lines = user.split("Headlines:\n")[1].splitlines()
-        return json.dumps({"results": [{"id": int(l.split(".")[0]), "sentiment": "positive"} for l in lines]})
+        return json.dumps({"results": [{"id": int(line.split(".")[0]), "sentiment": "positive"} for line in lines]})
 
 
 def make_deps(**kw):

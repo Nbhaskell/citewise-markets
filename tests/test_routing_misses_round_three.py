@@ -53,7 +53,7 @@ def test_a_companys_total_worth_in_shares_goes_to_the_stored_figure(question):
     "How much is the whole AMD segment table worth reading?",                   # "how much is the whole AMD segment" is not "X worth"
 ])
 def test_other_questions_with_shares_or_worth_are_not_the_total_value(question):
-    assert not ("market_value" in detect_intent(question).fundamentals), question
+    assert "market_value" not in detect_intent(question).fundamentals, question
 
 
 # ---- the press, named by what it does ----

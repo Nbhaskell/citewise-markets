@@ -5,7 +5,7 @@ swap in a licensed news API before a public launch.
 """
 import urllib.parse
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import timezone
 from email.utils import parsedate_to_datetime
 from typing import Optional
 

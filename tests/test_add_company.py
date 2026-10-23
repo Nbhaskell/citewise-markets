@@ -126,7 +126,7 @@ class SkippingLLM(FakeLLM):
     def generate(self, system, user, json_schema=None):
         import json
         lines = user.split("Headlines:\n")[1].splitlines()[:1]
-        return json.dumps({"results": [{"id": int(l.split(".")[0]), "sentiment": "positive"} for l in lines]})
+        return json.dumps({"results": [{"id": int(line.split(".")[0]), "sentiment": "positive"} for line in lines]})
 
 
 class NothingLLM(FakeLLM):

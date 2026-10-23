@@ -1173,9 +1173,9 @@ def _claims(question: str):
             continue
         n = float(m.group("n"))
         signed = n if _UP_RE.match(m.group("verb")) else -n
-        ok = lambda actual, signed=signed: (
-            abs(actual - signed) <= 1.0 or (actual * signed > 0 and 0.5 <= abs(actual) / abs(signed) <= 2.0)
-        )
+        def ok(actual, signed=signed):  # `signed` is bound as a default, so each claim keeps its own value
+            return abs(actual - signed) <= 1.0 or (actual * signed > 0 and 0.5 <= abs(actual) / abs(signed) <= 2.0)
+
         found.append((m.start(), m.group(0), ok))
         taken.append(m.span())
     for pattern, bound, kind in _MULTIPLE_CLAIMS:
