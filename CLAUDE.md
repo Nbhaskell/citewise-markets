@@ -111,7 +111,7 @@ The owner is building this step by step and is not a professional developer, so 
   query that joins tables**: that depends on the table statistics, and an earlier version of that test (asking for the plan of the real
   three-table search) passed on the dev database and every earlier CI run, then failed on `main` when the CI database held about 16 companies, 34
   filings and 165 chunks with statistics. Check the catalog, or ask a question with one answer (sequential scans and sorts switched off).
-- Baseline as of 2026-10-23: 3010 Python tests (run on `feature/fix-index-test`) and 303 web tests (run on `main`), typecheck clean, all passing.
+- Baseline as of 2026-10-23: 3011 Python tests (run on `feature/title-length-test`) and 303 web tests (run on `main`), typecheck clean, all passing.
   The suite also passes on a fresh clone with an empty database (checked 2026-10-22; it needs `DB_CONTAINER` set if the database container is not named `stockmarket-db`).
   `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
   before its tests (dead index entries from earlier test files crowded out its few passages) and passed 4 of 4 full runs afterwards. If it

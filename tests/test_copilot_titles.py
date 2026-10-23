@@ -61,6 +61,19 @@ def test_short_quotes_and_unquoted_text_are_not_titles():
     assert quoted_titles(answer) == [] and invented_titles(answer, SOURCES) == []
 
 
+def test_three_words_is_the_shortest_quote_that_counts_as_a_title():
+    # Both sides of the cut-off, in both forms (quotation marks, and the model's "[Sentiment: ...]" list format). Without the
+    # three-word side, raising the cut-off to four words passed every test and let short invented headlines through.
+    quoted = 'One headline says “Tesla Faces Challenges” [1].'
+    listed = "- Tesla Faces Challenges [Sentiment: Negative]"
+    assert quoted_titles(quoted) == ["Tesla Faces Challenges"]
+    assert quoted_titles(listed) == ["Tesla Faces Challenges"]
+    assert invented_titles(quoted, SOURCES) == ["Tesla Faces Challenges"]
+    assert invented_titles(listed, SOURCES) == ["Tesla Faces Challenges"]
+    assert quoted_titles('One headline says “Tesla Faces” [1].') == []
+    assert quoted_titles("- Tesla Falls [Sentiment: Negative]") == []
+
+
 def test_a_phrase_the_user_typed_is_not_invented():
     question = 'Is the "Tesla is doomed" story true?'
     assert invented_titles('The sources do not support "Tesla is doomed" [1].', SOURCES, question) == []
