@@ -192,7 +192,7 @@ The owner is building this step by step and is not a professional developer, so 
   "Understood as" and keep it out of the answer prompt. Measure a change to it with the real `resolve_question`, not only
   `ai.eval_followups` (every case in that eval was tuned): the 45 follow-ups with history in `CASES` plus fresh ones, old against new.
   A breakage script that reports everything caught is meaningless unless the unmutated code is verified green first.
-- **Copilot market data (`ai/market.py`):** prices, headlines, and sentiment reach the model only as numbered sources, with
+- **Copilot market data (`ai/market/`: `topics`, `advice`, `scope`, `intent`, `windows`, `premise` and `evidence`):** prices, headlines, and sentiment reach the model only as numbered sources, with
   every figure computed in Python (the model never calculates) and the direction written in words. Keep the numbers,
   direction, minus-sign, and cause checks, the "no company named" and index refusals, and the rule that headlines never
   explain a price move. Before changing the prompt, `detect_intent`, or `parse_window`, run `python -m ai.eval_market
@@ -249,14 +249,14 @@ The owner is building this step by step and is not a professional developer, so 
   of "Understood as", which means a rewritten follow-up. Before changing its prompt or a guard,
   run `python -m ai.eval_market --repeat 3` with `COPILOT_ROUTER=off` and with it on (the default; set `=model` to be explicit) on one data snapshot, read the answers, and
   A/B every case that drops; a new fair comparison needs a new `SEALED` set run once with `--sealed`.
-- **Questions the app cannot answer (`ai/market.py`: `outside_scope`, `unknown_name`, `writing_request`; used in
+- **Questions the app cannot answer (`ai/market/scope.py`: `outside_scope`, `unknown_name`, `writing_request`; used in
   `answer_question`):** declined in code, before the model, with a fixed message. A request to write something is declined
   even when a tracked company is named; the other rules run only when none is named or chosen, and a filings cue ("which
   companies", "10-K", "according to") keeps a research question answerable. A decline must say truthfully what is missing ("I can't
   find X in anything stored"); never decline a summary, list or table request. The company and asset lists are finite: add a
   phrasing as a test first, with a question of its own for every alternative (breaking each alternative on purpose found 46
   untested ones). Tests that need stored text insert their own filing and headline and no filing chunks.
-- **Copilot fundamentals (`ai/market.py`, `ai/copilot.py`):** the figures reach the model only as one numbered source
+- **Copilot fundamentals (`ai/market/evidence.py`, `ai/copilot.py`):** the figures reach the model only as one numbered source
   (kind `fundamentals`), every number from `data/fundamentals.py`, growth direction in words and checked like a price
   move. **Cautions are attached to the answer in code** (`relevant_cautions` into `Answer.cautions`), scoped to the
   figures the question or the answer is about; never leave them to the model, which dropped Alphabet's "investment
