@@ -1,0 +1,17 @@
+# gitleaks configuration (https://github.com/gitleaks/gitleaks). CI runs gitleaks over the whole git history on every push and pull request
+# (.github/workflows/ci.yml). To run it by hand, see the "Secret scan" job.
+
+title = "Citewise for Markets"
+
+[extend]
+useDefault = true
+
+# The only two findings gitleaks has ever reported on this repository are not secrets: they are the names of the browser-storage keys the
+# copilot page saves its history under, which the generic-api-key rule takes for keys. This allowlist is as narrow as it can be: that one
+# rule, that one file, and only these exact strings. A real secret anywhere, including elsewhere in that file, is still reported.
+[[allowlists]]
+description = "Browser-storage key names in web/src/lib/conversation.ts"
+targetRules = ["generic-api-key"]
+condition = "AND" # both the file and the string must match; the default, OR, would ignore every generic-key finding in that file
+paths = ['''web/src/lib/conversation\.ts''']
+regexes = ['''stockmarket\.copilot\.(topic\.)?v1''']

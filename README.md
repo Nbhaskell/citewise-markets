@@ -200,12 +200,12 @@ thing to do before any launch.
   when no backup has happened for days (a PC that is off sends none)
 - Accounts and login, portfolios, and alerts (the API has no login yet)
 - Deleting a removed company's stored data (removing stops tracking and keeps everything; there is no purge)
-- A natural-language stock screener and an "AI signal" (forecast) per stock, both shown in the wireframes
+- A natural-language stock screener and an "AI signal" (forecast) per stock, both in the original design sketches (not in this repo)
 - More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, what-changed, and copilot exist.
 - "Since last visit" is per browser (clearing site data or using another browser loses it), and "What changed" has no
   email or phone alert; the copilot can't answer "what changed today" from it
 - Conversation history that follows a user between devices (it's saved per browser; there are no accounts)
-- The wireframe's market indices strip, portfolio value, and "AI daily brief" on the dashboard, because no data or
+- The original design's market indices strip, portfolio value, and "AI daily brief" on the dashboard, because no data or
   accounts sit behind them yet
 - A mobile app, and anything for putting the app online
 - A Claude (Anthropic API) implementation of the LLM interface

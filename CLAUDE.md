@@ -279,6 +279,10 @@ The owner is building this step by step and is not a professional developer, so 
   working environment, and CI installs from it. To add or upgrade a package: change `requirements.in`, install it into a new virtual
   environment, run the full test suite, then replace `requirements.txt` with that environment's freeze. `.github/workflows/ci.yml` runs
   the Python tests (against a throwaway TimescaleDB started with the repo's own `docker-compose.yml`, no Ollama, no model downloads)
-  and the web typecheck, tests, and build. A test must never depend on text that happens to be in the dev database: CI starts empty,
+  and the web typecheck, tests, and build, plus a gitleaks scan of the whole git history (the "Secret scan" job; the image is pinned in
+  the workflow). `.gitleaks.toml` allowlists only the two browser-storage key names in `web/src/lib/conversation.ts`, with
+  `condition = "AND"`: gitleaks combines an allowlist's `paths` and `regexes` with OR by default, which silently ignored every
+  generic-key finding in that file until a planted secret showed it. Test any change to that file by planting made-up secrets in a scratch
+  folder and checking they are still reported. A test must never depend on text that happens to be in the dev database: CI starts empty,
   so a test that needs a stored name or headline inserts its own (four tests had to be fixed for this). Check a workflow change with
   `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest`.
