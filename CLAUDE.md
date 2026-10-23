@@ -5,7 +5,7 @@ history see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DECISIONS.md]
 
 ## What this is
 
-Citewise for Markets (the repo and folder are still called `stockMarket`): an AI stock market research app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
+Citewise for Markets (the GitHub repo is `citewise-markets`; the local folder, the Docker container and the PowerShell window titles keep the old name `stockMarket`): an AI stock market research app, built bottom-up. Built so far: the data layer (`data/`, `db/`), the AI layer (`ai/`), a nightly
 refresh job (`jobs/`, scheduled in Windows Task Scheduler for 3pm Pacific), a FastAPI backend (`api/`) that is read-only except for starting an add and removing a company, and a
 React web app (`web/`) with four screens: dashboard (with a small "What changed" card), stock detail, "What changed"
 (`/changes`), and a full-page copilot that understands follow-ups

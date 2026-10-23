@@ -1,6 +1,6 @@
 # Citewise for Markets
 
-[![CI](https://github.com/Nbhaskell/stockMarket/actions/workflows/ci.yml/badge.svg)](https://github.com/Nbhaskell/stockMarket/actions/workflows/ci.yml)
+[![CI](https://github.com/Nbhaskell/citewise-markets/actions/workflows/ci.yml/badge.svg)](https://github.com/Nbhaskell/citewise-markets/actions/workflows/ci.yml)
 
 **A local-first research copilot for public companies.** Ask a question in plain English and get an answer written only
 from SEC filings, daily prices, financial figures, and news headlines. Every claim carries a numbered citation, and every
