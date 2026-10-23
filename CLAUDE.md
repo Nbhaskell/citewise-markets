@@ -97,12 +97,13 @@ The owner is building this step by step and is not a professional developer, so 
   start `python -m api` and `npm run dev` (port 5173), or run `scripts\start.ps1` (database, Ollama check, API, and
   web app in their own windows) and `scripts\stop.ps1` afterwards. Don't leave servers running.
 - Before a commit, run all of them: `python -m pytest`, and `npm run typecheck` plus `npm test` in `web/`.
-- Baseline as of 2026-10-19 (on `feature/remove-company`, after PR #55 merged): 2992 Python tests, 267 web tests, typecheck clean; before the removal work it was (on `feature/lowercase-tickers`): 2970 Python tests (260 web tests, typecheck clean, last run
-  before the router PR; nothing in `web/` changed since), all passing. `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
+- Baseline as of 2026-10-22: 2996 Python tests (run on `feature/clean-room-fixes`) and 300 web tests (run on `main`, nothing in `web/` changed since), typecheck clean, all passing.
+  The suite also passes on a fresh clone with an empty database (checked 2026-10-22; it needs `DB_CONTAINER` set if the database container is not named `stockmarket-db`).
+  `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
   before its tests (dead index entries from earlier test files crowded out its few passages) and passed 4 of 4 full runs afterwards. If it
   fails again, rerun before assuming a break. A full test run can still fail vector-search tests while an evaluation shares the database;
-  run the suite when no evaluation is running. Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, TSLA. The nightly
-  refresh ran at 3pm on 2026-10-16 (success, 0 problems).
+  run the suite when no evaluation is running. Tracked companies: AAPL, AMD, AMZN, GOOGL, MSFT, NVDA, SIG, TSLA, XOM (CRWV
+  is switched off). The nightly refresh ran at 3pm on 2026-10-22 (success, 0 problems).
 
 ## Rules
 

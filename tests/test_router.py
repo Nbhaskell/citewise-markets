@@ -319,7 +319,16 @@ def test_an_outside_verdict_does_not_stop_a_question_the_filings_can_answer(conn
     assert not ans.refused and emb.queries and llm.calls == ["route", "answer"]
 
 
+def store_a_swiss_headline(conn):
+    """`unknown_name` declines a capitalised name that appears in no stored text. These two questions are about "the Swiss franc", so
+    "Swiss" has to be stored (a database with real headlines happens to have it; a fresh one does not). The conn fixture deletes ids
+    that start with fake:zzm-."""
+    conn.execute("INSERT INTO news_articles (id, source, title, url, published_at) VALUES ('fake:zzm-swiss', 'fake', %s, 'https://x/s', now())",
+                 ("Swiss franc holds steady against the dollar",))
+
+
 def test_an_outside_verdict_gives_the_clearer_message_when_nothing_relevant_is_found(conn):
+    store_a_swiss_headline(conn)
     llm = RouterLLM(reply(category="outside"))
     emb = NothingMatches()
     ans = answer_question(conn, emb, llm, "Is the Swiss franc strengthening?", expand=False, router=True)
@@ -327,6 +336,7 @@ def test_an_outside_verdict_gives_the_clearer_message_when_nothing_relevant_is_f
 
 
 def test_without_an_outside_verdict_nothing_found_keeps_the_old_message(conn):
+    store_a_swiss_headline(conn)
     llm = RouterLLM(reply(category="research", filings=True))
     ans = answer_question(conn, NothingMatches(), llm, "Is the Swiss franc strengthening?", expand=False, router=True)
     assert ans.refused and "couldn't find anything" in ans.text
