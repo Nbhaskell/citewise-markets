@@ -5,7 +5,7 @@ machine). It keeps what was asked, how it was understood, which data was looked 
 that looked wrong can replace synthetic evaluation rounds (`python -m ai.review_questions` lists them and marks likely misses). It does not keep
 the sources' text.
 
-This is a server-side write that is not a new endpoint; the owner approved it on 2026-10-19 (CLAUDE.md: API rules). It must never break an
+This is a server-side write that is not a new endpoint; the owner approved it on 2026-10-19 (the project's API rules). It must never break an
 answer: any failure is reported on stderr and swallowed. Switch it off with `COPILOT_LOG=off` (also `0`, `false`, `no`, `none`); a blank or
 unrecognised value keeps it on. `COPILOT_LOG_FILE` points it somewhere else (the tests do). The test suite switches it off (tests/conftest.py).
 """

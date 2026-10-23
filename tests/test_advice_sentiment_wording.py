@@ -3,7 +3,7 @@
 "My friend says Nvidia is a sure thing. Is she right?" and "Would you say Alphabet is cheap right now?" got no notice that
 the app does not tell anyone to buy, sell or hold, and "Are reporters being kind or harsh to Nvidia right now?" was not read
 as a question about the tone of the news. A probe of 24 further everyday advice wordings found 21 unflagged. Missing an
-advice request is worse than one extra notice (CLAUDE.md), so the rules lean towards flagging; the negative cases keep that
+advice request is worse than one extra notice (a project rule), so the rules lean towards flagging; the negative cases keep that
 honest: a plain filings or figures question must not be told it asked for advice.
 """
 import pytest
