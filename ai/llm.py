@@ -3,6 +3,7 @@
 Pick one with LLM_PROVIDER in .env (default "ollama"). A Claude implementation is not
 written yet; it slots in here as another class plus one line in get_llm().
 """
+import re
 from typing import Optional, Protocol
 
 import requests
@@ -60,3 +61,7 @@ def get_llm() -> LLM:
     if provider == "ollama":
         return OllamaLLM(model=get_setting("OLLAMA_MODEL") or "qwen3:latest")
     raise RuntimeError(f"Unknown LLM_PROVIDER '{provider}'. Supported: ollama")
+
+
+def strip_thinking(text: str) -> str:
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()

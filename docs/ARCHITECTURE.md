@@ -45,13 +45,13 @@ nothing downstream.
 ```
 filings text -> chunking.py -> embeddings.py -> filing_chunks (pgvector)
                                                       |
-question (+ earlier turns, optional) -> copilot.py: resolve_question: rewrite a follow-up into a standalone question (LLM)
+question (+ earlier turns, optional) -> followups.py: resolve_question: rewrite a follow-up into a standalone question (LLM)
          -> find companies -> rewrite into extra searches (LLM)
          -> market.py: detect_intent (keyword rules): which of filings / prices / headlines / sentiment does it need?
          -> search.py (vector search, merged by reciprocal rank, near-duplicates dropped)   [filings]
          -> market.py: price facts, headlines, sentiment summary worked out in Python from the database
          -> relevance gate (filings) -> LLM answers from the numbered sources with [n] citations
-         -> citations, numbers, direction, and cause checks (one retry on failure) -> answer
+         -> answer_checks.py: citations, numbers, direction, and cause checks (one retry on failure) -> answer
 headlines -> sentiment.py -> LLM labels in batches (strict JSON) -> news_sentiment
 ```
 
@@ -62,7 +62,10 @@ headlines -> sentiment.py -> LLM labels in batches (strict JSON) -> news_sentime
 | Indexer | `ai/index_filings.py` | Commits per filing. Skips filings already indexed with the current model |
 | Search | `ai/search.py` | Cosine similarity with an HNSW index. Filters by ticker and form. `latest_only` keeps the newest filing of each form |
 | LLM interface | `ai/llm.py` | `generate(system, user, json_schema=None)`. Only `OllamaLLM` (Qwen3) exists. Pick with `LLM_PROVIDER` |
-| Copilot | `ai/copilot.py` | See the safety behaviors below |
+| Copilot | `ai/copilot.py` | Puts the pieces together in `answer_question`: the prompts, retrieval, and the fixed messages. See the safety behaviors below |
+| Follow-ups | `ai/followups.py` | The rewriting step and the code rules that carry an earlier question's topic or comparison over; also the rule that sends "What does Apple say about falling demand?" to the filings |
+| Answer checks | `ai/answer_checks.py` | The checks on what the model wrote, done in code: citations, figures and their direction, implied causes, made-up headlines, and false "no price" or "no news" claims |
+| Company names | `ai/companies.py` | Which tracked (or removed) companies a piece of text names |
 | Market evidence | `ai/market.py` | Turns stored prices, headlines, and sentiment labels into numbered sources. See "Prices, headlines, and sentiment in answers" |
 | Sentiment | `ai/sentiment.py` | Labels each headline from an investor's view of one company. `label_counts` turns labels into the totals and score: each story once per company, quote and "X vs Y" pages left out (shared rules in `data/headlines.py`) |
 

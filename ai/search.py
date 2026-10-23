@@ -3,6 +3,7 @@
 Usage: python -m ai.search "What are Apple's biggest risks?" [--symbol AAPL] [--form 10-K] [--limit 5] [--latest]
 """
 import argparse
+import re
 import sys
 from dataclasses import dataclass
 from datetime import date
@@ -28,6 +29,17 @@ WHERE (%(symbols)s::text[] IS NULL OR f.symbol = ANY(%(symbols)s))
 ORDER BY c.embedding <=> %(q)s::vector
 LIMIT %(limit)s
 """
+
+ANNUAL_RE = re.compile(r"\b(annual|10-?K|fiscal year|full[- ]year)\b", re.IGNORECASE)
+QUARTER_RE = re.compile(r"\b(quarter|quarterly|10-?Q)\b", re.IGNORECASE)
+
+
+def detect_forms(question: str) -> list[str] | None:
+    """Restrict to 10-Ks or 10-Qs when the question clearly asks for one; otherwise search both."""
+    annual, quarterly = bool(ANNUAL_RE.search(question)), bool(QUARTER_RE.search(question))
+    if annual != quarterly:
+        return ["10-K"] if annual else ["10-Q"]
+    return None
 
 
 @dataclass(frozen=True)
