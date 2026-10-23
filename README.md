@@ -122,7 +122,8 @@ The first three rows ran every case three times (36 cases x 3 = 108); the sealed
 different rounds are not the same bar, because the questions and some of the checks changed. The agreed
 stopping rule (stop tuning keywords at 85 to 90 percent on two rounds in a row) has **not** been met, and the worst misses
 are written up case by case in [docs/DECISIONS.md](docs/DECISIONS.md). A confident wrong answer matters more than a refusal,
-which is why the checks above run in code.
+which is why the checks above run in code. The story behind these numbers, including what was tried and dropped, is in the
+[case study](docs/CASE_STUDY.md).
 
 ## Try it
 
@@ -231,6 +232,7 @@ docs/        Setup, operations, API, architecture, and decisions
 
 | Read this | For |
 |---|---|
+| [docs/CASE_STUDY.md](docs/CASE_STUDY.md) | The story: how the copilot was made checkable, what the evaluations showed, and what was tried and dropped |
 | [docs/SETUP.md](docs/SETUP.md) | Installing, loading data, running the web app, the command cheat sheet, and the settings |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | The nightly refresh, adding and removing companies, the question log, and backups |
 | [docs/API.md](docs/API.md) | Every endpoint |
