@@ -76,8 +76,11 @@ steps; walk them through each one, and never change repository settings without 
 4. Turn on secret scanning with push protection, and Dependabot alerts (Settings, Advanced Security).
 5. Turn on "Automatically delete head branches" (Settings, General).
 6. Check that the README CI badge now shows the real status.
-7. Still open: the demo video link in the README, a "how this relates" section for each README (needs the owner's RAG
-   project description), and whether the case study mentions that it was built with Claude Code.
+7. Still open: a "how this relates" section for each README (needs the owner's RAG project description), and whether the
+   case study mentions that it was built with Claude Code.
+8. Optional, for later (owner's call, 2026-10-23): a short demo video (a silent 60 to 90 second clip of the copilot is
+   enough). The repo is complete without it. If the owner records one, add its link under "See it" in the README. Don't
+   keep bringing it up.
 
 ## Working with the owner
 
