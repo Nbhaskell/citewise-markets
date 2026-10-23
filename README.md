@@ -127,11 +127,12 @@ which is why the checks above run in code. The story behind these numbers, inclu
 
 ## Try it
 
-Needs Docker Desktop, Python 3.10 or later, Node.js, and [Ollama](https://ollama.com) with `qwen3:latest`. It was
-developed and is run on Windows 11; the Python and web code do not depend on Windows, but the launch scripts, task
+Needs Docker Desktop, Python 3.14, Node.js, and [Ollama](https://ollama.com) with `qwen3:latest`. Python 3.14 is what it
+was developed and tested on; the code needs 3.10 or later and other versions are untested. It was developed and is run on
+Windows 11; the Python and web code do not depend on Windows, but the launch scripts, task
 scheduling, and desktop alerts are PowerShell, and the commands below are written for PowerShell.
 
-```bash
+```powershell
 cp .env.example .env        # set POSTGRES_PASSWORD (also inside DATABASE_URL) and SEC_USER_AGENT
 docker compose up -d
 python -m venv .venv
@@ -158,7 +159,7 @@ type separately, are in [docs/SETUP.md](docs/SETUP.md).
 | Copilot | A full-page chat with follow-ups, saved history in the browser, a company filter, and an "Understood as" line showing how a follow-up was read |
 
 Under it: a data layer (prices, headlines, filings, and SEC figures in one Postgres database), an AI layer (chunking,
-local embeddings, search, copilot, sentiment), a nightly job, a read-only API (plus two approved writes: adding and
+local embeddings, search, copilot, sentiment), a nightly job, a read-only API (plus two writes: adding and
 removing a company), and the React app. The suite has about 3,000 Python tests and 300 web tests, which use fakes for every
 outside service, so most of them need no network and no model.
 
@@ -176,8 +177,8 @@ headline, or filing dataset in the repo to redistribute.
 
 The one place real market data appears in the repo is the screenshots above: they are a snapshot of one day's prices and
 headline titles, there to show the interface, not a dataset. Each source sits behind an interface in
-`data/sources/base.py`, so swapping a licensed feed in for either unofficial one means writing one class. That is the first
-thing to do before any launch.
+`data/sources/base.py`, so swapping a licensed feed in for either unofficial one means writing one class. That would be the first
+change to make before offering this to other people.
 
 ## Limitations
 
@@ -200,13 +201,13 @@ thing to do before any launch.
   when no backup has happened for days (a PC that is off sends none)
 - Accounts and login, portfolios, and alerts (the API has no login yet)
 - Deleting a removed company's stored data (removing stops tracking and keeps everything; there is no purge)
-- A natural-language stock screener and an "AI signal" (forecast) per stock, both in the original design sketches (not in this repo)
+- A natural-language stock screener and an "AI signal" (forecast) per stock (both planned, neither built)
 - More screens: screener, portfolio, alerts and settings. Only the dashboard, stock detail, what-changed, and copilot exist.
 - "Since last visit" is per browser (clearing site data or using another browser loses it), and "What changed" has no
   email or phone alert; the copilot can't answer "what changed today" from it
 - Conversation history that follows a user between devices (it's saved per browser; there are no accounts)
-- The original design's market indices strip, portfolio value, and "AI daily brief" on the dashboard, because no data or
-  accounts sit behind them yet
+- A market indices strip, portfolio value, and an "AI daily brief" on the dashboard (planned; no data or accounts sit
+  behind them yet)
 - A mobile app, and anything for putting the app online
 - A Claude (Anthropic API) implementation of the LLM interface
 - A paid, licensed market data feed
