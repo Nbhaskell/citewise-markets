@@ -11,6 +11,30 @@ It is a research tool, not a trading tool: it refuses to say whether to buy or s
 > unofficial sources that are not licensed for a public product. SEC EDGAR is public. The copilot summarizes stored data
 > and can be wrong.
 
+## See it
+
+Screenshots of the running app, taken on 2026-10-22 from its own stored data.
+
+**The copilot answers from stored figures and shows its cautions.** The P/E is worked out in Python from the SEC filings,
+the model only quotes it as source 1, and the two yellow cautions are attached in code, not written by the model.
+
+![The copilot answering a question about Alphabet's P/E ratio, with a numbered citation, an expandable source, and two cautions](docs/images/copilot-answer.png)
+
+**Dashboard:** the watchlist with trend and news mood, a summary of what changed on the latest trading day, and the latest
+positive and negative headlines.
+
+![The dashboard: a watchlist of tracked companies with prices, daily change, one-month trend and news mood, beside a What changed card and the latest headlines](docs/images/dashboard.png)
+
+**Stock page:** a price chart, key stats, and fundamentals, where each figure has its calculation one click away and the
+cautions appear above the numbers they affect.
+
+![A stock page for Alphabet with a one-year price chart, key stats, SEC filings, and a fundamentals card with two cautions](docs/images/stock-detail.png)
+
+**What changed:** new filings and unusually large moves, each measured against that company's own usual day. The headlines
+beside a move are labeled as timing only, because they cannot show why a price moved.
+
+![The What changed page listing a new Tesla 10-Q and four big moves, each with that day's headlines](docs/images/what-changed.png)
+
 ## What makes it interesting
 
 - **Every number is checked.** The model sees only numbered sources, and each figure in its answer must appear in a source
