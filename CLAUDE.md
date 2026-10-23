@@ -180,7 +180,8 @@ The owner is building this step by step and is not a professional developer, so 
   Node.js lives in `C:\Program Files\nodejs`; add it to `PATH` if a tool can't find `node`. Stop any dev servers you
   start (ports 5173 and 8000). If the browser shows old text after you edit a file, check what Vite serves
   (`curl http://localhost:5173/src/...`) and restart `npm run dev`; its file watcher has missed edits.
-- **Copilot follow-ups:** earlier turns may only be used to understand the latest question (`condense_question`). Never
+- **Copilot follow-ups (`ai/followups.py`; the checks on the model's answer are in `ai/answer_checks.py`, company names in
+  `ai/companies.py`, and `answer_question` stays in `ai/copilot.py`):** earlier turns may only be used to understand the latest question (`condense_question`). Never
   put them in the prompt that writes the answer, or an earlier answer could become evidence; a test guards this. Keep
   showing "Understood as", keep the "No company was named" notice, and validate anything read back from
   `localStorage`. After changing the rewrite prompt or the pronoun safeguard, run `python -m ai.eval_followups` (needs

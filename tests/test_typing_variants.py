@@ -90,13 +90,13 @@ def test_a_ticker_inside_a_longer_word_is_not_a_mention(conn):
 
 
 def test_a_blocked_word_ticker_is_still_matched_only_in_capitals(conn, monkeypatch):
-    monkeypatch.setattr("ai.copilot.LOWERCASE_TICKER_BLOCKLIST", frozenset({"zzma"}))
+    monkeypatch.setattr("ai.companies.LOWERCASE_TICKER_BLOCKLIST", frozenset({"zzma"}))
     assert company_mentions(conn, "how is zzma doing") == {}
     assert set(company_mentions(conn, "How is ZZMA doing")) == {"ZZMA"}
 
 
 def test_a_short_ticker_is_matched_only_in_capitals(conn, monkeypatch):
-    monkeypatch.setattr("ai.copilot.lowercase_ticker_ok", lambda symbol: False)
+    monkeypatch.setattr("ai.companies.lowercase_ticker_ok", lambda symbol: False)
     assert company_mentions(conn, "how is zzma doing") == {}
 
 
