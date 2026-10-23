@@ -38,7 +38,7 @@ start of the bold title to search for.
 | One Postgres with TimescaleDB and pgvector | One database to run and back up instead of three. Plenty for this size. Moving to separate stores later is possible |
 | Free prototype data sources behind interfaces | Lets us build without paying. The interfaces make a licensed feed a one-class swap |
 | Local embeddings (`bge-small-en-v1.5`) | Free, private, no API key. Related passages scored about 0.8 and unrelated about 0.4 in a quick check |
-| Local LLM through Ollama (Qwen3 8B) as the starting model | No paid API key was available. The `LLM` interface keeps Claude a drop-in later |
+| Local LLM through Ollama (Qwen3 8B) as the starting model | Free and private, with no account needed. The `LLM` interface keeps Claude a drop-in later |
 | Headlines only for news | The free feed has no article text. Enough for a mood score, not for deep analysis |
 | Filings stored whole, then chunked | Keeps the original text so re-chunking or re-embedding never needs a re-download |
 | Nightly job as a plain Python command, scheduled by Windows Task Scheduler | No extra services to run. Works for a personal dev machine. A hosted deployment would use a cron job or a cloud scheduler running the same command |

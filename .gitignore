@@ -6,5 +6,5 @@ node_modules/
 .DS_Store
 logs/
 backups/
-# Working notes for the AI assistant; kept on the owner's PC, not published
+# Local working notes, not published
 CLAUDE.md
