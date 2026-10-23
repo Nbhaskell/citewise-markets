@@ -28,7 +28,7 @@ function Missing({ title, hint }: { title: string; hint: string }) {
       <h1 className="page-title">{title}</h1>
       <p className="muted">{hint}</p>
       <p>
-        <Link to="/">Back to the dashboard</Link>
+        <Link className="tap" to="/">Back to the dashboard</Link>
       </p>
     </section>
   );
@@ -77,7 +77,7 @@ function StockDetailView({ symbol }: { symbol: string }) {
   return (
     <>
       <nav className="crumbs">
-        <Link to="/">← Dashboard</Link>
+        <Link className="tap" to="/">← Dashboard</Link>
       </nav>
 
       <header className="stock-head">

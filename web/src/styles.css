@@ -83,7 +83,10 @@ th, td { padding: 9px 8px; border-bottom: 1px solid var(--border); text-align: l
 thead th { color: var(--muted); font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
 thead th.num { text-align: right; }
 tbody th { white-space: nowrap; }
-.symbol { font-weight: 700; margin-right: 6px; }
+.symbol { font-weight: 700; margin-right: 6px; display: inline-block; padding: 2px 0; }
+/* A link on a line of its own: tall enough to tap (24px) without changing how it looks */
+.tap { display: inline-flex; align-items: center; min-height: 24px; }
+input[type="checkbox"] { width: 1.5rem; height: 1.5rem; }
 .trend-col { width: 110px; }
 
 .sparkline polyline { stroke: currentColor; }
@@ -116,7 +119,7 @@ button.primary { background: var(--accent); color: var(--accent-text); border-co
 .sources li { padding: 4px 6px; border-radius: 6px; }
 .sources li.highlight { background: var(--highlight); }
 .excerpt { margin: 6px 0 0; color: var(--muted); white-space: pre-wrap; max-height: 11rem; overflow: auto; }
-details summary { cursor: pointer; color: var(--muted); }
+details summary { cursor: pointer; color: var(--muted); padding: 3px 0; } /* 20px tall before; at least 24px now */
 
 /* Stock detail page */
 .crumbs { padding: 4px 0 6px; font-size: 0.9rem; }
@@ -204,6 +207,7 @@ details summary { cursor: pointer; color: var(--muted); }
 }
 .add-company .add-form input {
   min-width: 8rem;
+  min-height: 1.75rem; /* at least 24px tall (it was 21px) */
 }
 .add-report h4 {
   margin: 0.75rem 0 0.25rem;
@@ -274,12 +278,20 @@ details summary { cursor: pointer; color: var(--muted); }
 .removed-item { padding: 8px 0; border-bottom: 1px solid var(--border); }
 .removed-item:last-child { border-bottom: 0; }
 .removed-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
-.removed-line .symbol { opacity: 0.7; margin-right: 0; }
-.removed-line .muted { flex: 1 1 8rem; opacity: 0.85; }
+/* A removed company is dimmed with the muted colour, not with opacity: opacity on top of it took the text under the 4.5:1 contrast minimum (4.06:1 in light mode) */
+.removed-line .symbol { color: var(--muted); margin-right: 0; }
+.removed-line .muted { flex: 1 1 8rem; }
 .removed-line .tracking-switch { margin-top: 0; }
 .removed-item .confirm-box { margin-top: 8px; }
 
 /* The question under a watchlist row: the table can be wider than the card (it scrolls sideways), so the box keeps the card's visible width */
 .table-wrap { container-type: inline-size; }
+/* In a narrow card (a phone) the watchlist keeps the company, price, and day. With the trend and mood columns the table was wider than the
+   card, so the price was cut off mid-number and the other columns sat out of sight; both stay on the stock page. Company names may wrap. */
+@container (max-width: 520px) {
+  .watch-optional { display: none; }
+  tbody th { white-space: normal; }
+  th, td { padding-left: 6px; padding-right: 6px; } /* five narrow columns (the filings list) were 5px wider than the card */
+}
 .confirm-row td { padding: 8px 0; }
 .confirm-row .confirm-box { position: sticky; left: 0; width: 100cqw; max-width: 100cqw; }

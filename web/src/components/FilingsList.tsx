@@ -48,7 +48,7 @@ export function FilingsList({ symbol }: { symbol: string }) {
                   </td>
                   <td>
                     {safeHttpUrl(f.url) && (
-                      <a href={safeHttpUrl(f.url)} target="_blank" rel="noopener noreferrer">
+                      <a className="tap" href={safeHttpUrl(f.url)} target="_blank" rel="noopener noreferrer">
                         View on SEC
                       </a>
                     )}

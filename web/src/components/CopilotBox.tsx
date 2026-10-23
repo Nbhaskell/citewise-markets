@@ -88,7 +88,7 @@ export function CopilotBox({ symbol, examples = DEFAULT_EXAMPLES }: Props) {
       </form>
       {hint && <p role="alert" className="error small">{hint}</p>}
 
-      <div className="chips" aria-label="Example questions">
+      <div className="chips" role="group" aria-label="Example questions">
         {examples.map((example) => (
           <button
             key={example}

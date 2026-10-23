@@ -9,6 +9,7 @@ import { Watchlist } from "../components/Watchlist";
 export function Dashboard() {
   return (
     <>
+      <h1 className="sr-only">Dashboard</h1>
       <FreshnessBar />
       <div className="dashboard-grid">
         <div className="col">

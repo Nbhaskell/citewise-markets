@@ -29,7 +29,7 @@ export function ChangesFilings({ filings, newest }: { filings: ChangeFiling[]; n
                 </span>
               </div>
               {safeHttpUrl(f.url) && (
-                <a href={safeHttpUrl(f.url)} target="_blank" rel="noopener noreferrer">
+                <a className="tap" href={safeHttpUrl(f.url)} target="_blank" rel="noopener noreferrer">
                   View on SEC
                 </a>
               )}

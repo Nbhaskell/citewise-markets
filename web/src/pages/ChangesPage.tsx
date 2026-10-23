@@ -122,7 +122,7 @@ export function ChangesPage() {
           </div>
         )}
         <p className="muted small">
-          <Link to="/">Back to the dashboard</Link>
+          <Link className="tap" to="/">Back to the dashboard</Link>
         </p>
       </div>
     </>

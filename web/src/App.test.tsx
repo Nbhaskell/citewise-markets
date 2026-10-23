@@ -23,6 +23,14 @@ describe("App", () => {
     expect(screen.getByText(/Not financial advice/, { selector: "header span" })).toBeInTheDocument();
   });
 
+  it("gives the dashboard a top-level heading for screen readers (it is not shown)", async () => {
+    mockApi(defaultRoutes());
+    renderAt("/");
+    const heading = await screen.findByRole("heading", { level: 1, name: "Dashboard" });
+    expect(heading).toHaveClass("sr-only");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
   it("keeps working when one panel's data fails", async () => {
     mockApi({ ...defaultRoutes(), "GET /api/news": new Response("boom", { status: 500 }) });
     renderAt("/");
