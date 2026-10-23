@@ -159,11 +159,28 @@ local embeddings, search, copilot, sentiment), a nightly job, a read-only API (p
 removing a company), and the React app. The suite has about 3,000 Python tests and 300 web tests, which use fakes for every
 outside service, so most of them need no network and no model.
 
+## Data sources and licensing
+
+The sources are documented here and in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and no unlicensed data is committed to
+this repository. The app downloads its own data onto your machine when you run it (see "Try it"), so there is no price,
+headline, or filing dataset in the repo to redistribute.
+
+| Source | Used for | Status |
+|---|---|---|
+| SEC EDGAR | 10-K and 10-Q filings, reported financial figures | Public data. The app sends a contact email in its request header, as the SEC requires, and stays under its request limit |
+| Yahoo Finance (through `yfinance`) | Daily prices | Free and unofficial. **Not licensed for a public product** |
+| Google News (public RSS feed) | Headline titles only, never article text | Free and unofficial. **Not licensed for a public product** |
+
+The one place real market data appears in the repo is the screenshots above: they are a snapshot of one day's prices and
+headline titles, there to show the interface, not a dataset. Each source sits behind an interface in
+`data/sources/base.py`, so swapping a licensed feed in for either unofficial one means writing one class. That is the first
+thing to do before any launch.
+
 ## Limitations
 
 - **Answers come from a small local model and can be wrong.** The numbers, direction, and cause checks catch a lot, but
   not wording, and the routing is mostly keyword rules (see the scores above).
-- **Prototype data.** Yahoo Finance and Google News are not licensed for a public product; replace them before any launch.
+- **Prototype data.** Yahoo Finance and Google News are not licensed for a public product; see "Data sources and licensing" above.
 - **US filers only for filings and figures.** Companies that file a 20-F instead of a 10-K (TSM, ASML) get prices and
   headlines, but no filings or fundamentals.
 - **One user, no login, local only.** The API listens on `127.0.0.1` and accepts the local web app's origin. That is
