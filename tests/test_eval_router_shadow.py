@@ -169,7 +169,7 @@ def test_the_plan_counts_every_case_once_per_group():
     text = plan(cases, 3)
     dev = [c for c in cases if c.name.startswith("sl ")]
     older = [c for c in cases if not c.name.startswith("sl ")]
-    assert f"development (sl): " in text and f"/{len(dev)}\n" in text + "\n" and f"/{len(older)}" in text
+    assert "development (sl): " in text and f"/{len(dev)}\n" in text + "\n" and f"/{len(older)}" in text
 
 
 # ---- which cases are measured ----

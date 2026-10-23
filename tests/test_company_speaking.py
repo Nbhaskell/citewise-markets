@@ -11,7 +11,7 @@ with prices, headlines and a filing (tests/test_market.py). Nothing here calls a
 import pytest
 
 from ai.copilot import answer_question, company_is_speaking, route_by_speaker
-from ai.market import Intent, detect_intent
+from ai.market import detect_intent
 from test_market import FakeEmbedder, conn  # noqa: F401  (conn is a fixture)
 from test_router import RouterLLM, reply
 
