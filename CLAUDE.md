@@ -107,7 +107,7 @@ The owner is building this step by step and is not a professional developer, so 
   chunks and dead entries; with the setting, 10 of 10 such runs passed. `tests/test_exact_search.py` checks that the setting stays on and
   that the HNSW index still exists and can be used. A new search test should not expect the index to behave; if you want to test the
   index path, set `enable_indexscan = on` on that connection deliberately.
-- Baseline as of 2026-10-23: 2998 Python tests (run on `feature/stabilize-removal-test`) and 300 web tests (run on `main`, nothing in `web/` changed since), typecheck clean, all passing.
+- Baseline as of 2026-10-23: 3008 Python tests and 303 web tests (both run on `feature/ui-polish`), typecheck clean, all passing.
   The suite also passes on a fresh clone with an empty database (checked 2026-10-22; it needs `DB_CONTAINER` set if the database container is not named `stockmarket-db`).
   `tests/test_search.py` used to fail one or two tests in about half of the full runs; it now vacuums the vector table right
   before its tests (dead index entries from earlier test files crowded out its few passages) and passed 4 of 4 full runs afterwards. If it
@@ -162,6 +162,12 @@ The owner is building this step by step and is not a professional developer, so 
   depend on them, and keep copilot answers passing through the `unverified_numbers` field. Tests override the
   embedder, chat model, and sentiment model via `app.dependency_overrides`; don't load real models in tests.
   Stop any server you start for a manual check.
+- **Web app (`web/`) styling:** jsdom does not apply stylesheets (`css: false` in the Vitest config, which even empties a `?raw` import), so a
+  CSS rule that fixes a real defect is tested as text in `tests/test_web_styles.py`, and the web tests check the markup (classes, headings,
+  roles). The phone watchlist (a container query that hides the trend and mood columns in a card under 520 px), the contrast of dimmed text
+  (use the muted colour, never opacity, on text), and the 24 px minimum for tap targets are covered there; check a layout change in a real
+  browser at 375 px, 768 px, and 1280 px, in light and dark, and run an axe-core scan (DECISIONS: "On a phone-width screen the watchlist
+  showed a cut-off price").
 - **Web app (`web/`):** its types are generated, never hand-copied. After changing an endpoint or response shape, run
   `python -m api.export_openapi` then `npm run gen:api` in `web/` (the Python contract test fails otherwise). Keep
   TypeScript on 5.x (see DECISIONS). Never use `dangerouslySetInnerHTML` or render API text as HTML, and run any

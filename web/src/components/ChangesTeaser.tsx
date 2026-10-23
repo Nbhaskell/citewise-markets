@@ -57,7 +57,7 @@ export function ChangesTeaser() {
         </>
       )}
       <p className="muted small note">
-        <Link to="/changes">See everything that changed →</Link>
+        <Link className="tap" to="/changes">See everything that changed →</Link>
       </p>
     </section>
   );

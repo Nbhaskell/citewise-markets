@@ -35,10 +35,10 @@ function Row({ stock, switchDisabled, onToggle }: { stock: StockSummary; switchD
       </th>
       <td className="num">{formatPrice(stock.last_price)}</td>
       <td className={`num ${dir}`}>{formatChangePct(stock.change_pct)}</td>
-      <td className="trend-col">
+      <td className="trend-col watch-optional">
         <TrendCell symbol={stock.symbol} />
       </td>
-      <td>
+      <td className="watch-optional">
         <MoodPill mood={moodFor(s)} />
         <span className="muted block small" title={`Headlines in the last ${s.days} days`}>
           {s.positive} positive · {s.negative} negative · {s.neutral} routine
@@ -106,8 +106,8 @@ export function Watchlist({ pollMs }: { pollMs?: number } = {}) {
                 <th scope="col">Company</th>
                 <th scope="col" className="num">Price</th>
                 <th scope="col" className="num">Day</th>
-                <th scope="col">1 month</th>
-                <th scope="col">News mood</th>
+                <th scope="col" className="watch-optional">1 month</th>
+                <th scope="col" className="watch-optional">News mood</th>
               </tr>
             </thead>
             <tbody>

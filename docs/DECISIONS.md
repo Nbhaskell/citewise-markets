@@ -2062,9 +2062,23 @@ start of the bold title to search for.
   automated contrast check found no text below 4.5:1 (140 elements on the copilot page, none failing on the others),
   the price line is 6:1 against the background, and the chart's gridlines are deliberately faint (1.3:1). Warnings
   and pills carry words, not just color. Not checked in light mode: the stock detail page and the copilot at 375 px, and the filings list.
-- **On a phone-width screen the watchlist hides its last two columns.** At 375 px the table is about 500 px wide
-  inside a scrolling box, so the 1-month chart and the News mood column are off-screen until you scroll sideways,
-  with nothing hinting that you can. Found during the light-mode check; it is the same in dark mode. Not fixed.
+- **On a phone-width screen the watchlist showed a cut-off price (found 2026-10-19, fixed 2026-10-23).** At 375 px the table was
+  about 500 px wide (585 px once the tracking switch was added) inside a scrolling box, so the price was cut off mid-number
+  ("$348.2" for $348.22) and the 1-month chart and News mood were off-screen with nothing hinting that you could scroll. The
+  company cell was `white-space: nowrap`, so a name like "ExxonMobil Holdings Corporation" alone took 255 px. **Fix
+  (`feature/ui-polish`, owner's choice of layout):** when the card holding the table is narrower than 520 px (a container query on
+  `.table-wrap`, so it follows the card, not the screen), the watchlist shows company, price, and day only, and company names wrap;
+  the trend and mood stay on the stock page. Between about 520 px and the width the full table needs, it still scrolls sideways as
+  before. **How it was found and checked:** a product check on 2026-10-23 at 375 px, 768 px, and 1280 px, in light and dark, with the
+  axe-core accessibility scanner (loaded temporarily from a CDN into the local page) on all four pages. Before: the dashboard had two
+  violations (no level-one heading; the dimmed "not tracked" line at 4.06:1 contrast, from `opacity: 0.85` on top of the muted colour)
+  and the other pages none. After: zero violations on all four pages, light and dark, at 375 px; 768 px and 1280 px also clean, with all
+  five watchlist columns shown. Also done: a hidden `h1` on the dashboard, the example-questions group given `role="group"`, ticker and
+  stand-alone links, checkboxes, the ticker field and the "How this was calculated" toggles made at least 24 px tall, and the filings list
+  narrowed 5 px so it no longer scrolls sideways. **Not covered:** a real phone, a screen reader, 200% zoom, and inline links in text
+  (the standard exempts them, so about a dozen headline links on the wider pages are still under 24 px tall by my stricter measure).
+  jsdom does not apply stylesheets, so the CSS rules are tested as text in `tests/test_web_styles.py` (the web tests cover the markup:
+  the classes, the heading, the group role); six deliberate breakages were each caught.
 - **The dashboard is for local development only:** no login, no production build served anywhere, no HTTPS. The
   production build (`npm run build`) compiles but hasn't been deployed or served.
 - **Tests fake the network.** The web tests use a fake `fetch`. They were backed by one real browser session (watchlist

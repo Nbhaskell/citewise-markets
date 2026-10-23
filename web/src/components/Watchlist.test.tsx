@@ -23,6 +23,24 @@ describe("Watchlist", () => {
     expect(await within(nvda).findByRole("img", { name: /NVDA price/ })).toHaveClass("down");
   });
 
+  it("marks the trend and mood columns as optional, so a phone can hide them and keep company, price and day", async () => {
+    mockApi(defaultRoutes());
+    render(<Watchlist />);
+    const aapl = (await screen.findByRole("rowheader", { name: /AAPL/ })).closest("tr")!;
+
+    for (const name of ["1 month", "News mood"]) {
+      expect(screen.getByRole("columnheader", { name })).toHaveClass("watch-optional");
+    }
+    for (const name of ["Company", "Price", "Day"]) {
+      expect(screen.getByRole("columnheader", { name })).not.toHaveClass("watch-optional");
+    }
+    expect(within(aapl).getByText("$340.97").closest("td")).not.toHaveClass("watch-optional");
+    expect(within(aapl).getByText("▲ +1.29%").closest("td")).not.toHaveClass("watch-optional");
+    expect(await within(aapl).findByRole("img", { name: /AAPL price, last month/ })).toBeInTheDocument();
+    expect(within(aapl).getByRole("img", { name: /AAPL price, last month/ }).closest("td")).toHaveClass("watch-optional");
+    expect(within(aapl).getByText("Neutral").closest("td")).toHaveClass("watch-optional");
+  });
+
   it("links each company to its detail page", async () => {
     mockApi(defaultRoutes());
     render(<Watchlist />);

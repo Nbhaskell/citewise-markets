@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CopilotBox } from "./CopilotBox";
 import { AnswerText } from "./AnswerText";
@@ -10,6 +10,13 @@ async function ask(text: string) {
 }
 
 describe("CopilotBox", () => {
+  it("labels the example questions as a group, so a screen reader announces the label", () => {
+    mockApi({});
+    render(<CopilotBox />);
+    const group = screen.getByRole("group", { name: "Example questions" });
+    expect(within(group).getAllByRole("button").length).toBeGreaterThan(0);
+  });
+
   it("shows a cited answer with its sources and the disclaimer", async () => {
     const fetchMock = mockApi({ "POST /api/copilot": copilotAnswer() });
     render(<CopilotBox />);
