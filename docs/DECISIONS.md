@@ -4,6 +4,11 @@ A record of why things are the way they are, and what testing showed. Numbers ar
 (AAPL, MSFT, NVDA, GOOGL, AMZN, TSLA); AMD was added on 2026-10-15, so later entries (the "What changed" ones) cover seven. Most evaluations were small and hand-read, so treat them as spot checks, not
 benchmarks.
 
+**File names in this log are as they were when each entry was written.** The code has been reorganised since: `ai/market.py`
+is now the package `ai/market/` (modules `topics`, `advice`, `scope`, `intent`, `windows`, `premise` and `evidence`),
+`ai/copilot.py` was split into `copilot`, `followups`, `answer_checks` and `companies`, and the evaluation cases moved from
+`ai/eval_market.py` into `ai/eval_cases/`. If a path in an entry no longer exists, search the code for the function name.
+
 ## Highlights
 
 This file is long (about 2,000 lines). If you read only a few entries, read these. The story that connects them is in
