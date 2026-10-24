@@ -155,4 +155,7 @@ If printing filing text fails with an encoding error in a Windows console, set `
 | `DB_CONTAINER` | no | Name of the database container the backup runs `pg_dump` in. Defaults to `stockmarket-db` |
 | `API_PORT` | no | Port for the API. Defaults to `8000` |
 | `CORS_ORIGINS` | no | Comma-separated web app addresses the API accepts. Defaults to localhost on ports 5173 and 3000 |
+| `COPILOT_ROUTER` | no | The local model picks the kind of evidence (filings, prices, figures, headlines) for a question the keyword rules do not recognise. On by default; `off` (also `0`, `false`, `no`, `none`) turns it off, so only the keyword rules route. When it changes what is searched, the answer says so |
+| `COPILOT_LOG` | no | Every question asked in the web app is appended, with its answer, to a log on this PC (see [OPERATIONS.md](OPERATIONS.md#your-questions)). On by default; `off` (also `0`, `false`, `no`, `none`) turns it off |
+| `COPILOT_LOG_FILE` | no | Where that log is written. Defaults to `logs/copilot_questions.jsonl` in the project |
 
