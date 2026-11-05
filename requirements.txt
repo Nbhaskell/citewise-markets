@@ -1,19 +1,19 @@
-# Exact versions of everything installed when the tests passed (2026-10-23, Python 3.14).
+# Exact versions of everything installed when the tests passed (2026-11-05, Python 3.14).
 # The packages the project asks for directly are in requirements.in; the rest are what those pull in.
 # To update: install requirements.in into a new virtual environment, run the tests, then replace this file with `pip freeze`.
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
 beautifulsoup4==4.15.0
-certifi==2026.7.22
+certifi==2026.10.23
 cffi==2.1.1
 charset-normalizer==3.5.2
 click==8.5.0
 colorama==0.4.6
 curl_cffi==0.16.3
 fastapi==0.143.0
-fastembed==0.9.0
-filelock==4.1.1
+fastembed==0.9.1
+filelock==4.2.9
 flatbuffers==25.12.19
 fsspec==2026.9.0
 h11==0.16.0
@@ -33,7 +33,7 @@ opentelemetry-api==1.45.1
 packaging==26.3
 pandas==3.0.6
 peewee==4.5.3
-pillow==12.3.0
+pillow==13.0.0
 platformdirs==4.13.0
 pluggy==1.6.0
 protobuf==7.36.2
