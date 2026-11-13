@@ -144,7 +144,7 @@ PERIOD_COMPARE_RE = re.compile(
 BARE_STOCK_RE = re.compile(
     r"^\W*(?:(?:and|or|so|ok|okay|then|also|now|what|how|about|what's|whats|how's|hows)[\s,]+)*"
     r"(?!(?:the|its|their|this|that|these|those|a|an|my|your|our|what|which|who|why|how|any|some|each|every|no|"
-    r"penny|growth|value|tech|cheap)\b)[\w.&-]+(?:['’]s)?\s+(?:stocks?|shares?)"
+    r"penny|growth|value|tech|cheap)\b)\w[\w.&-]*(?:['’]s)?\s+(?:stocks?|shares?)"
     r"(?:[\s,]+(?:now|currently|right now|today|please|then|too|again|as well|at the moment|lately))*\W*$",
     re.IGNORECASE,
 )

@@ -14,7 +14,7 @@ from typing import Optional
 import psycopg
 
 from .db import connect, get_setting
-from .sources.edgar import EdgarClient, parse_company_facts
+from .sources.edgar import EdgarClient, is_placeholder_user_agent, parse_company_facts
 
 log = logging.getLogger("refresh")
 
@@ -63,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     user_agent = get_setting("SEC_USER_AGENT")
-    if not user_agent or "example.com" in user_agent:
+    if is_placeholder_user_agent(user_agent):
         sys.exit("Set SEC_USER_AGENT in .env to your name and contact email (SEC requires it).")
 
     edgar = EdgarClient(user_agent)
