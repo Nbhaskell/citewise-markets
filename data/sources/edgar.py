@@ -41,6 +41,17 @@ def _date(value: Optional[str]) -> Optional[date]:
     return date.fromisoformat(value) if value else None
 
 
+def is_placeholder_user_agent(user_agent: Optional[str]) -> bool:
+    """True when SEC_USER_AGENT is empty or still carries the example address from .env.example (an example.com mail host)."""
+    if not user_agent:
+        return True
+    for token in user_agent.split():
+        host = token.rpartition("@")[2].strip("<>(),;").lower() if "@" in token else ""
+        if host == "example.com" or host.endswith(".example.com"):
+            return True
+    return False
+
+
 class EdgarClient:
     def __init__(self, user_agent: str, min_interval: float = 0.15):
         self._session = requests.Session()

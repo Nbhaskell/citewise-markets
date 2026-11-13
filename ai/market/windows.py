@@ -119,7 +119,7 @@ def _numbered_period(question: str) -> Optional[Window]:
     else:
         return None
     if rough:  # few / couple / several
-        word = re.sub(r"\s+of$", "", rough.lower())
+        word = rough.lower().split()[0]  # "couple of" -> "couple"
         n, note = _ROUGH_AMOUNTS[word], f" (reading '{word}' as {_ROUGH_AMOUNTS[word]})"
     else:
         n, note = _to_int(number), ""
