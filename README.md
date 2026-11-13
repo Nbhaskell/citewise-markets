@@ -239,6 +239,7 @@ docs/        Setup, operations, API, architecture, and decisions
 | [docs/API.md](docs/API.md) | Every endpoint |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The design, layer by layer |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Why things are the way they are, the evaluation rounds, and the known weak spots |
+| [SECURITY.md](SECURITY.md) | How to report a vulnerability privately, and what is in scope |
 
 ## A related project
 
