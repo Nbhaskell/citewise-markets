@@ -24,6 +24,9 @@ if (-not (Test-Path $python)) { throw "Can't find $python. Create the virtual en
 
 $action = New-ScheduledTaskAction -Execute $python -Argument "-X utf8 -m jobs.refresh" -WorkingDirectory $root
 $trigger = New-ScheduledTaskTrigger -Daily -At $Time
+# New-ScheduledTaskTrigger stores the start with a UTC offset ("...T15:00:00-07:00"), which pins the task to one UTC time: after a
+# daylight-saving change it runs an hour early or late. A start with no offset is read as local clock time, all year.
+$trigger.StartBoundary = ([datetime]$Time).ToString("yyyy-MM-ddTHH:mm:ss")
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit (New-TimeSpan -Hours 2) -MultipleInstances IgnoreNew
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited

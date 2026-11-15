@@ -55,7 +55,9 @@ powershell -ExecutionPolicy Bypass -File scripts\register_nightly_task.ps1 -Time
 ```
 
 Use 3pm (Pacific). Yahoo left out the day's closing price when the job ran at 5pm, so the stored prices stayed a day
-behind; see "Prices were always a day behind" in `docs/DECISIONS.md`.
+behind; see "Prices were always a day behind" in `docs/DECISIONS.md`. The time is local clock time and stays at 3pm
+across daylight-saving changes. A task registered before 2026-11-15 was pinned to one UTC time and ran an hour early in
+winter; run the register script again to correct it (the same applies to the backup task).
 
 Remove it with `powershell -File scripts\unregister_nightly_task.ps1`. The task only runs while you are logged in,
 and if the PC was off at the scheduled time it runs when you next log in. **Docker Desktop and Ollama must be running**
